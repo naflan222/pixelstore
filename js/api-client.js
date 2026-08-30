@@ -303,9 +303,11 @@
     'cart.html': async function () {
       const tbody = $('.cart-table tbody');
       if (!tbody) return;
+      const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
+      // Hide the demo total IMMEDIATELY so it never flashes before real data loads
+      if (totalWrap) totalWrap.style.display = 'none';
       let data;
       try { data = await get('/cart'); } catch (err) { return; }
-      const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
 
       function render(items) {
         if (!items.length) {
@@ -349,6 +351,9 @@
 
     'checkout.html': async function () {
       // Works for guests too — billing info is entered right on this page
+      const checkoutTotal = $('.cart-amount-area');
+      // Hide the demo "Rs. 39.84" IMMEDIATELY so it never flashes before real data loads
+      if (checkoutTotal) checkoutTotal.style.display = 'none';
       const billingCard = $('.billing-information-card .user-data-card .card-body');
       const billing = currentUser ? {
         name: currentUser.full_name || currentUser.username || '',
@@ -416,6 +421,8 @@
       function updateTotal() {
         const totalEl = $('.cart-amount-area .counter');
         if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US');
+        // Only reveal the total bar once it holds the REAL cart total
+        if (checkoutTotal && subtotal > 0) checkoutTotal.style.display = '';
       }
       $$('input[name="selector"]').forEach((r) => r.addEventListener('change', updateTotal));
       updateTotal();
@@ -640,11 +647,10 @@
       if (!input) return;
       form.setAttribute('autocomplete', 'off');
 
-      // Raise the search area above the image slider and product grids
+      // Keep the sticky search bar BELOW the fixed navbar (navbar is z-index 1000),
+      // while the suggestions dropdown (z-index 1200) still floats above sliders/products
       const searchWrap = form.closest('.search-form');
-      if (searchWrap) { searchWrap.style.position = 'relative'; searchWrap.style.zIndex = '1100'; }
-      const headerArea = form.closest('.header-area');
-      if (headerArea) { headerArea.style.zIndex = '1100'; }
+      if (searchWrap) { searchWrap.style.zIndex = '999'; }
 
       const box = document.createElement('div');
       box.className = 'search-suggestions';

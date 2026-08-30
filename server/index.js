@@ -33,20 +33,22 @@ function shopAssistant(message) {
 
   if (/price|cost|how much|rate/.test(msg) && matches.length) {
     const p = matches[0];
-    return `The ${p.name} costs ${fmt(p.price)}${p.old_price ? ` (was ${fmt(p.old_price)})` : ''}. We currently have ${p.stock} in stock. You can view it here: ${p.slug}.html`;
+    return `The ${p.name} costs ${fmt(p.price)}${p.old_price ? ` (was ${fmt(p.old_price)})` : ''}. We currently have ${p.stock} in stock — you can add it to your cart right from the product page!`;
   }
   if (matches.length) {
     const list = matches.slice(0, 3).map(p => `• ${p.name} — ${fmt(p.price)}`).join('\n');
-    return `Here's what I found:\n${list}\n\nTap a product on the shop page to see full details, or ask me about a price!`;
+    return `Here's what I found for you:\n${list}\n\nWould you like the price or details of any of these?`;
   }
   if (/cheap|budget|low price|afford/.test(msg)) {
     const cheapest = [...products].sort((a, b) => a.price - b.price).slice(0, 3);
-    return 'Our most affordable items:\n' + cheapest.map(p => `• ${p.name} — ${fmt(p.price)}`).join('\n');
+    return 'Our most affordable items right now:\n' + cheapest.map(p => `• ${p.name} — ${fmt(p.price)}`).join('\n');
   }
   if (/sale|offer|discount|deal|flash/.test(msg)) {
     const onSale = products.filter(p => p.old_price).slice(0, 4);
-    return 'Current deals:\n' + onSale.map(p => `• ${p.name} — ${fmt(p.price)} (was ${fmt(p.old_price)})`).join('\n');
+    return 'Here are our current deals:\n' + onSale.map(p => `• ${p.name} — ${fmt(p.price)} (was ${fmt(p.old_price)})`).join('\n');
   }
+  if (/buy|order|how can i get|purchase/.test(msg))
+    return 'Ordering is easy — no account needed! Just tap a product, hit the "+" button to add it to your cart, then open the Cart tab and tap "Checkout Now". Fill in your name, phone and address, choose delivery and payment — done! 🛒';
   if (/shipping|deliver|courier|dispatch/.test(msg))
     return 'We offer three delivery options at checkout: Fast Shipping (1 day, Rs. 500), Regular (3–7 days, Rs. 250), and Courier (5–8 days, free). You can pick your preferred one on the checkout page.';
   if (/payment|pay|card|paypal|cash/.test(msg))
@@ -54,13 +56,13 @@ function shopAssistant(message) {
   if (/order|track|status|purchase/.test(msg))
     return 'You can see all your orders on the "My Orders" page (my-order.html) after logging in. Each order shows its items, total and status.';
   if (/return|refund|exchange|warranty/.test(msg))
-    return 'For returns, refunds or warranty questions, please message us via the Contact page (contact.html) and our team will help you within 24 hours.';
+    return 'For returns, refunds or warranty questions, please reach out via our Contact page and the PixelHouse team will help you within 24 hours.';
   if (/hi|hello|hey|assalam|salam/.test(msg))
-    return 'Hello! 👋 Welcome to Pixels. I can help you find GoPro accessories, check prices, explain shipping or payments. What are you looking for?';
+    return 'Hello! 👋 Welcome to PixelHouse. I can help you find GoPro accessories, check prices, explain shipping or payments. What are you looking for?';
   if (/thank/.test(msg))
     return 'You\'re most welcome! Happy shooting 📷 Anything else I can help with?';
 
-  return 'I can help with: product prices & availability, current deals, shipping options, payment methods, and order tracking. Try asking "price of dome port" or "any deals?"';
+  return 'I can help with product prices, availability, current deals, shipping options and payment methods. Try asking "price of dome port" or "any deals?" 😊';
 }
 
 app.post('/api/chat', async (req, res) => {

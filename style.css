@@ -5664,3 +5664,32 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   margin-left: 0;
   margin-right: 1rem;
 }
+/* ===== PixelHouse chat improvements ===== */
+/* Input bar layout */
+.chat-input-form { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; }
+.chat-input-form textarea { flex: 1; resize: none; border-radius: 1.5rem !important; padding: 0.625rem 1rem !important; max-height: 6rem; }
+/* Professional circular send button */
+.chat-send-btn {
+  flex-shrink: 0;
+  width: 2.75rem; height: 2.75rem;
+  border: none; border-radius: 50%;
+  background: linear-gradient(135deg, #625AFA 0%, #8b5cf6 100%);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(98, 90, 250, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.chat-send-btn:hover { transform: scale(1.06); box-shadow: 0 6px 16px rgba(98, 90, 250, 0.45); }
+.chat-send-btn:active { transform: scale(0.95); }
+/* Bubbles: full readable text, never cropped */
+.agent-message-content .agent-message-text,
+.user-message-content .user-message-text { max-width: 82%; }
+.agent-message-content .agent-message-text p,
+.user-message-content .user-message-text p {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+/* Keep chat messages above the input bar */
+.support-wrapper { padding-bottom: 5.5rem !important; }

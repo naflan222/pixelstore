@@ -10,6 +10,25 @@ const router = express.Router();
 
 const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 };
 
+// Merge a guest's cart/wishlist into their account when they register or log in
+function mergeGuestData(req, userId) {
+  if (!req.guestId) return;
+  const guestCart = db.prepare('SELECT product_id, quantity FROM carts WHERE guest_id = ?').all(req.guestId);
+  for (const item of guestCart) {
+    const existing = db.prepare('SELECT id FROM carts WHERE user_id = ? AND product_id = ?').get(userId, item.product_id);
+    if (existing) db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(item.quantity, existing.id);
+    else db.prepare('INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)').run(userId, item.product_id, item.quantity);
+  }
+  db.prepare('DELETE FROM carts WHERE guest_id = ?').run(req.guestId);
+  const guestWish = db.prepare('SELECT product_id FROM wishlists WHERE guest_id = ?').all(req.guestId);
+  for (const item of guestWish) {
+    const existing = db.prepare('SELECT id FROM wishlists WHERE user_id = ? AND product_id = ?').get(userId, item.product_id);
+    if (!existing) db.prepare('INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)').run(userId, item.product_id);
+  }
+  db.prepare('DELETE FROM wishlists WHERE guest_id = ?').run(req.guestId);
+  db.prepare('UPDATE orders SET user_id = ?, guest_id = NULL WHERE guest_id = ?').run(userId, req.guestId);
+}
+
 function notify(userId, title, body, type = 'info') {
   db.prepare('INSERT INTO notifications (user_id, title, body, type) VALUES (?, ?, ?, ?)')
     .run(userId, title, body, type);
@@ -32,7 +51,8 @@ router.post('/auth/register', (req, res) => {
   const info = db.prepare('INSERT INTO users (username, email, password_hash, full_name) VALUES (?, ?, ?, ?)')
     .run(username, email.toLowerCase(), hash, username);
 
-  notify(info.lastInsertRowid, 'Welcome to Pixels!', 'Your account was created successfully.', 'welcome');
+  notify(info.lastInsertRowid, 'Welcome to PixelHouse!', 'Your account was created successfully.', 'welcome');
+  mergeGuestData(req, info.lastInsertRowid);
   const token = createSession(info.lastInsertRowid);
   res.cookie('pixels_session', token, COOKIE_OPTS);
   res.json({ ok: true, redirect: 'home.html' });
@@ -48,6 +68,7 @@ router.post('/auth/login', (req, res) => {
   if (!user || !bcrypt.compareSync(password, user.password_hash))
     return res.status(401).json({ error: 'Invalid username or password.' });
 
+  mergeGuestData(req, user.id);
   const token = createSession(user.id);
   res.cookie('pixels_session', token, COOKIE_OPTS);
   res.json({ ok: true, redirect: 'home.html' });
@@ -60,9 +81,12 @@ router.post('/auth/logout', (req, res) => {
 });
 
 router.get('/auth/me', (req, res) => {
-  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  const cw = req.user
+    ? { sql: 'user_id = ?', param: req.user.id }
+    : { sql: 'guest_id = ?', param: req.guestId };
+  const cartCount = db.prepare(`SELECT COALESCE(SUM(quantity),0) AS c FROM carts WHERE ${cw.sql}`).get(cw.param).c;
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated', cart_count: cartCount });
   const notifCount = db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0').get(req.user.id).c;
-  const cartCount = db.prepare('SELECT COALESCE(SUM(quantity),0) AS c FROM carts WHERE user_id = ?').get(req.user.id).c;
   res.json({ user: req.user, unread_notifications: notifCount, cart_count: cartCount });
 });
 
@@ -154,64 +178,94 @@ router.get('/products/:slug', (req, res) => {
   res.json({ product, related, reviews });
 });
 
-/* ---------------- CART ---------------- */
+/* ---------------- CART (works for guests AND logged-in users) ---------------- */
 
-router.get('/cart', requireAuth, (req, res) => {
+// Alias-free WHERE fragments — usable in any carts query (with or without JOIN)
+function cartWhere(req) {
+  return req.user
+    ? { sql: 'user_id = ?', param: req.user.id }
+    : { sql: 'guest_id = ?', param: req.guestId };
+}
+
+router.get('/cart', (req, res) => {
+  const w = cartWhere(req);
   const items = db.prepare(`
     SELECT c.id AS cart_id, c.quantity, p.id, p.slug, p.name, p.price, p.old_price, p.image
     FROM carts c JOIN products p ON p.id = c.product_id
-    WHERE c.user_id = ?`).all(req.user.id);
+    WHERE ${w.sql}`).all(w.param);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   res.json({ items, subtotal });
 });
 
-router.post('/cart', requireAuth, (req, res) => {
+router.post('/cart', (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};
   const product = db.prepare('SELECT id FROM products WHERE id = ?').get(product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
-  db.prepare(`INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)
-    ON CONFLICT(user_id, product_id) DO UPDATE SET quantity = quantity + excluded.quantity`)
-    .run(req.user.id, product_id, Math.max(1, parseInt(quantity) || 1));
+  const qty = Math.max(1, parseInt(quantity) || 1);
+  const w = cartWhere(req);
+  const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product_id);
+  if (existing) {
+    db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(qty, existing.id);
+  } else {
+    db.prepare('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)')
+      .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product_id, qty);
+  }
   res.json({ ok: true });
 });
 
-router.put('/cart/:id', requireAuth, (req, res) => {
+function ownsCartItem(req, id) {
+  const w = cartWhere(req);
+  return db.prepare(`SELECT id FROM carts WHERE id = ? AND ${w.sql}`).get(id, w.param);
+}
+
+router.put('/cart/:id', (req, res) => {
+  if (!ownsCartItem(req, req.params.id)) return res.status(404).json({ error: 'Cart item not found' });
   const qty = Math.max(1, parseInt(req.body && req.body.quantity) || 1);
-  db.prepare('UPDATE carts SET quantity = ? WHERE id = ? AND user_id = ?').run(qty, req.params.id, req.user.id);
+  db.prepare('UPDATE carts SET quantity = ? WHERE id = ?').run(qty, req.params.id);
   res.json({ ok: true });
 });
 
-router.delete('/cart/:id', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM carts WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+router.delete('/cart/:id', (req, res) => {
+  if (!ownsCartItem(req, req.params.id)) return res.status(404).json({ error: 'Cart item not found' });
+  db.prepare('DELETE FROM carts WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
-/* ---------------- WISHLIST ---------------- */
+/* ---------------- WISHLIST (guests too) ---------------- */
 
-router.get('/wishlist', requireAuth, (req, res) => {
+function wishWhere(req) {
+  return req.user
+    ? { sql: 'user_id = ?', param: req.user.id }
+    : { sql: 'guest_id = ?', param: req.guestId };
+}
+
+router.get('/wishlist', (req, res) => {
+  const w = wishWhere(req);
   const items = db.prepare(`
     SELECT w.id AS wishlist_id, p.id, p.slug, p.name, p.price, p.old_price, p.image, p.badge
     FROM wishlists w JOIN products p ON p.id = w.product_id
-    WHERE w.user_id = ?`).all(req.user.id);
+    WHERE ${w.sql}`).all(w.param);
   res.json({ items });
 });
 
-router.post('/wishlist', requireAuth, (req, res) => {
+router.post('/wishlist', (req, res) => {
   const { product_id } = req.body || {};
   const product = db.prepare('SELECT id FROM products WHERE id = ?').get(product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
-  const existing = db.prepare('SELECT id FROM wishlists WHERE user_id = ? AND product_id = ?')
-    .get(req.user.id, product_id);
+  const w = wishWhere(req);
+  const existing = db.prepare(`SELECT id FROM wishlists WHERE ${w.sql} AND product_id = ?`).get(w.param, product_id);
   if (existing) {
     db.prepare('DELETE FROM wishlists WHERE id = ?').run(existing.id);
     return res.json({ ok: true, added: false });
   }
-  db.prepare('INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)').run(req.user.id, product_id);
+  db.prepare('INSERT INTO wishlists (user_id, guest_id, product_id) VALUES (?, ?, ?)')
+    .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product_id);
   res.json({ ok: true, added: true });
 });
 
-router.delete('/wishlist/:id', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM wishlists WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+router.delete('/wishlist/:id', (req, res) => {
+  const w = wishWhere(req);
+  db.prepare(`DELETE FROM wishlists WHERE id = ? AND ${w.sql}`).run(req.params.id, w.param);
   res.json({ ok: true });
 });
 
@@ -219,15 +273,18 @@ router.delete('/wishlist/:id', requireAuth, (req, res) => {
 
 const SHIPPING_FEES = { standard: 250, express: 500, pickup: 0 };
 
-router.post('/orders', requireAuth, (req, res) => {
+router.post('/orders', (req, res) => {
   const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash' } = req.body || {};
   if (!full_name || !email || !phone || !address)
     return res.status(400).json({ error: 'Full name, email, phone and address are required.' });
+  if (!String(phone).trim() || !String(address).trim())
+    return res.status(400).json({ error: 'Phone number and shipping address are required.' });
 
+  const w = cartWhere(req);
   const items = db.prepare(`
     SELECT c.quantity, p.id, p.name, p.price, p.stock
     FROM carts c JOIN products p ON p.id = c.product_id
-    WHERE c.user_id = ?`).all(req.user.id);
+    WHERE ${w.sql}`).all(w.param);
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty.' });
 
   for (const i of items) {
@@ -241,9 +298,10 @@ router.post('/orders', requireAuth, (req, res) => {
 
   const placeOrder = db.transaction(() => {
     const info = db.prepare(`INSERT INTO orders
-      (user_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, total)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(req.user.id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shippingFee, total);
+      (user_id, guest_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, total)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(req.user ? req.user.id : null, req.user ? null : req.guestId,
+           full_name, email, phone, address, shipping_method, payment_method, subtotal, shippingFee, total);
     const orderId = info.lastInsertRowid;
     const insertItem = db.prepare('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)');
     const decStock = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
@@ -251,8 +309,8 @@ router.post('/orders', requireAuth, (req, res) => {
       insertItem.run(orderId, i.id, i.name, i.price, i.quantity);
       decStock.run(i.quantity, i.id);
     }
-    db.prepare('DELETE FROM carts WHERE user_id = ?').run(req.user.id);
-    notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${payment_method}.`, 'order');
+    db.prepare(`DELETE FROM carts WHERE ${w.sql}`).run(w.param);
+    if (req.user) notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${payment_method}.`, 'order');
     return orderId;
   });
 

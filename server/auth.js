@@ -24,9 +24,16 @@ function destroySession(token) {
   if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
 
-// Express middleware: attaches req.user when a valid session cookie exists
+// Express middleware: attaches req.user when a valid session cookie exists.
+// Also assigns a guest id cookie so visitors can shop WITHOUT an account.
 function attachUser(req, res, next) {
   req.user = getUserByToken(req.cookies && req.cookies.pixels_session);
+  let guestId = req.cookies && req.cookies.pixels_guest;
+  if (!guestId || !/^[a-f0-9]{32}$/.test(guestId)) {
+    guestId = crypto.randomBytes(16).toString('hex');
+    res.cookie('pixels_guest', guestId, { httpOnly: true, sameSite: 'lax', maxAge: 365 * 24 * 3600 * 1000 });
+  }
+  req.guestId = guestId;
   next();
 }
 

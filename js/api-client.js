@@ -64,18 +64,17 @@
     $$('[data-cart-id]', root).forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (!requireLogin()) return;
         try {
           await post('/cart', { product_id: Number(el.dataset.cartId) });
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          refreshCartBadge();
         } catch (err) { alert(err.message); }
       });
     });
     $$('[data-wishlist-id]', root).forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (!requireLogin()) return;
         try {
           const r = await post('/wishlist', { product_id: Number(el.dataset.wishlistId) });
           el.style.color = r.added ? '#ea4c62' : '';
@@ -96,23 +95,36 @@
   // places the REAL order with the chosen payment + shipping method.
   function placeOrderPage(paymentMethod) {
     return function () {
-      if (!currentUser) { location.href = 'login.html'; return; }
       const btn = $('a[href="payment-success.html"]');
       if (!btn) return;
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
+        // Billing details were validated & saved on the checkout page
+        let billing = null;
+        try { billing = JSON.parse(sessionStorage.getItem('guest_billing') || 'null'); } catch (_) {}
+        if (!billing && currentUser) {
+          billing = {
+            full_name: currentUser.full_name || currentUser.username,
+            email: currentUser.email,
+            phone: currentUser.phone || '',
+            address: currentUser.address || '',
+          };
+        }
+        if (!billing || !billing.phone || !billing.address || !billing.full_name) {
+          alert('Please fill in your billing information first.');
+          location.href = 'checkout.html';
+          return;
+        }
         btn.classList.add('disabled');
         btn.textContent = 'Placing order...';
         try {
           const r = await post('/orders', {
-            full_name: currentUser.full_name || currentUser.username,
-            email: currentUser.email,
-            phone: currentUser.phone || 'N/A',
-            address: currentUser.address || 'N/A',
+            ...billing,
             shipping_method: sessionStorage.getItem('shipping_method') || 'standard',
             payment_method: paymentMethod,
           });
           sessionStorage.setItem('last_order', JSON.stringify({ order_id: r.order_id, total: r.total }));
+          sessionStorage.removeItem('guest_billing');
           location.href = r.redirect || 'payment-success.html';
         } catch (err) {
           btn.classList.remove('disabled');
@@ -140,7 +152,7 @@
         badge.style.display = data.unread_notifications ? '' : 'none';
       }
       // Cart count badges used by the template
-      $$('.cart-count, [data-cart-count]').forEach((el) => { el.textContent = data.cart_count; });
+      updateCartBadge(data.cart_count);
       // Wire sign-out link
       $$('a[href="intro.html"]').forEach((a) => {
         if (/sign\s*out/i.test(a.textContent)) {
@@ -153,7 +165,20 @@
       });
     } catch (_) {
       currentUser = null;
+      // Guests still get a cart badge
+      refreshCartBadge();
     }
+  }
+
+  function updateCartBadge(count) {
+    $$('.cart-count, [data-cart-count]').forEach((el) => { el.textContent = count; });
+  }
+
+  async function refreshCartBadge() {
+    try {
+      const data = await get('/cart');
+      updateCartBadge(data.items.reduce((s, i) => s + i.quantity, 0));
+    } catch (_) {}
   }
 
   /* ---------- page wiring ---------- */
@@ -278,17 +303,17 @@
     'cart.html': async function () {
       const tbody = $('.cart-table tbody');
       if (!tbody) return;
-      if (!currentUser) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Please <a href="login.html">log in</a> to view your cart.</td></tr>';
-        return;
-      }
       let data;
       try { data = await get('/cart'); } catch (err) { return; }
+      const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
 
       function render(items) {
         if (!items.length) {
           tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Your cart is empty. <a href="shop-grid.html">Shop now</a></td></tr>';
+          // Hide the total bar so the stale demo number never shows on an empty cart
+          if (totalWrap) totalWrap.style.display = 'none';
         } else {
+          if (totalWrap) totalWrap.style.display = '';
           tbody.innerHTML = items.map((i) => (
             '<tr>' +
               '<th scope="row"><a class="remove-product" href="#" data-remove="' + i.cart_id + '"><i class="ti ti-x"></i></a></th>' +
@@ -317,19 +342,53 @@
       async function refresh() {
         data = await get('/cart');
         render(data.items);
+        refreshCartBadge();
       }
       render(data.items);
     },
 
     'checkout.html': async function () {
-      if (!currentUser) { location.href = 'login.html'; return; }
-      // Fill billing card from the logged-in profile
-      const dc = $$('.billing-information-card .data-content');
-      if (dc.length >= 4) {
-        dc[0].textContent = (currentUser.full_name || currentUser.username).toUpperCase();
-        dc[1].textContent = currentUser.email;
-        dc[2].textContent = currentUser.phone || '—';
-        dc[3].textContent = currentUser.address || '—';
+      // Works for guests too — billing info is entered right on this page
+      const billingCard = $('.billing-information-card .user-data-card .card-body');
+      const billing = currentUser ? {
+        name: currentUser.full_name || currentUser.username || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || '',
+        address: currentUser.address || '',
+      } : { name: '', email: '', phone: '', address: '' };
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('guest_billing') || 'null');
+        if (!currentUser && saved) Object.assign(billing, saved);
+      } catch (_) {}
+
+      // Replace the static billing card with an editable form
+      if (billingCard) {
+        billingCard.innerHTML =
+          '<div class="mb-3"><div class="title mb-2"><i class="ti ti-user"></i><span>Full Name</span></div>' +
+            '<input class="form-control" id="billName" type="text" placeholder="Your full name" value="' + billing.name + '"></div>' +
+          '<div class="mb-3"><div class="title mb-2"><i class="ti ti-mail"></i><span>Email Address</span></div>' +
+            '<input class="form-control" id="billEmail" type="email" placeholder="you@example.com" value="' + billing.email + '"></div>' +
+          '<div class="mb-3"><div class="title mb-2"><i class="ti ti-phone"></i><span>Phone Number</span></div>' +
+            '<input class="form-control" id="billPhone" type="text" placeholder="07X XXX XXXX" value="' + billing.phone + '"></div>' +
+          '<div class="mb-3"><div class="title mb-2"><i class="ti ti-location"></i><span>Shipping Address</span></div>' +
+            '<input class="form-control" id="billAddress" type="text" placeholder="Street, City" value="' + billing.address + '"></div>' +
+          '<div class="api-alert alert alert-danger py-2 px-3 mb-2" id="billError" style="display:none;font-size:13px"></div>';
+      }
+
+      function billingValid() {
+        const err = $('#billError');
+        const name = $('#billName') && $('#billName').value.trim();
+        const email = $('#billEmail') && $('#billEmail').value.trim();
+        const phone = $('#billPhone') && $('#billPhone').value.trim();
+        const address = $('#billAddress') && $('#billAddress').value.trim();
+        let msg = '';
+        if (!name) msg = 'Please enter your full name.';
+        else if (!phone) msg = 'Please enter your phone number.';
+        else if (!address) msg = 'Please enter your shipping address.';
+        else if (!email) msg = 'Please enter your email address.';
+        if (msg && err) { err.textContent = msg; err.style.display = 'block'; return null; }
+        if (err) err.style.display = 'none';
+        return { full_name: name, email, phone, address };
       }
 
       // Shipping methods: radio id → { api method, fee }
@@ -361,11 +420,14 @@
       $$('input[name="selector"]').forEach((r) => r.addEventListener('change', updateTotal));
       updateTotal();
 
-      // "Confirm & Pay" → go to payment-method page, remembering the choice
+      // "Confirm & Pay" → validate billing first, then go to payment-method page
       $$('a[href="checkout-payment.html"]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           if (!subtotal) { alert('Your cart is empty.'); return; }
+          const b = billingValid();
+          if (!b) return; // missing name / phone / address → block
+          sessionStorage.setItem('guest_billing', JSON.stringify(b));
           sessionStorage.setItem('shipping_method', selectedShipping().method);
           location.href = 'checkout-payment.html';
         });
@@ -481,6 +543,24 @@
       });
     },
 
+    'profile.html': function () {
+      if (!currentUser) return; // guests see the page as-is
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
+      set('profileUsername', '@' + currentUser.username);
+      set('profileFullName', (currentUser.full_name || '').toUpperCase() || currentUser.username.toUpperCase());
+      set('profilePhone', currentUser.phone);
+      // Email row has no id — fill by position among the profile data rows
+      const rows = $$('.profile-wrapper-area .single-profile-data .data-content, .user-data-card .single-profile-data .data-content');
+      rows.forEach((el) => {
+        if (el.previousElementSibling && /Email/.test(el.previousElementSibling.textContent)) {
+          el.textContent = currentUser.email;
+        }
+      });
+      // Profile header name
+      const headerName = $('.user-info h5, .profile-info h5');
+      if (headerName && (currentUser.full_name || currentUser.username)) headerName.textContent = currentUser.full_name || currentUser.username;
+    },
+
     'featured-products.html': async function () { await renderProductGrid({ featured: '1' }); },
     'flash-sale.html': async function () { await renderProductGrid({ flash_sale: '1' }); },
   };
@@ -516,7 +596,6 @@
     if (!buyBtn) return;
     buyBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      if (!requireLogin()) return;
       try {
         const { product } = await get('/products/' + slug);
         await post('/cart', { product_id: product.id });
@@ -534,7 +613,7 @@
     const style = document.createElement('style');
     style.textContent = `
       .search-suggestions{position:absolute;top:100%;left:0;right:0;background:#fff;border-radius:0 0 12px 12px;
-        box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:1050;max-height:320px;overflow-y:auto;display:none}
+        box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:1200;max-height:320px;overflow-y:auto;display:none}
       .search-suggestions a{display:flex;align-items:center;gap:10px;padding:10px 14px;color:#1f0755;text-decoration:none;border-bottom:1px solid #f0eefc}
       .search-suggestions a:last-child{border-bottom:none}
       .search-suggestions a:hover,.search-suggestions a.active{background:#f4f3ff}
@@ -560,6 +639,12 @@
       const input = $('input[type="search"]', form);
       if (!input) return;
       form.setAttribute('autocomplete', 'off');
+
+      // Raise the search area above the image slider and product grids
+      const searchWrap = form.closest('.search-form');
+      if (searchWrap) { searchWrap.style.position = 'relative'; searchWrap.style.zIndex = '1100'; }
+      const headerArea = form.closest('.header-area');
+      if (headerArea) { headerArea.style.zIndex = '1100'; }
 
       const box = document.createElement('div');
       box.className = 'search-suggestions';

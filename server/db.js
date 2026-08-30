@@ -55,24 +55,25 @@ CREATE TABLE IF NOT EXISTS products (
 
 CREATE TABLE IF NOT EXISTS carts (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  guest_id   TEXT,
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   quantity   INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now')),
-  UNIQUE(user_id, product_id)
+  created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS wishlists (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  guest_id   TEXT,
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  created_at TEXT DEFAULT (datetime('now')),
-  UNIQUE(user_id, product_id)
+  created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS orders (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  guest_id    TEXT,
   full_name   TEXT NOT NULL,
   email       TEXT NOT NULL,
   phone       TEXT NOT NULL,
@@ -144,6 +145,88 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at TEXT DEFAULT (datetime('now'))
 );
 `);
+
+// ---------- Migrations for databases created by older versions ----------
+(function migrate() {
+  // node:sqlite does not reliably return rows from prepared PRAGMA statements,
+  // so we inspect the stored CREATE TABLE SQL from sqlite_master instead.
+  const tableSql = (t) => {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(t);
+    return row ? String(row.sql) : '';
+  };
+  const hasCol = (t, col) => tableSql(t).includes(col);
+
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec('PRAGMA legacy_alter_table = ON');
+
+  // carts: add guest_id + make user_id nullable (guest shopping)
+  if (tableSql('carts') && !hasCol('carts', 'guest_id')) {
+    db.exec(`
+      ALTER TABLE carts RENAME TO carts_old;
+      CREATE TABLE carts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        guest_id TEXT,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO carts (id, user_id, product_id, quantity, created_at)
+        SELECT id, user_id, product_id, quantity, created_at FROM carts_old;
+      DROP TABLE carts_old;
+    `);
+  }
+
+  // wishlists: same treatment
+  if (tableSql('wishlists') && !hasCol('wishlists', 'guest_id')) {
+    db.exec(`
+      ALTER TABLE wishlists RENAME TO wishlists_old;
+      CREATE TABLE wishlists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        guest_id TEXT,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO wishlists (id, user_id, product_id, created_at)
+        SELECT id, user_id, product_id, created_at FROM wishlists_old;
+      DROP TABLE wishlists_old;
+    `);
+  }
+
+  // orders: user_id must be nullable (guest checkout) + guest_id column
+  const oSql = tableSql('orders');
+  const userNotNull = /user_id\s+INTEGER\s+NOT\s+NULL/i.test(oSql);
+  if (oSql && userNotNull) {
+    db.exec(`
+      ALTER TABLE orders RENAME TO orders_old;
+      CREATE TABLE orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        guest_id TEXT,
+        full_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL,
+        shipping_method TEXT DEFAULT 'standard',
+        payment_method TEXT DEFAULT 'cash',
+        subtotal REAL NOT NULL,
+        shipping_fee REAL NOT NULL DEFAULT 0,
+        total REAL NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO orders (id, user_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, total, status, created_at)
+        SELECT id, user_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, total, status, created_at FROM orders_old;
+      DROP TABLE orders_old;
+    `);
+  } else if (oSql && !hasCol('orders', 'guest_id')) {
+    db.exec('ALTER TABLE orders ADD COLUMN guest_id TEXT');
+  }
+
+  db.exec('PRAGMA legacy_alter_table = OFF');
+  db.exec('PRAGMA foreign_keys = ON');
+})();
 
 // ---------- Seed products ----------
 const products = [

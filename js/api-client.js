@@ -525,11 +525,97 @@
     });
   }
 
+  /* ---------- live product search with suggestions ---------- */
+  function initSearch() {
+    const forms = $$('.search-form form');
+    if (!forms.length) return;
+
+    // Suggestion box styles (injected once)
+    const style = document.createElement('style');
+    style.textContent = `
+      .search-suggestions{position:absolute;top:100%;left:0;right:0;background:#fff;border-radius:0 0 12px 12px;
+        box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:1050;max-height:320px;overflow-y:auto;display:none}
+      .search-suggestions a{display:flex;align-items:center;gap:10px;padding:10px 14px;color:#1f0755;text-decoration:none;border-bottom:1px solid #f0eefc}
+      .search-suggestions a:last-child{border-bottom:none}
+      .search-suggestions a:hover,.search-suggestions a.active{background:#f4f3ff}
+      .search-suggestions img{width:38px;height:38px;object-fit:contain;border-radius:6px;background:#faf9ff}
+      .search-suggestions .ss-name{flex:1;font-size:13px;font-weight:600}
+      .search-suggestions .ss-price{font-size:12px;color:#625AFA;font-weight:700;white-space:nowrap}
+      .search-suggestions .ss-empty{padding:12px 14px;font-size:13px;color:#888}
+      .search-form form{position:relative}
+    `;
+    document.head.appendChild(style);
+
+    let products = null; // lazy-loaded once
+    async function loadProducts() {
+      if (products) return products;
+      try {
+        const { products: list } = await get('/products');
+        products = list;
+      } catch (_) { products = []; }
+      return products;
+    }
+
+    forms.forEach((form) => {
+      const input = $('input[type="search"]', form);
+      if (!input) return;
+      form.setAttribute('autocomplete', 'off');
+
+      const box = document.createElement('div');
+      box.className = 'search-suggestions';
+      form.appendChild(box);
+
+      function hide() { box.style.display = 'none'; }
+      function show(matches) {
+        if (!matches.length) {
+          box.innerHTML = '<div class="ss-empty">No products found. Try "stick", "case", "kit"...</div>';
+        } else {
+          box.innerHTML = matches.map((p) =>
+            `<a href="${p.slug}.html" data-slug="${p.slug}">` +
+              `<img src="${p.image}" alt="">` +
+              `<span class="ss-name">${p.name}</span>` +
+              `<span class="ss-price">${money(p.price)}</span>` +
+            '</a>'
+          ).join('');
+        }
+        box.style.display = 'block';
+      }
+
+      input.addEventListener('input', async () => {
+        const q = input.value.trim().toLowerCase();
+        if (q.length < 2) { hide(); return; }
+        const list = await loadProducts();
+        const words = q.split(/\s+/).filter(Boolean);
+        const matches = list.filter((p) =>
+          words.every((w) => p.name.toLowerCase().includes(w))
+        ).slice(0, 6);
+        show(matches);
+      });
+
+      // Submit (Enter or search icon) → go to the best matching product page
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = input.value.trim().toLowerCase();
+        if (!q) return;
+        const list = await loadProducts();
+        const words = q.split(/\s+/).filter(Boolean);
+        const match = list.find((p) => words.every((w) => p.name.toLowerCase().includes(w)))
+                   || list.find((p) => words.some((w) => p.name.toLowerCase().includes(w)));
+        if (match) location.href = match.slug + '.html';
+        else { input.value = ''; input.placeholder = 'No product found — try again'; }
+      });
+
+      input.addEventListener('blur', () => setTimeout(hide, 200));
+      input.addEventListener('focus', () => { if (box.innerHTML) box.style.display = 'block'; });
+    });
+  }
+
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', async () => {
     await loadSession();
     if (wiring[page]) await wiring[page]();
     wireProductDetail();
     bindProductButtons(document);
+    initSearch();
   });
 })();

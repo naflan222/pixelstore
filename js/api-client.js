@@ -619,8 +619,8 @@
     // Suggestion box styles (injected once)
     const style = document.createElement('style');
     style.textContent = `
-      .search-suggestions{position:absolute;top:100%;left:0;right:0;background:#fff;border-radius:0 0 12px 12px;
-        box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:1200;max-height:320px;overflow-y:auto;display:none}
+      .search-suggestions{position:fixed;background:#fff;border-radius:12px;
+        box-shadow:0 10px 30px rgba(0,0,0,.28);z-index:2000;max-height:320px;overflow-y:auto;display:none}
       .search-suggestions a{display:flex;align-items:center;gap:10px;padding:10px 14px;color:#1f0755;text-decoration:none;border-bottom:1px solid #f0eefc}
       .search-suggestions a:last-child{border-bottom:none}
       .search-suggestions a:hover,.search-suggestions a.active{background:#f4f3ff}
@@ -647,14 +647,21 @@
       if (!input) return;
       form.setAttribute('autocomplete', 'off');
 
-      // Keep the sticky search bar BELOW the fixed navbar (navbar is z-index 1000),
-      // while the suggestions dropdown (z-index 1200) still floats above sliders/products
-      const searchWrap = form.closest('.search-form');
-      if (searchWrap) { searchWrap.style.zIndex = '999'; }
-
+      // Attach the dropdown to <body> with position:fixed so NOTHING can cover it
+      // (sliders and category cards create their own stacking layers — a dropdown
+      // inside the search bar would be capped by the search bar's z-index)
       const box = document.createElement('div');
       box.className = 'search-suggestions';
-      form.appendChild(box);
+      document.body.appendChild(box);
+
+      function placeBox() {
+        const r = input.getBoundingClientRect();
+        box.style.top = (r.bottom + 4) + 'px';
+        box.style.left = r.left + 'px';
+        box.style.width = r.width + 'px';
+      }
+      window.addEventListener('scroll', placeBox, { passive: true });
+      window.addEventListener('resize', placeBox);
 
       function hide() { box.style.display = 'none'; }
       function show(matches) {
@@ -669,6 +676,7 @@
             '</a>'
           ).join('');
         }
+        placeBox();
         box.style.display = 'block';
       }
 
@@ -697,7 +705,7 @@
       });
 
       input.addEventListener('blur', () => setTimeout(hide, 200));
-      input.addEventListener('focus', () => { if (box.innerHTML) box.style.display = 'block'; });
+      input.addEventListener('focus', () => { if (box.innerHTML) { placeBox(); box.style.display = 'block'; } });
     });
   }
 

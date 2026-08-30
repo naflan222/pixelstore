@@ -1,0 +1,19 @@
+{
+  "name": "pixels-store",
+  "version": "1.0.0",
+  "description": "Pixels — GoPro & action camera accessories store (full-stack)",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "nodemailer": "^9.0.6"
+  }
+}

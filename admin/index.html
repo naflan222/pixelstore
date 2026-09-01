@@ -156,7 +156,16 @@ tr:last-child td{border-bottom:none}
   .overlay.show{display:block}
   .form-grid{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:1fr 1fr}
+  .dashboard-grid{grid-template-columns:1fr !important}
+  .order-detail-grid{grid-template-columns:1fr !important}
 }
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:1fr}
+  .content{padding:14px !important}
+  .card{padding:16px !important}
+}
+.dashboard-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:13px}
 </style>
 </head>
 <body>
@@ -212,7 +221,7 @@ tr:last-child td{border-bottom:none}
       <!-- DASHBOARD -->
       <div class="tab active" id="tab-dashboard">
         <div class="stats-grid" id="statsGrid"></div>
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+        <div class="dashboard-grid">
           <div class="card">
             <h3><i class="ti ti-chart-bar"></i> Revenue (Last 7 Days)</h3>
             <div class="chart-bars" id="chartBars"></div>
@@ -609,7 +618,7 @@ async function viewOrder(id) {
   try {
     const { order, items } = await api('/admin/orders/' + id);
     $('#orderDetail').innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:13px">
+      <div class="order-detail-grid">
         <div><strong>Order #:</strong> ${order.id}</div>
         <div><strong>Status:</strong> <span class="badge badge-${order.status}">${order.status}</span></div>
         <div><strong>Customer:</strong> ${esc(order.full_name)}</div>

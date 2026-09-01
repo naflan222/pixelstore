@@ -360,7 +360,7 @@
 
       function render(items) {
         if (!items.length) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Your cart is empty. <a href="shop-grid.html">Shop now</a></td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Your cart is empty. <a href="home.html">Shop now</a></td></tr>';
           // Hide the total bar so the stale demo number never shows on an empty cart
           if (totalWrap) totalWrap.style.display = 'none';
         } else {
@@ -614,13 +614,12 @@
 
     'featured-products.html': async function () { await renderProductGrid({ featured: '1' }); },
     'flash-sale.html': async function () { await renderProductGrid({ flash_sale: '1' }); },
-    'shop-grid.html': async function () { await renderProductGrid({}); },
+
     'shop-list.html': async function () { await renderProductGrid({}); },
   };
 
   async function renderProductGrid(query) {
-    const grid = $('.flash-sale-wrapper .row, .featured-products-wrapper .row, .top-products-area .row, .page-content-wrapper .row.g-2, .page-content-wrapper .row.g-1 .row.g-2, .shop-grid-wrapper .row, .page-content-wrapper > .container > .row.g-2');
-    // Fallback: try the main product grid on shop-grid.html
+    const grid = $('.flash-sale-wrapper .row, .featured-products-wrapper .row, .top-products-area .row, .page-content-wrapper .row.g-2, .page-content-wrapper > .container > .row.g-2');
     const grid2 = grid || $('.page-content-wrapper .py-3 .container .row.g-2');
     if (!grid2) return;
     try {
@@ -633,7 +632,7 @@
   }
 
   /* ---------- product detail pages: wire "Add to Cart" ---------- */
-  function wireProductDetail() {
+  async function wireProductDetail() {
     const slug = page.replace('.html', '');
     // Only run on actual product detail pages (not home, index, cart, etc.)
     if (!slug || page === 'index.html' || page === 'home.html') return;

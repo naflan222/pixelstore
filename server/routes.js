@@ -53,9 +53,8 @@ router.post('/auth/register', (req, res) => {
 
   notify(info.lastInsertRowid, 'Welcome to PixelHouse!', 'Your account was created successfully.', 'welcome');
   mergeGuestData(req, info.lastInsertRowid);
-  const token = createSession(info.lastInsertRowid);
-  res.cookie('pixels_session', token, COOKIE_OPTS);
-  res.json({ ok: true, redirect: 'home.html' });
+  // Don't auto-login: user should see the success message and log in manually
+  res.json({ ok: true, redirect: 'login.html' });
 });
 
 router.post('/auth/login', (req, res) => {

@@ -236,14 +236,29 @@
       form.removeAttribute('action');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Creating account...'; }
         try {
-          const r = await post('/auth/register', {
+          await post('/auth/register', {
             username: $('#username').value.trim(),
             email: $('#email').value.trim(),
             password: $('#registerPassword').value,
           });
-          location.href = r.redirect || 'home.html';
-        } catch (err) { alertBox(form, err.message); }
+          // Show professional success message, then redirect to login
+          const wrap = $('.register-form') || form.parentElement;
+          wrap.innerHTML =
+            '<div class="text-center py-4">' +
+              '<div style="width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center">' +
+                '<i class="ti ti-check" style="font-size:32px;color:#fff"></i>' +
+              '</div>' +
+              '<h5 style="color:#1f0755;font-weight:700;margin-bottom:8px">Successfully Signed Up!</h5>' +
+              '<p style="color:#6b7280;font-size:14px;margin-bottom:16px">Your account has been created. Please log in to continue shopping.</p>' +
+              '<a class="btn btn-warning btn-lg w-100" href="login.html">Go to Login</a>' +
+            '</div>';
+        } catch (err) {
+          alertBox(form, err.message);
+          if (btn) { btn.disabled = false; btn.textContent = 'Sign Up'; }
+        }
       });
     },
 
@@ -332,13 +347,16 @@
     },
 
     'cart.html': async function () {
-      const tbody = $('.cart-table tbody');
+      const tbody = $('.cart-table tbody') || document.getElementById('cartTbody');
       if (!tbody) return;
       const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
       // Hide the demo total IMMEDIATELY so it never flashes before real data loads
       if (totalWrap) totalWrap.style.display = 'none';
       let data;
-      try { data = await get('/cart'); } catch (err) { return; }
+      try { data = await get('/cart'); } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-danger">Could not load cart. Please refresh the page.</td></tr>';
+        return;
+      }
 
       function render(items) {
         if (!items.length) {
@@ -573,17 +591,25 @@
       const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
       set('profileUsername', '@' + currentUser.username);
       set('profileFullName', (currentUser.full_name || '').toUpperCase() || currentUser.username.toUpperCase());
-      set('profilePhone', currentUser.phone);
-      // Email row has no id — fill by position among the profile data rows
+      set('profilePhone', currentUser.phone || '—');
+      // Fill email row by position among the profile data rows
       const rows = $$('.profile-wrapper-area .single-profile-data .data-content, .user-data-card .single-profile-data .data-content');
       rows.forEach((el) => {
-        if (el.previousElementSibling && /Email/.test(el.previousElementSibling.textContent)) {
-          el.textContent = currentUser.email;
+        if (el.previousElementSibling && /Email/i.test(el.previousElementSibling.textContent)) {
+          el.textContent = currentUser.email || '—';
+        }
+        if (el.previousElementSibling && /Shipping/i.test(el.previousElementSibling.textContent)) {
+          el.textContent = currentUser.address || '—';
         }
       });
-      // Profile header name
-      const headerName = $('.user-info h5, .profile-info h5');
+      // Profile header: update the @handle and display name
+      const handleP = $('.user-info-card .user-info p');
+      if (handleP) handleP.textContent = '@' + currentUser.username;
+      const headerName = $('.user-info-card .user-info h5');
       if (headerName && (currentUser.full_name || currentUser.username)) headerName.textContent = currentUser.full_name || currentUser.username;
+      // Sidenav profile name
+      const sideName = $('.sidenav-profile .user-name');
+      if (sideName) sideName.textContent = currentUser.full_name || currentUser.username;
     },
 
     'featured-products.html': async function () { await renderProductGrid({ featured: '1' }); },
@@ -609,7 +635,8 @@
   /* ---------- product detail pages: wire "Add to Cart" ---------- */
   function wireProductDetail() {
     const slug = page.replace('.html', '');
-    if (!slug || page === 'index.html') return;
+    // Only run on actual product detail pages (not home, index, cart, etc.)
+    if (!slug || page === 'index.html' || page === 'home.html') return;
 
     // The main "Add to Cart" button on product detail pages is inside <form class="cart-form">
     const cartForm = $('.cart-form');
@@ -646,8 +673,9 @@
       return;
     }
 
-    // Fallback: older templates that use an <a> tag for add-to-cart
-    const buyBtn = $('a[href="cart.html"], .add-to-cart-btn, .btn-danger.btn-lg');
+    // Fallback: older templates that use an <a> tag for add-to-cart.
+    // IMPORTANT: only match buttons INSIDE a product detail wrapper, not footer nav links.
+    const buyBtn = $('.product-description .add-to-cart-btn, .product-description .btn-danger.btn-lg, .product-detail-wrapper .add-to-cart-btn');
     if (!buyBtn) return;
     buyBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -759,6 +787,11 @@
 
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', async () => {
+    // Force-remove the preloader immediately — don't wait for window.onload
+    // which only fires after ALL images/fonts load (can take a long time)
+    var pl = document.getElementById('preloader');
+    if (pl) pl.style.display = 'none';
+
     await loadSession();
     if (wiring[page]) await wiring[page]();
     wireProductDetail();

@@ -144,6 +144,10 @@ CREATE TABLE IF NOT EXISTS reviews (
   comment    TEXT DEFAULT '',
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS read_messages (
+  contact_message_id INTEGER PRIMARY KEY REFERENCES contact_messages(id) ON DELETE CASCADE
+);
 `);
 
 // ---------- Migrations for databases created by older versions ----------
@@ -228,6 +232,12 @@ CREATE TABLE IF NOT EXISTS reviews (
   db.exec('PRAGMA foreign_keys = ON');
 })();
 
+// Ensure the demo user has admin role (for databases created before admin panel)
+const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@pixels.com'").get();
+if (demoUser) {
+  db.prepare("UPDATE users SET role = 'admin' WHERE id = ? AND role = 'customer'").run(demoUser.id);
+}
+
 // ---------- Seed products ----------
 const products = [
   { slug: 'single-product', name: '50 in 1 Accessories Kit GoPro', price: 8000, old_price: 13000, image: 'img/product/11.png', badge: 'Sale', featured: 1, flash_sale: 1, description: 'Complete 50-in-1 accessory bundle for GoPro Hero cameras — mounts, straps, grips, cases and more.' },
@@ -264,13 +274,13 @@ if (count === 0) {
   console.log(`Seeded ${products.length} products`);
 }
 
-// Demo user (demo@pixels.com / demo1234) so the shop works out of the box
+// Demo user (demo@pixels.com / demo1234) — admin role so the shop works out of the box
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
 if (userCount === 0) {
   const hash = bcrypt.hashSync('demo1234', 10);
-  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, phone, address, balance)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run('demo', 'demo@pixels.com', hash, 'Demo User', '+92 300 0000000', '28/C Green Road', 99);
-  console.log('Seeded demo user (demo@pixels.com / demo1234)');
+  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, phone, address, balance, role)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run('demo', 'demo@pixels.com', hash, 'Demo User', '+92 300 0000000', '28/C Green Road', 99, 'admin');
+  console.log('Seeded admin user (demo@pixels.com / demo1234)');
 }
 
 // Simple transaction helper (mimics better-sqlite3's db.transaction)

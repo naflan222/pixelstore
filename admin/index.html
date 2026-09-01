@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PixelHouse Admin Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+:root{
+  --bg:#0f1117; --panel:#1a1d28; --panel2:#222636; --border:#2d3142;
+  --text:#e4e6ef; --text2:#9ca3af; --primary:#625AFA; --primary2:#7c75ff;
+  --green:#22c55e; --red:#ef4444; --yellow:#f59e0b; --blue:#3b82f6;
+  --radius:14px; --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{text-decoration:none;color:inherit}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Login */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:40px;max-width:400px;width:100%;text-align:center}
+.login-box h1{font-size:26px;font-weight:700;margin-bottom:6px}
+.login-box p{color:var(--text2);font-size:14px;margin-bottom:28px}
+.login-box input{width:100%;padding:12px 16px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:14px;outline:none;transition:border .2s}
+.login-box input:focus{border-color:var(--primary)}
+.login-box button{width:100%;padding:12px;background:var(--primary);border:none;border-radius:var(--radius-sm);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+.login-box button:hover{background:var(--primary2)}
+.login-box .err{color:var(--red);font-size:13px;margin-top:10px;display:none}
+.login-box .hint{margin-top:16px;padding:10px;background:var(--panel2);border-radius:var(--radius-sm);font-size:12px;color:var(--text2);text-align:left;line-height:1.6}
+
+/* App layout */
+.app{display:none;min-height:100vh}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--panel);border-right:1px solid var(--border);padding:20px 0;overflow-y:auto;z-index:100;transition:transform .3s}
+.sidebar.active{transform:translateX(0)}
+.sidebar .logo{padding:0 24px 20px;font-size:18px;font-weight:800;color:#fff;border-bottom:1px solid var(--border)}
+.sidebar .logo span{color:var(--primary)}
+.sidebar nav{padding:12px 12px}
+.sidebar nav a{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:var(--text2);font-size:14px;font-weight:500;transition:all .15s;cursor:pointer}
+.sidebar nav a:hover{background:var(--panel2);color:var(--text)}
+.sidebar nav a.active{background:var(--primary);color:#fff}
+.sidebar nav a i{font-size:20px}
+.sidebar .logout{position:absolute;bottom:20px;left:12px;right:12px}
+.sidebar .logout a{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:var(--red);font-size:14px;font-weight:500;cursor:pointer;transition:background .15s}
+.sidebar .logout a:hover{background:rgba(239,68,68,.1)}
+
+.main{margin-left:240px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:64px;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:var(--panel)}
+.topbar h2{font-size:18px;font-weight:700}
+.topbar .right{display:flex;align-items:center;gap:16px}
+.topbar .avatar{width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.hamburger{display:none;font-size:24px;cursor:pointer;color:var(--text)}
+
+.content{padding:24px;flex:1}
+.tab{display:none}
+.tab.active{display:block}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.card h3{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+/* Stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.stat-card .icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px}
+.stat-card .val{font-size:28px;font-weight:800}
+.stat-card .lbl{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* Tables */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);color:var(--text2);font-weight:600;white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--panel2)}
+tr:last-child td{border-bottom:none}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-pending{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-confirmed{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-shipped{background:rgba(168,85,247,.15);color:#a855f7}
+.badge-delivered{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-cancelled{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-success{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-danger{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-warning{background:rgba(245,158,11,.15);color:var(--yellow)}
+
+/* Forms */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--primary)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.form-grid .full{grid-column:1/-1}
+.form-actions{display:flex;gap:10px;margin-top:20px}
+.btn{padding:10px 20px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary2)}
+.btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{background:#16a34a}
+
+/* Search bar */
+.search-bar{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.search-bar input,.search-bar select{padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-family:inherit;outline:none}
+.search-bar input{flex:1;min-width:200px}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-close{float:right;font-size:24px;cursor:pointer;color:var(--text2)}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;padding:14px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;z-index:2000;animation:slideIn .3s ease}
+.toast-success{background:var(--green);color:#fff}
+.toast-error{background:var(--red);color:#fff}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Revenue chart */
+.chart-bars{display:flex;align-items:flex-end;gap:8px;height:160px;margin-top:16px}
+.chart-bar{flex:1;background:linear-gradient(180deg,var(--primary),var(--primary2));border-radius:6px 6px 0 0;position:relative;min-height:4px;transition:opacity .2s}
+.chart-bar:hover{opacity:.8}
+.chart-bar .tip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:11px;color:var(--text2);margin-bottom:6px;white-space:nowrap}
+.chart-bar .date{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text2);margin-top:6px}
+
+/* Pagination */
+.pagination{display:flex;gap:6px;justify-content:center;margin-top:16px}
+.pagination button{padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel2);color:var(--text);font-size:13px;cursor:pointer}
+.pagination button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pagination button:disabled{opacity:.4;cursor:default}
+
+/* Product image in table */
+.prod-img{width:40px;height:40px;object-fit:cover;border-radius:6px}
+.empty{text-align:center;padding:40px;color:var(--text2);font-size:14px}
+
+/* Overlay for mobile */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .hamburger{display:block}
+  .overlay.show{display:block}
+  .form-grid{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h1>Pixel<span style="color:var(--primary)">House</span></h1>
+    <p>Admin Panel</p>
+    <form id="loginForm" onsubmit="return false">
+      <input type="text" id="loginUser" placeholder="Username or Email" required>
+      <input type="password" id="loginPass" placeholder="Password" required>
+      <button type="submit" id="loginBtn">Sign In</button>
+      <div class="err" id="loginErr"></div>
+    </form>
+    <div class="hint">
+      <strong>Default admin credentials:</strong><br>
+      Username: <code>demo</code> &nbsp; Password: <code>demo1234</code><br>
+      <small style="color:#6b7280">(Change after first login)</small>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app" id="app">
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">Pixel<span>House</span></div>
+    <nav>
+      <a class="active" data-tab="dashboard" onclick="showTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+      <a data-tab="orders" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
+      <a data-tab="products" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
+      <a data-tab="users" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
+      <a data-tab="messages" onclick="showTab('messages')"><i class="ti ti-mail"></i> Messages</a>
+      <a data-tab="vendors" onclick="showTab('vendors')"><i class="ti ti-building-store"></i> Vendors</a>
+      <a data-tab="reviews" onclick="showTab('reviews')"><i class="ti ti-star"></i> Reviews</a>
+    </nav>
+    <div class="logout"><a onclick="doLogout()"><i class="ti ti-logout"></i> Sign Out</a></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="hamburger" onclick="toggleSidebar()"><i class="ti ti-menu-2"></i></span>
+        <h2 id="pageTitle">Dashboard</h2>
+      </div>
+      <div class="right">
+        <div class="avatar" id="userAvatar">A</div>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="tab active" id="tab-dashboard">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+          <div class="card">
+            <h3><i class="ti ti-chart-bar"></i> Revenue (Last 7 Days)</h3>
+            <div class="chart-bars" id="chartBars"></div>
+          </div>
+          <div class="card">
+            <h3><i class="ti ti-alert-triangle"></i> Low Stock Alert</h3>
+            <div id="lowStockList"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <h3><i class="ti ti-recent"></i> Recent Orders</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody id="recentOrdersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORDERS -->
+      <div class="tab" id="tab-orders">
+        <div class="search-bar">
+          <input type="text" id="orderSearch" placeholder="Search by name, phone, email or order ID..." onkeyup="searchOrders(event)">
+          <select id="orderStatusFilter" onchange="loadOrders()">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th>Shipping</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="orderPagination"></div>
+        </div>
+      </div>
+
+      <!-- PRODUCTS -->
+      <div class="tab" id="tab-products">
+        <div class="search-bar">
+          <input type="text" id="productSearch" placeholder="Search products..." onkeyup="searchProducts(event)">
+          <button class="btn btn-primary" onclick="openProductModal()"><i class="ti ti-plus"></i> Add Product</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Price</th><th>Old Price</th><th>Stock</th><th>Category</th><th>Featured</th><th>Actions</th></tr></thead>
+              <tbody id="productsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div class="tab" id="tab-users">
+        <div class="search-bar">
+          <input type="text" id="userSearch" placeholder="Search users..." onkeyup="searchUsers(event)">
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Username</th><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- MESSAGES -->
+      <div class="tab" id="tab-messages">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Subject</th><th>Message</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody id="messagesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENDORS -->
+      <div class="tab" id="tab-vendors">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Store Name</th><th>Type</th><th>Location</th><th>Mobile</th><th>Applicant</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="vendorsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVIEWS -->
+      <div class="tab" id="tab-reviews">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Product</th><th>User</th><th>Rating</th><th>Comment</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody id="reviewsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeProductModal()">&times;</span>
+    <h3 id="productModalTitle">Add Product</h3>
+    <form onsubmit="return false" id="productForm">
+      <input type="hidden" id="prodId">
+      <div class="form-grid">
+        <div class="form-group"><label>Name *</label><input type="text" id="prodName" required></div>
+        <div class="form-group"><label>Slug * (URL key, no spaces)</label><input type="text" id="prodSlug" required></div>
+        <div class="form-group"><label>Price (Rs.) *</label><input type="number" step="0.01" id="prodPrice" required></div>
+        <div class="form-group"><label>Old Price (Rs.)</label><input type="number" step="0.01" id="prodOldPrice"></div>
+        <div class="form-group"><label>Image Path *</label><input type="text" id="prodImage" placeholder="img/product/example.png" required></div>
+        <div class="form-group"><label>Category</label><input type="text" id="prodCategory" value="GoPro Accessories"></div>
+        <div class="form-group"><label>Stock</label><input type="number" id="prodStock" value="100"></div>
+        <div class="form-group"><label>Badge (e.g. Sale, New, -20%)</label><input type="text" id="prodBadge"></div>
+        <div class="form-group"><label>Rating (0-5)</label><input type="number" step="0.1" id="prodRating" value="4.5"></div>
+        <div class="form-group" style="display:flex;gap:20px;align-items:center;padding-top:30px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="prodFeatured"> Featured</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="prodFlashSale"> Flash Sale</label>
+        </div>
+        <div class="form-group full"><label>Description</label><textarea id="prodDesc"></textarea></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveProduct()">Save Product</button>
+        <button class="btn btn-secondary" onclick="closeProductModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeOrderModal()">&times;</span>
+    <h3>Order Details</h3>
+    <div id="orderDetail"></div>
+  </div>
+</div>
+
+<script>
+/* ==================== ADMIN APP ==================== */
+const API = '/api';
+let adminUser = null;
+let orderPage = 1;
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const money = (n) => 'Rs. ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    ...opts,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+  return data;
+}
+const apiPost = (p, b) => api(p, { method: 'POST', body: JSON.stringify(b || {}) });
+const apiPut = (p, b) => api(p, { method: 'PUT', body: JSON.stringify(b || {}) });
+const apiDel = (p) => api(p, { method: 'DELETE' });
+
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ---------- LOGIN ---------- */
+async function checkSession() {
+  try {
+    const data = await api('/auth/me');
+    if (data.user && data.user.role === 'admin') {
+      adminUser = data.user;
+      showApp();
+      return;
+    }
+  } catch (_) {}
+  showLogin();
+}
+
+function showLogin() {
+  $('#loginScreen').style.display = 'flex';
+  $('#app').style.display = 'none';
+}
+
+function showApp() {
+  $('#loginScreen').style.display = 'none';
+  $('#app').style.display = 'block';
+  $('#userAvatar').textContent = (adminUser.full_name || adminUser.username || 'A').charAt(0).toUpperCase();
+  showTab('dashboard');
+}
+
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const u = $('#loginUser').value.trim();
+  const p = $('#loginPass').value;
+  const btn = $('#loginBtn');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  $('#loginErr').style.display = 'none';
+  try {
+    const r = await apiPost('/auth/login', { username: u, password: p });
+    // Check if user is admin
+    const me = await api('/auth/me');
+    if (!me.user || me.user.role !== 'admin') {
+      $('#loginErr').textContent = 'This account does not have admin access.';
+      $('#loginErr').style.display = 'block';
+      await apiPost('/auth/logout');
+    } else {
+      adminUser = me.user;
+      showApp();
+    }
+  } catch (err) {
+    $('#loginErr').textContent = err.message;
+    $('#loginErr').style.display = 'block';
+  }
+  btn.textContent = 'Sign In';
+  btn.disabled = false;
+});
+
+async function doLogout() {
+  try { await apiPost('/auth/logout'); } catch (_) {}
+  location.reload();
+}
+
+/* ---------- NAVIGATION ---------- */
+function showTab(tab) {
+  $$('.tab').forEach(t => t.classList.remove('active'));
+  $('#tab-' + tab).classList.add('active');
+  $$('.sidebar nav a').forEach(a => a.classList.remove('active'));
+  $$(`.sidebar nav a[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
+  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', users: 'Users', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews' };
+  $('#pageTitle').textContent = titles[tab] || tab;
+  // Load data
+  if (tab === 'dashboard') loadDashboard();
+  if (tab === 'orders') loadOrders();
+  if (tab === 'products') loadProducts();
+  if (tab === 'users') loadUsers();
+  if (tab === 'messages') loadMessages();
+  if (tab === 'vendors') loadVendors();
+  if (tab === 'reviews') loadReviews();
+  // Close sidebar on mobile
+  $('#sidebar').classList.remove('open');
+  $('#overlay').classList.remove('show');
+}
+
+function toggleSidebar() {
+  $('#sidebar').classList.toggle('open');
+  $('#overlay').classList.toggle('show');
+}
+
+/* ---------- DASHBOARD ---------- */
+async function loadDashboard() {
+  try {
+    const d = await api('/admin/stats');
+    const statColors = { green: '#22c55e', red: '#ef4444', blue: '#3b82f6', yellow: '#f59e0b', purple: '#a855f7' };
+    const stats = [
+      { icon: 'ti-cash', bg: 'rgba(34,197,94,.15)', color: statColors.green, val: money(d.revenue), lbl: 'Total Revenue' },
+      { icon: 'ti-shopping-bag', bg: 'rgba(59,130,246,.15)', color: statColors.blue, val: d.orders, lbl: 'Total Orders' },
+      { icon: 'ti-clock-pause', bg: 'rgba(245,158,11,.15)', color: statColors.yellow, val: d.pending_orders, lbl: 'Pending Orders' },
+      { icon: 'ti-users', bg: 'rgba(168,85,247,.15)', color: statColors.purple, val: d.users, lbl: 'Users' },
+      { icon: 'ti-packages', bg: 'rgba(98,90,250,.15)', color: '#625AFA', val: d.products, lbl: 'Products' },
+      { icon: 'ti-alert-triangle', bg: 'rgba(239,68,68,.15)', color: statColors.red, val: d.out_of_stock, lbl: 'Out of Stock' },
+      { icon: 'ti-package', bg: 'rgba(245,158,11,.15)', color: statColors.yellow, val: d.low_stock, lbl: 'Low Stock (<10)' },
+      { icon: 'ti-building-store', bg: 'rgba(34,197,94,.15)', color: statColors.green, val: d.vendor_applications, lbl: 'Vendor Applications' },
+    ];
+    $('#statsGrid').innerHTML = stats.map(s => `
+      <div class="stat-card">
+        <div class="icon" style="background:${s.bg};color:${s.color}"><i class="ti ${s.icon}"></i></div>
+        <div class="val">${s.val}</div>
+        <div class="lbl">${s.lbl}</div>
+      </div>
+    `).join('');
+
+    // Revenue chart
+    const maxRev = Math.max(...d.revenue7.map(r => r.total), 1);
+    $('#chartBars').innerHTML = d.revenue7.map(r => `
+      <div class="chart-bar" style="height:${Math.max(4, (r.total / maxRev) * 140)}px">
+        <span class="tip">${money(r.total)}</span>
+        <span class="date">${r.date.slice(5)}</span>
+      </div>
+    `).join('') || '<div class="empty">No revenue data yet</div>';
+
+    // Low stock
+    if (d.lowStock.length) {
+      $('#lowStockList').innerHTML = d.lowStock.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <img src="../${p.image}" class="prod-img" alt="">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${esc(p.name)}</div>
+            <div style="font-size:11px;color:var(--text2)">Stock: ${p.stock}</div>
+          </div>
+          <span class="badge ${p.stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.stock === 0 ? 'Out' : p.stock + ' left'}</span>
+        </div>
+      `).join('');
+    } else {
+      $('#lowStockList').innerHTML = '<div class="empty">All products well stocked</div>';
+    }
+
+    // Recent orders
+    $('#recentOrdersBody').innerHTML = d.recentOrders.map(o => `
+      <tr>
+        <td>#${o.id}</td>
+        <td>${esc(o.full_name)}</td>
+        <td>${o.item_count} item(s)</td>
+        <td>${money(o.total)}</td>
+        <td>${esc(o.payment_method)}</td>
+        <td><span class="badge badge-${o.status}">${o.status}</span></td>
+        <td style="font-size:11px;color:var(--text2)">${o.created_at}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" class="empty">No orders yet</td></tr>';
+  } catch (err) {
+    toast('Failed to load dashboard: ' + err.message, 'error');
+  }
+}
+
+/* ---------- ORDERS ---------- */
+async function loadOrders() {
+  const status = $('#orderStatusFilter').value;
+  const search = $('#orderSearch').value.trim();
+  try {
+    const params = new URLSearchParams();
+    if (status !== 'all') params.set('status', status);
+    if (search) params.set('search', search);
+    params.set('page', orderPage);
+    const data = await api('/admin/orders?' + params.toString());
+    $('#ordersBody').innerHTML = data.orders.map(o => `
+      <tr>
+        <td>#${o.id}</td>
+        <td>${esc(o.full_name)}<br><span style="font-size:11px;color:var(--text2)">${esc(o.email)}</span></td>
+        <td>${esc(o.phone)}</td>
+        <td>${o.items.length} item(s)</td>
+        <td>${money(o.total)}</td>
+        <td>${esc(o.payment_method)}</td>
+        <td>${esc(o.shipping_method)}</td>
+        <td><span class="badge badge-${o.status}">${o.status}</span></td>
+        <td style="font-size:11px;color:var(--text2)">${o.created_at}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="viewOrder(${o.id})"><i class="ti ti-eye"></i></button>
+          <select onchange="updateOrderStatus(${o.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+            <option value="">Set Status...</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="10" class="empty">No orders found</td></tr>';
+
+    // Pagination
+    const p = data;
+    let pag = '';
+    if (p.pages > 1) {
+      pag += `<button ${p.page === 1 ? 'disabled' : ''} onclick="orderPage=${p.page - 1};loadOrders()">Prev</button>`;
+      for (let i = 1; i <= p.pages; i++) {
+        if (i === 1 || i === p.pages || (i >= p.page - 2 && i <= p.page + 2)) {
+          pag += `<button class="${i === p.page ? 'active' : ''}" onclick="orderPage=${i};loadOrders()">${i}</button>`;
+        } else if (i === p.page - 3 || i === p.page + 3) {
+          pag += '<button disabled>...</button>';
+        }
+      }
+      pag += `<button ${p.page === p.pages ? 'disabled' : ''} onclick="orderPage=${p.page + 1};loadOrders()">Next</button>`;
+    }
+    $('#orderPagination').innerHTML = pag;
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+function searchOrders(e) { if (e.key === 'Enter') { orderPage = 1; loadOrders(); } }
+
+async function viewOrder(id) {
+  try {
+    const { order, items } = await api('/admin/orders/' + id);
+    $('#orderDetail').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:13px">
+        <div><strong>Order #:</strong> ${order.id}</div>
+        <div><strong>Status:</strong> <span class="badge badge-${order.status}">${order.status}</span></div>
+        <div><strong>Customer:</strong> ${esc(order.full_name)}</div>
+        <div><strong>Email:</strong> ${esc(order.email)}</div>
+        <div><strong>Phone:</strong> ${esc(order.phone)}</div>
+        <div><strong>Address:</strong> ${esc(order.address)}</div>
+        <div><strong>Shipping:</strong> ${esc(order.shipping_method)}</div>
+        <div><strong>Payment:</strong> ${esc(order.payment_method)}</div>
+        <div><strong>Date:</strong> ${order.created_at}</div>
+        <div><strong>Guest:</strong> ${order.guest_id ? 'Yes' : 'No'}</div>
+      </div>
+      <h4 style="margin-bottom:12px;font-size:14px">Items</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Subtotal</th></tr></thead>
+          <tbody>
+            ${items.map(i => `<tr><td>${esc(i.name)}</td><td>${money(i.price)}</td><td>${i.quantity}</td><td>${money(i.price * i.quantity)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;display:flex;justify-content:space-between;font-size:15px;font-weight:700">
+        <span>Subtotal:</span><span>${money(order.subtotal)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2)">
+        <span>Shipping Fee:</span><span>${money(order.shipping_fee)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+        <span>Total:</span><span style="color:var(--green)">${money(order.total)}</span>
+      </div>
+    `;
+    $('#orderModal').classList.add('active');
+  } catch (err) { toast(err.message, 'error'); }
+}
+function closeOrderModal() { $('#orderModal').classList.remove('active'); }
+
+async function updateOrderStatus(id, status) {
+  if (!status) return;
+  try {
+    await apiPut('/admin/orders/' + id + '/status', { status });
+    toast('Order #' + id + ' marked as ' + status);
+    loadOrders();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- PRODUCTS ---------- */
+let allProducts = [];
+async function loadProducts() {
+  try {
+    const data = await api('/admin/products');
+    allProducts = data.products;
+    renderProducts(data.products);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+function renderProducts(products) {
+  $('#productsBody').innerHTML = products.map(p => `
+    <tr>
+      <td><img src="../${p.image}" class="prod-img" alt=""></td>
+      <td style="font-weight:600">${esc(p.name)}</td>
+      <td style="font-size:12px;color:var(--text2)">${esc(p.slug)}</td>
+      <td>${money(p.price)}</td>
+      <td>${p.old_price ? money(p.old_price) : '-'}</td>
+      <td><span class="badge ${p.stock === 0 ? 'badge-danger' : p.stock < 10 ? 'badge-warning' : 'badge-success'}">${p.stock}</span></td>
+      <td style="font-size:12px">${esc(p.category)}</td>
+      <td>${p.featured ? '<i class="ti ti-check" style="color:var(--green)"></i>' : '-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="editProduct(${p.id})"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty">No products found</td></tr>';
+}
+
+function searchProducts(e) {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { renderProducts(allProducts); return; }
+  renderProducts(allProducts.filter(p => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)));
+}
+
+function openProductModal() {
+  $('#productModalTitle').textContent = 'Add Product';
+  $('#productForm').reset();
+  $('#prodId').value = '';
+  $('#prodCategory').value = 'GoPro Accessories';
+  $('#prodStock').value = '100';
+  $('#prodRating').value = '4.5';
+  $('#productModal').classList.add('active');
+}
+
+function editProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  $('#productModalTitle').textContent = 'Edit Product';
+  $('#prodId').value = p.id;
+  $('#prodName').value = p.name;
+  $('#prodSlug').value = p.slug;
+  $('#prodPrice').value = p.price;
+  $('#prodOldPrice').value = p.old_price || '';
+  $('#prodImage').value = p.image;
+  $('#prodCategory').value = p.category;
+  $('#prodBadge').value = p.badge || '';
+  $('#prodStock').value = p.stock;
+  $('#prodRating').value = p.rating;
+  $('#prodFeatured').checked = !!p.featured;
+  $('#prodFlashSale').checked = !!p.flash_sale;
+  $('#prodDesc').value = p.description || '';
+  $('#productModal').classList.add('active');
+}
+
+function closeProductModal() { $('#productModal').classList.remove('active'); }
+
+async function saveProduct() {
+  const id = $('#prodId').value;
+  const body = {
+    name: $('#prodName').value.trim(),
+    slug: $('#prodSlug').value.trim().replace(/\s+/g, '-').toLowerCase(),
+    price: parseFloat($('#prodPrice').value),
+    old_price: $('#prodOldPrice').value ? parseFloat($('#prodOldPrice').value) : null,
+    image: $('#prodImage').value.trim(),
+    description: $('#prodDesc').value.trim(),
+    category: $('#prodCategory').value.trim(),
+    badge: $('#prodBadge').value.trim() || null,
+    stock: parseInt($('#prodStock').value) || 0,
+    rating: parseFloat($('#prodRating').value) || 4.5,
+    featured: $('#prodFeatured').checked,
+    flash_sale: $('#prodFlashSale').checked,
+  };
+  if (!body.name || !body.slug || !body.image || body.price == null) {
+    toast('Name, slug, price and image are required', 'error');
+    return;
+  }
+  try {
+    if (id) {
+      await apiPut('/admin/products/' + id, body);
+      toast('Product updated');
+    } else {
+      await apiPost('/admin/products', body);
+      toast('Product added');
+    }
+    closeProductModal();
+    loadProducts();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Are you sure you want to delete this product?')) return;
+  try {
+    await apiDel('/admin/products/' + id);
+    toast('Product deleted');
+    loadProducts();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- USERS ---------- */
+async function loadUsers() {
+  try {
+    const data = await api('/admin/users');
+    renderUsers(data.users);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+function renderUsers(users) {
+  $('#usersBody').innerHTML = users.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td style="font-weight:600">${esc(u.username)}</td>
+      <td>${esc(u.full_name)}</td>
+      <td style="font-size:12px">${esc(u.email)}</td>
+      <td style="font-size:12px">${esc(u.phone)}</td>
+      <td>${u.order_count}</td>
+      <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-warning'}">${u.role}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${u.created_at}</td>
+      <td>
+        <select onchange="updateUserRole(${u.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+          <option value="customer" ${u.role === 'customer' ? 'selected' : ''}>Customer</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+        </select>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty">No users found</td></tr>';
+}
+
+function searchUsers(e) {
+  const q = e.target.value.trim().toLowerCase();
+  $$('tr').forEach(tr => {
+    if (tr.parentElement.id !== 'usersBody') return;
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+async function updateUserRole(id, role) {
+  try {
+    await apiPut('/admin/users/' + id + '/role', { role });
+    toast('User role updated to ' + role);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- MESSAGES ---------- */
+async function loadMessages() {
+  try {
+    const data = await api('/admin/messages');
+    $('#messagesBody').innerHTML = data.messages.map(m => `
+      <tr>
+        <td>#${m.id}</td>
+        <td style="font-weight:600">${esc(m.name)}</td>
+        <td style="font-size:12px">${esc(m.email)}</td>
+        <td style="font-size:12px">${esc(m.subject)}</td>
+        <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(m.message)}</td>
+        <td style="font-size:11px;color:var(--text2)">${m.created_at}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewMessage(${m.id})"><i class="ti ti-eye"></i></button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" class="empty">No messages</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+function viewMessage(id) {
+  apiPut('/admin/messages/' + id + '/read').catch(() => {});
+  const row = $$('tr').find(tr => tr.cells[0] && tr.cells[0].textContent === '#' + id);
+  if (row) {
+    const msg = row.cells[4].textContent;
+    const name = row.cells[1].textContent;
+    const email = row.cells[2].textContent;
+    const subject = row.cells[3].textContent;
+    alert(`From: ${name} (${email})\nSubject: ${subject}\n\n${msg}`);
+  }
+}
+
+/* ---------- VENDORS ---------- */
+async function loadVendors() {
+  try {
+    const data = await api('/admin/vendors');
+    $('#vendorsBody').innerHTML = data.vendors.map(v => `
+      <tr>
+        <td>#${v.id}</td>
+        <td style="font-weight:600">${esc(v.store_name)}</td>
+        <td>${esc(v.account_type)}</td>
+        <td style="font-size:12px">${esc(v.location)}</td>
+        <td style="font-size:12px">${esc(v.mobile)}</td>
+        <td style="font-size:12px">${esc(v.username || 'N/A')} ${v.email ? '(' + v.email + ')' : ''}</td>
+        <td><span class="badge badge-${v.status}">${v.status}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-green btn-sm" onclick="updateVendorStatus(${v.id},'approved')"><i class="ti ti-check"></i></button>
+          <button class="btn btn-danger btn-sm" onclick="updateVendorStatus(${v.id},'rejected')"><i class="ti ti-x"></i></button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" class="empty">No vendor applications</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function updateVendorStatus(id, status) {
+  try {
+    await apiPut('/admin/vendors/' + id + '/status', { status });
+    toast('Vendor application ' + status);
+    loadVendors();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- REVIEWS ---------- */
+async function loadReviews() {
+  try {
+    const data = await api('/admin/reviews');
+    $('#reviewsBody').innerHTML = data.reviews.map(r => `
+      <tr>
+        <td>#${r.id}</td>
+        <td style="font-weight:600">${esc(r.product_name)}</td>
+        <td>${esc(r.username)}</td>
+        <td>${'<i class="ti ti-star-filled" style="color:#f59e0b"></i>'.repeat(r.rating)} ${r.rating}/5</td>
+        <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(r.comment)}</td>
+        <td style="font-size:11px;color:var(--text2)">${r.created_at}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteReview(${r.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" class="empty">No reviews</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function deleteReview(id) {
+  if (!confirm('Delete this review?')) return;
+  try {
+    await apiDel('/admin/reviews/' + id);
+    toast('Review deleted');
+    loadReviews();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- BOOT ---------- */
+checkSession();
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 
 const { attachUser } = require('./auth');
 const apiRoutes = require('./routes');
+const adminRoutes = require('./admin-routes');
 const db = require('./db');
 
 const app = express();
@@ -96,17 +97,8 @@ app.post('/api/chat', async (req, res) => {
 // ---- Store API ----
 app.use('/api', apiRoutes);
 
-// ---- Admin-lite stats (useful for the shop owner) ----
-app.get('/api/admin/stats', (req, res) => {
-  res.json({
-    users: db.prepare('SELECT COUNT(*) c FROM users').get().c,
-    products: db.prepare('SELECT COUNT(*) c FROM products').get().c,
-    orders: db.prepare('SELECT COUNT(*) c FROM orders').get().c,
-    revenue: db.prepare("SELECT COALESCE(SUM(total),0) t FROM orders WHERE status != 'cancelled'").get().t,
-    vendor_applications: db.prepare('SELECT COUNT(*) c FROM vendor_applications').get().c,
-    contact_messages: db.prepare('SELECT COUNT(*) c FROM contact_messages').get().c,
-  });
-});
+// ---- Admin API ----
+app.use('/api/admin', adminRoutes);
 
 // ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
 app.use(express.static(path.join(__dirname, '..')));

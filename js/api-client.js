@@ -43,17 +43,22 @@
   function productCardHTML(p) {
     const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + p.badge + '</span>' : '';
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
+    const outOfStock = p.stock != null && p.stock <= 0;
+    const stockBadge = outOfStock ? '<span class="badge rounded-pill badge-danger" style="position:absolute;top:8px;left:8px;">Out of Stock</span>' : '';
+    const addBtn = outOfStock
+      ? '<a class="btn btn-secondary btn-sm disabled" href="#" style="opacity:.5;pointer-events:none;cursor:not-allowed"><i class="ti ti-x"></i></a>'
+      : '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>';
     return (
       '<div class="col-6 col-md-4">' +
-        '<div class="card product-card">' +
+        '<div class="card product-card" style="position:relative">' +
           '<div class="card-body">' +
-            badge +
+            badge + stockBadge +
             '<a class="wishlist-btn" href="#" data-wishlist-id="' + p.id + '"><i class="ti ti-heart"></i></a>' +
             '<a class="product-thumbnail d-block" href="' + p.slug + '.html"><img class="mb-2" src="' + p.image + '" alt=""></a>' +
             '<a class="product-title" href="' + p.slug + '.html">' + p.name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
             '<div class="product-rating"><i class="ti ti-star-filled"></i>' + p.rating + '</div>' +
-            '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>' +
+            addBtn +
           '</div>' +
         '</div>' +
       '</div>'
@@ -639,6 +644,25 @@
     // The main "Add to Cart" button on product detail pages is inside <form class="cart-form">
     const cartForm = $('.cart-form');
     if (cartForm) {
+      // Fetch product to show stock status and disable add if out of stock
+      try {
+        const { product: prod } = await get('/products/' + slug);
+        if (prod.stock != null && prod.stock <= 0) {
+          // Show "Out of Stock" and disable the button
+          const btn = cartForm.querySelector('button[type="submit"]');
+          if (btn) { btn.textContent = 'Out of Stock'; btn.classList.add('disabled'); btn.style.opacity = '.5'; btn.style.pointerEvents = 'none'; }
+          const stockInfo = document.createElement('p');
+          stockInfo.style.cssText = 'color:#ef4444;font-size:13px;font-weight:600;margin-bottom:8px';
+          stockInfo.innerHTML = '<i class="ti ti-alert-circle"></i> Out of Stock — Available soon';
+          cartForm.querySelector('.order-plus-minus').insertAdjacentElement('afterend', stockInfo);
+        } else if (prod.stock != null && prod.stock < 10) {
+          const stockInfo = document.createElement('p');
+          stockInfo.style.cssText = 'color:#f59e0b;font-size:12px;font-weight:600;margin-bottom:8px';
+          stockInfo.innerHTML = '<i class="ti ti-alert-triangle"></i> Only ' + prod.stock + ' left in stock!';
+          cartForm.querySelector('.order-plus-minus').insertAdjacentElement('afterend', stockInfo);
+        }
+      } catch (_) {}
+
       cartForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const qtyInput = $('.cart-quantity-input', cartForm);

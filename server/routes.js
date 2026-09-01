@@ -199,8 +199,9 @@ router.get('/cart', (req, res) => {
 
 router.post('/cart', (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};
-  const product = db.prepare('SELECT id FROM products WHERE id = ?').get(product_id);
+  const product = db.prepare('SELECT id, stock FROM products WHERE id = ?').get(product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
   const w = cartWhere(req);
   const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product_id);
@@ -235,8 +236,9 @@ router.delete('/cart/:id', (req, res) => {
 router.post('/cart/by-slug', (req, res) => {
   const { slug, quantity = 1 } = req.body || {};
   if (!slug) return res.status(400).json({ error: 'Product slug is required.' });
-  const product = db.prepare('SELECT id FROM products WHERE slug = ?').get(slug);
+  const product = db.prepare('SELECT id, stock FROM products WHERE slug = ?').get(slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
   const w = cartWhere(req);
   const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product.id);

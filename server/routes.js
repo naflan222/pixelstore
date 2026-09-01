@@ -231,6 +231,24 @@ router.delete('/cart/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Add to cart by product slug (used by static "+" buttons on home/listing pages)
+router.post('/cart/by-slug', (req, res) => {
+  const { slug, quantity = 1 } = req.body || {};
+  if (!slug) return res.status(400).json({ error: 'Product slug is required.' });
+  const product = db.prepare('SELECT id FROM products WHERE slug = ?').get(slug);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  const qty = Math.max(1, parseInt(quantity) || 1);
+  const w = cartWhere(req);
+  const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product.id);
+  if (existing) {
+    db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(qty, existing.id);
+  } else {
+    db.prepare('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)')
+      .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product.id, qty);
+  }
+  res.json({ ok: true });
+});
+
 /* ---------------- WISHLIST (guests too) ---------------- */
 
 function wishWhere(req) {

@@ -61,11 +61,47 @@
   }
 
   function bindProductButtons(root) {
+    // Buttons with data-cart-id (numeric product ID — used on dynamically rendered grids)
     $$('[data-cart-id]', root).forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.preventDefault();
         try {
           await post('/cart', { product_id: Number(el.dataset.cartId) });
+          el.innerHTML = '<i class="ti ti-check"></i>';
+          setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          refreshCartBadge();
+        } catch (err) { alert(err.message); }
+      });
+    });
+    // Buttons with data-cart-slug (used on static product cards like home.html)
+    $$('[data-cart-slug]', root).forEach((el) => {
+      el.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          await post('/cart/by-slug', { slug: el.dataset.cartSlug });
+          el.innerHTML = '<i class="ti ti-check"></i>';
+          setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          refreshCartBadge();
+        } catch (err) { alert(err.message); }
+      });
+    });
+    // Generic "+" add-to-cart buttons without any data attribute —
+    // extract the slug from the nearest .product-title link inside the same card.
+    // Only match buttons that contain a ti-plus icon to avoid catching other btn-primary buttons.
+    $$('.product-card .btn-primary:not([data-cart-id]):not([data-cart-slug])', root).forEach((el) => {
+      if (el.dataset.cartBound) return;
+      if (!el.querySelector('.ti-plus')) return; // only "+" buttons
+      el.dataset.cartBound = '1';
+      el.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const card = el.closest('.product-card') || el.closest('.card');
+        const titleLink = card && $('.product-title', card);
+        if (!titleLink) return;
+        const href = titleLink.getAttribute('href') || '';
+        const slug = href.replace(/\.html$/, '');
+        if (!slug || slug === '#') return;
+        try {
+          await post('/cart/by-slug', { slug });
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
@@ -599,6 +635,24 @@
   function wireProductDetail() {
     const slug = page.replace('.html', '');
     if (!slug || page === 'index.html') return;
+
+    // The main "Add to Cart" button on product detail pages is inside <form class="cart-form">
+    const cartForm = $('.cart-form');
+    if (cartForm) {
+      cartForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const qtyInput = $('.cart-quantity-input', cartForm);
+        const quantity = qtyInput ? Math.max(1, parseInt(qtyInput.value) || 1) : 1;
+        try {
+          const { product } = await get('/products/' + slug);
+          await post('/cart', { product_id: product.id, quantity });
+          location.href = 'cart.html';
+        } catch (err) { alert(err.message); }
+      });
+      return;
+    }
+
+    // Fallback: older templates that use an <a> tag for add-to-cart
     const buyBtn = $('a[href="cart.html"], .add-to-cart-btn, .btn-danger.btn-lg');
     if (!buyBtn) return;
     buyBtn.addEventListener('click', async (e) => {

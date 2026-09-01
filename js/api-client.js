@@ -328,8 +328,8 @@
           )).join('');
         }
         const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-        const totalEl = $('.cart-amount-area .counter');
-        if (totalEl) totalEl.textContent = subtotal.toLocaleString('en-US');
+        const totalEl = $('.cart-amount-area .cart-total');
+        if (totalEl) totalEl.textContent = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         $$('[data-remove]', tbody).forEach((el) => el.addEventListener('click', async (e) => {
           e.preventDefault();
@@ -419,8 +419,8 @@
         return SHIPPING[checked ? checked.id : 'normalShipping'] || SHIPPING.normalShipping;
       }
       function updateTotal() {
-        const totalEl = $('.cart-amount-area .counter');
-        if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US');
+        const totalEl = $('.cart-amount-area .cart-total');
+        if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // Only reveal the total bar once it holds the REAL cart total
         if (checkoutTotal && subtotal > 0) checkoutTotal.style.display = '';
       }

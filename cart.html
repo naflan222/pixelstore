@@ -65,18 +65,13 @@
           <div class="user-profile"><img src="img/bg-img/9.jpg" alt=""></div>
           <div class="user-info">
             <h5 class="user-name mb-1 text-white">PixelHouse User</h5>
-            <p class="available-balance text-white">Current Balance $<span class="counter">99</span></p>
+            <p class="available-balance text-white">Current Balance Rs.<span class="counter">99</span></p>
           </div>
         </div>
         <!-- Sidenav Nav-->
         <ul class="sidenav-nav ps-0">
           <li><a href="profile.html"><i class="ti ti-user"></i>My Profile</a></li>
-          <li class="suha-dropdown-menu"><a href="wishlist-grid.html"><i class="ti ti-heart"></i>My Wishlist</a>
-            <ul>
-              <li><a href="wishlist-grid.html">Wishlist Grid</a></li>
-              <li><a href="wishlist-list.html">Wishlist List</a></li>
-            </ul>
-          </li>
+          
           <li><a href="intro.html"><i class="ti ti-logout"></i>Sign Out</a></li>
         </ul>
       </div>
@@ -88,37 +83,8 @@
           <div class="cart-table card mb-3">
             <div class="table-responsive card-body">
               <table class="table mb-0">
-                <tbody>
-                  <tr>
-                    <th scope="row"><a class="remove-product" href="#"><i class="ti ti-x"></i></a></th>
-                    <td><img class="rounded" src="img/product/11.png" alt=""></td>
-                    <td><a class="product-title" href="single-product.html">Ciramic Pot Set<span class="mt-1">$12.10 × 1</span></a></td>
-                    <td>
-                      <div class="quantity">
-                        <input class="qty-text" type="number" min="1" max="99" value="1">
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><a class="remove-product" href="#"><i class="ti ti-x"></i></a></th>
-                    <td><img class="rounded" src="img/product/14.png" alt=""></td>
-                    <td><a class="product-title" href="single-product.html">Bluetooth Speaker<span class="mt-1">$9.87 × 2</span></a></td>
-                    <td>
-                      <div class="quantity">
-                        <input class="qty-text" type="number" min="1" max="99" value="2">
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><a class="remove-product" href="#"><i class="ti ti-x"></i></a></th>
-                    <td><img class="rounded" src="img/product/10.png" alt=""></td>
-                    <td><a class="product-title" href="single-product.html">Modern Gray Tops<span class="mt-1">$7 × 1</span></a></td>
-                    <td>
-                      <div class="quantity">
-                        <input class="qty-text" type="number" min="1" max="99" value="1">
-                      </div>
-                    </td>
-                  </tr>
+                <tbody id="cartTbody">
+                  <tr><td colspan="4" class="text-center py-3">Loading cart...</td></tr>
                 </tbody>
               </table>
             </div>

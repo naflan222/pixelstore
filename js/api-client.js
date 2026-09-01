@@ -22,7 +22,7 @@
   const put = (p, body) => api(p, { method: 'PUT', body: JSON.stringify(body || {}) });
   const del = (p) => api(p, { method: 'DELETE' });
 
-  const money = (n) => 'Rs. ' + Number(n).toLocaleString('en-US');
+  const money = (n) => 'Rs. ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
@@ -53,7 +53,6 @@
         '<div class="card product-card" style="position:relative">' +
           '<div class="card-body">' +
             badge + stockBadge +
-            '<a class="wishlist-btn" href="#" data-wishlist-id="' + p.id + '"><i class="ti ti-heart"></i></a>' +
             '<a class="product-thumbnail d-block" href="' + p.slug + '.html"><img class="mb-2" src="' + p.image + '" alt=""></a>' +
             '<a class="product-title" href="' + p.slug + '.html">' + p.name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
@@ -104,21 +103,12 @@
         if (!titleLink) return;
         const href = titleLink.getAttribute('href') || '';
         const slug = href.replace(/\.html$/, '');
-        if (!slug || slug === '#') return;
+        if (!slug || slug === '#' || slug === 'single-product') return; // skip demo products
         try {
           await post('/cart/by-slug', { slug });
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
-        } catch (err) { alert(err.message); }
-      });
-    });
-    $$('[data-wishlist-id]', root).forEach((el) => {
-      el.addEventListener('click', async (e) => {
-        e.preventDefault();
-        try {
-          const r = await post('/wishlist', { product_id: Number(el.dataset.wishlistId) });
-          el.style.color = r.added ? '#ea4c62' : '';
         } catch (err) { alert(err.message); }
       });
     });
@@ -500,19 +490,6 @@
       } catch (_) {}
     },
 
-    'wishlist-grid.html': async function () { await renderWishlist('.row', productCardHTML); },
-    'wishlist-list.html': async function () {
-      await renderWishlist('.row', (p) => (
-        '<div class="col-12"><div class="card product-card"><div class="card-body">' +
-          '<a class="product-thumbnail d-block" href="' + p.slug + '.html"><img class="mb-2" src="' + p.image + '" alt=""></a>' +
-          '<a class="product-title" href="' + p.slug + '.html">' + p.name + '</a>' +
-          '<p class="sale-price">' + money(p.price) + (p.old_price ? '<span>' + money(p.old_price) + '</span>' : '') + '</p>' +
-          '<div class="product-rating"><i class="ti ti-star-filled"></i>' + p.rating + '</div>' +
-          '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>' +
-        '</div></div></div>'
-      ));
-    },
-
     'my-order.html': async function () {
       const wrap = $('.my-order-area, .order-wrapper, .page-content-wrapper .container');
       if (!wrap) return;
@@ -611,28 +588,21 @@
 
     'featured-products.html': async function () { await renderProductGrid({ featured: '1' }); },
     'flash-sale.html': async function () { await renderProductGrid({ flash_sale: '1' }); },
+    'shop-grid.html': async function () { await renderProductGrid({}); },
+    'shop-list.html': async function () { await renderProductGrid({}); },
   };
 
-  async function renderWishlist(selector, tpl) {
-    const row = $(selector);
-    if (!row || !currentUser) return;
-    try {
-      const { items } = await get('/wishlist');
-      if (!items.length) return;
-      row.innerHTML = items.map((p) => tpl({ ...p, rating: p.rating || 4.5 })).join('');
-      bindProductButtons(row);
-    } catch (_) {}
-  }
-
   async function renderProductGrid(query) {
-    const grid = $('.flash-sale-wrapper .row, .featured-products-wrapper .row, .top-products-area .row, .page-content-wrapper .row.g-3');
-    if (!grid) return;
+    const grid = $('.flash-sale-wrapper .row, .featured-products-wrapper .row, .top-products-area .row, .page-content-wrapper .row.g-2, .page-content-wrapper .row.g-1 .row.g-2, .shop-grid-wrapper .row, .page-content-wrapper > .container > .row.g-2');
+    // Fallback: try the main product grid on shop-grid.html
+    const grid2 = grid || $('.page-content-wrapper .py-3 .container .row.g-2');
+    if (!grid2) return;
     try {
       const qs = new URLSearchParams(query).toString();
       const { products } = await get('/products?' + qs);
       if (!products.length) return;
-      grid.innerHTML = products.map(productCardHTML).join('');
-      bindProductButtons(grid);
+      grid2.innerHTML = products.map(productCardHTML).join('');
+      bindProductButtons(grid2);
     } catch (_) {}
   }
 

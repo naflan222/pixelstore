@@ -257,6 +257,7 @@ const products = [
   { slug: 'lensfilter', name: 'GoPro Lens Filter (UnderWater)', price: 6000, old_price: 8500, image: 'img/product/14.png', badge: 'On Sale', description: 'Red/magenta dive filters that restore natural colour underwater.' },
   { slug: 'wpdcase', name: 'Water Proof Diving Case', price: 4300, old_price: 6500, image: 'img/product/15.png', badge: '-11%', description: '45 m waterproof dive housing for GoPro Hero cameras.' },
   { slug: 'x4case1', name: 'Insta 360 X4 Silicone Case', price: 1900, old_price: 2800, image: 'img/product/16.png', badge: 'New', description: 'Shock-absorbing silicone case for the Insta360 X4.' },
+  { slug: 'btrychrger13', name: 'Battery charger for Hero 13', price: 8200, old_price: 9400, image: 'img/product/22.png', badge: 'New', description: 'Hero 13 3Slot Battery Charger' },
 ];
 
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;

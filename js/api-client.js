@@ -174,6 +174,8 @@
       // Sidenav identity
       const name = $('.sidenav-profile .user-name');
       if (name) name.textContent = currentUser.username;
+      const accountName = document.getElementById('accountDisplayName');
+      if (accountName) accountName.textContent = currentUser.username;
       // Notification badge
       const badge = $('.sidenav-nav .badge');
       if (badge) {
@@ -196,6 +198,8 @@
       currentUser = null;
       const name = $('.sidenav-profile .user-name');
       if (name) name.textContent = 'Guest';
+      const accountName = document.getElementById('accountDisplayName');
+      if (accountName) accountName.textContent = 'Guest';
       // Guests still get a cart badge
       refreshCartBadge();
     }

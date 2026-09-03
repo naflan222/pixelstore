@@ -259,6 +259,7 @@ const products = [
   { slug: 'x4case1', name: 'Insta 360 X4 Silicone Case', price: 1900, old_price: 2800, image: 'img/product/19.png', badge: 'New', description: 'Shock-absorbing silicone case for the Insta360 X4.' },
   { slug: 'btrychrger13', name: 'Battery charger for Hero 13', price: 8200, old_price: 9400, image: 'img/product/22.png', badge: 'New', description: 'Hero 13 3Slot Battery Charger' },
   { slug: 'antifog', name: 'GoPro Hero Anti-Fog Inserts 12 Pack', price: 300, old_price: 360, image: 'img/product/23.png', badge: 'New', description: 'GoPro Hero Anti-Fogs' },
+  { slug: 'hero13', name: 'GoPro Hero 13 Black', price: 92000, old_price: 98000, image: 'img/product/hero13.png', badge: 'New', description: 'GoPro Hero 13 Black' },
 ];
 
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;

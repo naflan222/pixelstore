@@ -100,6 +100,9 @@ app.use('/api', apiRoutes);
 // ---- Admin API ----
 app.use('/api/admin', adminRoutes);
 
+// The template showcase is not part of the public storefront.
+app.get('/', (req, res) => res.redirect('/home.html'));
+
 // ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
 app.use(express.static(path.join(__dirname, '..')));
 

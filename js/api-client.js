@@ -167,10 +167,20 @@
   }
 
   /* ---------- session ---------- */
+  function setSessionNavigation(isAuthenticated) {
+    $$('a[href="intro.html"], a[href="login.html"]').forEach((link) => {
+      link.href = isAuthenticated ? 'intro.html' : 'login.html';
+      link.innerHTML = isAuthenticated
+        ? '<i class="ti ti-logout"></i>Sign Out'
+        : '<i class="ti ti-login"></i>Sign In';
+    });
+  }
+
   async function loadSession() {
     try {
       const data = await get('/auth/me');
       currentUser = data.user;
+      setSessionNavigation(true);
       // Sidenav identity
       const name = $('.sidenav-profile .user-name');
       if (name) name.textContent = currentUser.username;
@@ -196,6 +206,7 @@
       });
     } catch (_) {
       currentUser = null;
+      setSessionNavigation(false);
       const name = $('.sidenav-profile .user-name');
       if (name) name.textContent = 'Guest';
       const accountName = document.getElementById('accountDisplayName');

@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\naflan\\Documents\\pixel\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\server\\db.js||{3B902123-F8A7-4915-9F01-361F908088D0}",
@@ -30,7 +30,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Document",
@@ -42,12 +42,11 @@
               "RelativeToolTip": "server\\db.js",
               "ViewState": "AgIAAPQAAAAAAAAAAAAAAAQBAAA/AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2026-09-03T20:19:31.459Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-03T20:19:31.459Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "antifog.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\antifog.html",
               "RelativeDocumentMoniker": "antifog.html",
@@ -84,13 +83,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "gpproducts2.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html",
               "RelativeDocumentMoniker": "gpproducts2.html",
               "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html",
               "RelativeToolTip": "gpproducts2.html",
-              "ViewState": "AgIAALIBAAAAAAAAAAAAALcBAABQAAAAAAAAAA==",
+              "ViewState": "AgIAALIBAAAAAAAAAAAAAMEBAABpAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2026-09-03T15:25:23.211Z",
               "EditorCaption": ""

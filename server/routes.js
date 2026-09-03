@@ -76,7 +76,7 @@ router.post('/auth/login', (req, res) => {
 router.post('/auth/logout', (req, res) => {
   destroySession(req.cookies && req.cookies.pixels_session);
   res.clearCookie('pixels_session');
-  res.json({ ok: true, redirect: 'intro.html' });
+  res.json({ ok: true, redirect: 'home.html' });
 });
 
 router.get('/auth/me', (req, res) => {

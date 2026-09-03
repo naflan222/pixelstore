@@ -153,9 +153,11 @@
             ...billing,
             shipping_method: sessionStorage.getItem('shipping_method') || 'standard',
             payment_method: paymentMethod,
+            coupon_code: sessionStorage.getItem('coupon_code') || '',
           });
           sessionStorage.setItem('last_order', JSON.stringify({ order_id: r.order_id, total: r.total }));
           sessionStorage.removeItem('guest_billing');
+          sessionStorage.removeItem('coupon_code');
           location.href = r.redirect || 'payment-success.html';
         } catch (err) {
           btn.classList.remove('disabled');
@@ -365,6 +367,35 @@
       const tbody = $('.cart-table tbody') || document.getElementById('cartTbody');
       if (!tbody) return;
       const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
+      const couponForm = $('.coupon-form form');
+      const couponInput = $('#couponCode', couponForm);
+      const couponFeedback = $('.coupon-feedback');
+
+      function showCouponFeedback(message, valid) {
+        if (!couponFeedback) return;
+        couponFeedback.textContent = message;
+        couponFeedback.className = 'coupon-feedback small mb-0 mt-2 ' + (valid ? 'text-success' : 'text-danger');
+      }
+
+      const savedCoupon = sessionStorage.getItem('coupon_code');
+      if (savedCoupon) {
+        if (couponInput) couponInput.value = savedCoupon;
+        showCouponFeedback(savedCoupon + ' is saved for checkout.', true);
+      }
+      if (couponForm) couponForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = (couponInput && couponInput.value || '').trim().toUpperCase();
+        try {
+          const coupon = await post('/coupons/validate', { code });
+          sessionStorage.setItem('coupon_code', coupon.code);
+          sessionStorage.setItem('coupon_discount', coupon.discount_amount);
+          showCouponFeedback(coupon.code + ' applied — you save ' + money(coupon.discount_amount) + ' at checkout.', true);
+        } catch (err) {
+          sessionStorage.removeItem('coupon_code');
+          sessionStorage.removeItem('coupon_discount');
+          showCouponFeedback(err.message, false);
+        }
+      });
       // Hide the demo total IMMEDIATELY so it never flashes before real data loads
       if (totalWrap) totalWrap.style.display = 'none';
       let data;
@@ -468,6 +499,8 @@
       };
 
       let subtotal = 0;
+      let couponDiscount = 0;
+      let couponMessage = '';
       try {
         const data = await get('/cart');
         subtotal = data.subtotal;
@@ -476,6 +509,18 @@
           if (btn) { btn.textContent = 'Cart is Empty'; btn.classList.add('disabled'); }
         }
       } catch (_) {}
+      const couponCode = sessionStorage.getItem('coupon_code');
+      if (couponCode && subtotal) {
+        try {
+          const coupon = await post('/coupons/validate', { code: couponCode });
+          couponDiscount = coupon.discount_amount;
+          sessionStorage.setItem('coupon_discount', couponDiscount);
+        } catch (err) {
+          sessionStorage.removeItem('coupon_code');
+          sessionStorage.removeItem('coupon_discount');
+          couponMessage = err.message;
+        }
+      }
 
       // Live total: subtotal + selected shipping fee, updates when user picks shipping
       function selectedShipping() {
@@ -484,7 +529,14 @@
       }
       function updateTotal() {
         const totalEl = $('.cart-amount-area .cart-total');
-        if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const discountNote = $('.checkout-discount-note');
+        if (discountNote) {
+          discountNote.textContent = couponDiscount
+            ? couponCode + ' applied: you save ' + money(couponDiscount) + ' on your items.'
+            : couponMessage;
+          discountNote.className = 'checkout-discount-note small text-center mb-2 ' + (couponMessage ? 'text-danger' : 'text-success');
+        }
+        if (totalEl) totalEl.textContent = (subtotal - couponDiscount + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // Only reveal the total bar once it holds the REAL cart total
         if (checkoutTotal && subtotal > 0) checkoutTotal.style.display = '';
       }

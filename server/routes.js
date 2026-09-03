@@ -293,7 +293,7 @@ router.delete('/wishlist/:id', (req, res) => {
 const SHIPPING_FEES = { standard: 250, express: 500, pickup: 0 };
 
 router.post('/orders', (req, res) => {
-  const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash' } = req.body || {};
+  const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash', coupon_code = '' } = req.body || {};
   if (!full_name || !email || !phone || !address)
     return res.status(400).json({ error: 'Full name, email, phone and address are required.' });
   if (!String(phone).trim() || !String(address).trim())
@@ -313,7 +313,8 @@ router.post('/orders', (req, res) => {
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const shippingFee = SHIPPING_FEES[shipping_method] ?? SHIPPING_FEES.standard;
-  const total = subtotal + shippingFee;
+  const discount = String(coupon_code).trim().toUpperCase() === 'GET20' ? subtotal * 0.2 : 0;
+  const total = subtotal - discount + shippingFee;
 
   const placeOrder = db.transaction(() => {
     const info = db.prepare(`INSERT INTO orders

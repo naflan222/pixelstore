@@ -3,20 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\naflan\\Documents\\pixel\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\server\\db.js||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:server\\db.js||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:btrychrger13.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:btrychrger13.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\domeport.html||{8B382828-6202-11D1-8870-0000F87579D2}",
@@ -30,37 +22,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "db.js",
-              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
-              "RelativeDocumentMoniker": "server\\db.js",
-              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
-              "RelativeToolTip": "server\\db.js",
-              "ViewState": "AgIAAOoAAAAAAAAAAAAAAAQBAAA/AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2026-09-03T20:19:31.459Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "antifog.html",
-              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\antifog.html",
-              "RelativeDocumentMoniker": "antifog.html",
-              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\antifog.html",
-              "RelativeToolTip": "antifog.html",
-              "ViewState": "AgIAAFEAAAAAAAAAAAAAAGQAAABCAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
-              "WhenOpened": "2026-09-03T20:10:40.124Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 2,
               "Title": "domeport.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\domeport.html",
               "RelativeDocumentMoniker": "domeport.html",
@@ -68,30 +34,31 @@
               "RelativeToolTip": "domeport.html",
               "ViewState": "AgIAAE8BAAAAAAAAAAAswHEBAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
-              "WhenOpened": "2026-09-03T16:00:05.177Z"
+              "WhenOpened": "2026-09-03T16:00:05.177Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 0,
               "Title": "btrychrger13.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html",
               "RelativeDocumentMoniker": "btrychrger13.html",
               "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html",
               "RelativeToolTip": "btrychrger13.html",
-              "ViewState": "AgIAAE8BAAAAAAAAAAAswHEBAAAHAAAAAAAAAA==",
+              "ViewState": "AgIAAJgAAAAAAAAAAAAAAKwAAAAzAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2026-09-03T16:00:00.244Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "gpproducts2.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html",
               "RelativeDocumentMoniker": "gpproducts2.html",
               "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html",
               "RelativeToolTip": "gpproducts2.html",
-              "ViewState": "AgIAALIBAAAAAAAAAAAAALcBAABQAAAAAAAAAA==",
+              "ViewState": "AgIAAJcBAAAAAAAAAAAAAKABAABbAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2026-09-03T15:25:23.211Z",
               "EditorCaption": ""

@@ -5693,3 +5693,6 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 }
 /* Keep chat messages above the input bar */
 .support-wrapper { padding-bottom: 5.5rem !important; }
+
+/* Account balances are not part of the storefront experience. */
+.available-balance { display: none; }

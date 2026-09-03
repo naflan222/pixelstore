@@ -173,9 +173,7 @@
       currentUser = data.user;
       // Sidenav identity
       const name = $('.sidenav-profile .user-name');
-      if (name) name.textContent = currentUser.full_name || currentUser.username;
-      const bal = $('.sidenav-profile .available-balance .counter');
-      if (bal) bal.textContent = currentUser.balance;
+      if (name) name.textContent = currentUser.username;
       // Notification badge
       const badge = $('.sidenav-nav .badge');
       if (badge) {
@@ -190,12 +188,14 @@
           a.addEventListener('click', async (e) => {
             e.preventDefault();
             await post('/auth/logout');
-            location.href = 'intro.html';
+            location.href = 'home.html';
           });
         }
       });
     } catch (_) {
       currentUser = null;
+      const name = $('.sidenav-profile .user-name');
+      if (name) name.textContent = 'Guest';
       // Guests still get a cart badge
       refreshCartBadge();
     }
@@ -587,10 +587,12 @@
     },
 
     'profile.html': function () {
-      if (!currentUser) return; // guests see the page as-is
+      const username = currentUser ? currentUser.username : 'Guest';
       const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.textContent = val; };
-      set('profileUsername', '@' + currentUser.username);
-      set('profileFullName', (currentUser.full_name || '').toUpperCase() || currentUser.username.toUpperCase());
+      set('profileUsername', username);
+      set('profileDisplayName', username);
+      if (!currentUser) return;
+      set('profileFullName', (currentUser.full_name || '').toUpperCase() || username.toUpperCase());
       set('profilePhone', currentUser.phone || '—');
       // Fill email row by position among the profile data rows
       const rows = $$('.profile-wrapper-area .single-profile-data .data-content, .user-data-card .single-profile-data .data-content');
@@ -602,14 +604,11 @@
           el.textContent = currentUser.address || '—';
         }
       });
-      // Profile header: update the @handle and display name
-      const handleP = $('.user-info-card .user-info p');
-      if (handleP) handleP.textContent = '@' + currentUser.username;
       const headerName = $('.user-info-card .user-info h5');
-      if (headerName && (currentUser.full_name || currentUser.username)) headerName.textContent = currentUser.full_name || currentUser.username;
+      if (headerName) headerName.textContent = username;
       // Sidenav profile name
       const sideName = $('.sidenav-profile .user-name');
-      if (sideName) sideName.textContent = currentUser.full_name || currentUser.username;
+      if (sideName) sideName.textContent = username;
     },
 
     'featured-products.html': async function () { await renderProductGrid({ featured: '1' }); },

@@ -3,16 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\naflan\\Documents\\pixel\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\actioncamera.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:actioncamera.html||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\hero13.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:hero13.html||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\server\\db.js||{3B902123-F8A7-4915-9F01-361F908088D0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:server\\db.js||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmocap.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmocap.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}",
@@ -21,6 +21,14 @@
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:gpproducts2.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\actioncamera.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:actioncamera.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\hero13.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:hero13.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html||{8B382828-6202-11D1-8870-0000F87579D2}",
@@ -38,11 +46,51 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "db.js",
+              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
+              "RelativeDocumentMoniker": "server\\db.js",
+              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
+              "RelativeToolTip": "server\\db.js",
+              "ViewState": "AgIAAPkAAAAAAAAAAAAAAAUBAABaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-09-03T20:19:31.459Z",
+              "IsPinned": true,
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "osmocap.html",
+              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\osmocap.html",
+              "RelativeDocumentMoniker": "osmocap.html",
+              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\osmocap.html",
+              "RelativeToolTip": "osmocap.html",
+              "ViewState": "AgIAALcAAAAAAAAAAAAAAKwAAACwAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-09-04T04:19:14.291Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "osmocat.html",
+              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\osmocat.html",
+              "RelativeDocumentMoniker": "osmocat.html",
+              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\osmocat.html",
+              "RelativeToolTip": "osmocat.html",
+              "ViewState": "AgIAAEkBAAAAAAAAAAAAAGABAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
+              "WhenOpened": "2026-09-04T04:09:03.007Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "hero13.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\hero13.html",
               "RelativeDocumentMoniker": "hero13.html",
@@ -50,12 +98,11 @@
               "RelativeToolTip": "hero13.html",
               "ViewState": "AgIAAKAAAAAAAAAAAAAAAKwAAAClAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
-              "WhenOpened": "2026-09-03T20:46:14.305Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-03T20:46:14.305Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 5,
               "Title": "actioncamera.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\actioncamera.html",
               "RelativeDocumentMoniker": "actioncamera.html",
@@ -68,33 +115,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "db.js",
-              "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
-              "RelativeDocumentMoniker": "server\\db.js",
-              "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
-              "RelativeToolTip": "server\\db.js",
-              "ViewState": "AgIAAPQAAAAAAAAAAAAAAAUBAAChAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
-              "WhenOpened": "2026-09-03T20:19:31.459Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 3,
               "Title": "antifog.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\antifog.html",
               "RelativeDocumentMoniker": "antifog.html",
               "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\antifog.html",
               "RelativeToolTip": "antifog.html",
-              "ViewState": "AgIAAFsBAAAAAAAAAAAgwHEBAAAHAAAAAAAAAA==",
+              "ViewState": "AgIAAFwBAAAAAAAAAAAwwHEBAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2026-09-03T20:10:40.124Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 8,
               "Title": "domeport.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\domeport.html",
               "RelativeDocumentMoniker": "domeport.html",
@@ -106,7 +140,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 7,
               "Title": "btrychrger13.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\btrychrger13.html",
               "RelativeDocumentMoniker": "btrychrger13.html",

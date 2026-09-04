@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\naflan\\Documents\\pixel\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmobag.html||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmobag.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
@@ -13,10 +17,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmocap.html||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmocap.html||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:osmocat.html||{8B382828-6202-11D1-8870-0000F87579D2}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\naflan\\Documents\\pixel\\antifog.html||{8B382828-6202-11D1-8870-0000F87579D2}",
@@ -38,11 +38,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "db.js",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\server\\db.js",
               "RelativeDocumentMoniker": "server\\db.js",
@@ -51,12 +51,11 @@
               "ViewState": "AgIAAPkAAAAAAAAAAAAAAAcBAADHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
               "WhenOpened": "2026-09-03T20:19:31.459Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "osmobag.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\osmobag.html",
               "RelativeDocumentMoniker": "osmobag.html",
@@ -69,7 +68,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "osmocap.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\osmocap.html",
               "RelativeDocumentMoniker": "osmocap.html",
@@ -77,18 +76,17 @@
               "RelativeToolTip": "osmocap.html",
               "ViewState": "AgIAAFsBAAAAAAAAAAAgwHEBAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
-              "WhenOpened": "2026-09-04T04:19:14.291Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-04T04:19:14.291Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 0,
               "Title": "osmocat.html",
               "DocumentMoniker": "C:\\Users\\naflan\\Documents\\pixel\\osmocat.html",
               "RelativeDocumentMoniker": "osmocat.html",
               "ToolTip": "C:\\Users\\naflan\\Documents\\pixel\\osmocat.html",
               "RelativeToolTip": "osmocat.html",
-              "ViewState": "AgIAAGEBAAAAAAAAAAAgwG8BAABOAAAAAAAAAA==",
+              "ViewState": "AgIAAPsAAAAAAAAAAAAAAAYBAABeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2026-09-04T04:09:03.007Z",
               "EditorCaption": ""

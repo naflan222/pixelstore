@@ -261,6 +261,7 @@ const products = [
   { slug: 'antifog', name: 'GoPro Hero Anti-Fog Inserts 12 Pack', price: 300, old_price: 360, image: 'img/product/23.png', badge: 'New', description: 'GoPro Hero Anti-Fogs' },
   { slug: 'hero13', name: 'GoPro Hero 13 Black', price: 92000, old_price: 98000, image: 'img/product/hero13.png', badge: 'New', description: 'GoPro Hero 13 Black' },
   { slug: 'osmocap', name: 'DJI Action 5Pro/4/3 Lens Cover', price: 1490, old_price: 1800, image: 'img/product/osmocap.png', badge: 'New', description: 'Soft Silicone Action Camera Lens Protective Case Cover for Dji Action 5Pro/4/3 ActionCam' },
+  { slug: 'osmobag', name: 'All-purpose Set Storage Bag Dji Action', price: 5490, old_price: 6300, image: 'img/product/osmobag.png', badge: 'New', description: 'All-purpose Set Storage Bag Dji Action' },
 ];
 
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;

@@ -96,9 +96,11 @@
                 <p class="mb-2">Enter your coupon code here &amp; get awesome discounts!</p>
                 <div class="coupon-form">
                   <form action="#">
-                    <input class="form-control" type="text" placeholder="Enter coupon code">
+                    <label class="visually-hidden" for="couponCode">Coupon code</label>
+                    <input class="form-control" id="couponCode" type="text" placeholder="Enter coupon code" autocomplete="off">
                     <button class="btn btn-primary" type="submit">Apply</button>
                   </form>
+                  <p class="coupon-feedback small mb-0 mt-2" role="status" aria-live="polite"></p>
                 </div>
               </div>
             </div>

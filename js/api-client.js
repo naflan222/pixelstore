@@ -153,9 +153,11 @@
             ...billing,
             shipping_method: sessionStorage.getItem('shipping_method') || 'standard',
             payment_method: paymentMethod,
+            coupon_code: sessionStorage.getItem('coupon_code') || '',
           });
           sessionStorage.setItem('last_order', JSON.stringify({ order_id: r.order_id, total: r.total }));
           sessionStorage.removeItem('guest_billing');
+          sessionStorage.removeItem('coupon_code');
           location.href = r.redirect || 'payment-success.html';
         } catch (err) {
           btn.classList.remove('disabled');
@@ -365,6 +367,32 @@
       const tbody = $('.cart-table tbody') || document.getElementById('cartTbody');
       if (!tbody) return;
       const totalWrap = $('.cart-amount-area'); // contains the "Rs. 38.84" demo number
+      const couponForm = $('.coupon-form form');
+      const couponInput = $('#couponCode', couponForm);
+      const couponFeedback = $('.coupon-feedback');
+
+      function showCouponFeedback(message, valid) {
+        if (!couponFeedback) return;
+        couponFeedback.textContent = message;
+        couponFeedback.className = 'coupon-feedback small mb-0 mt-2 ' + (valid ? 'text-success' : 'text-danger');
+      }
+
+      const savedCoupon = sessionStorage.getItem('coupon_code');
+      if (savedCoupon === 'GET20') {
+        if (couponInput) couponInput.value = savedCoupon;
+        showCouponFeedback('GET20 applied — 20% off your items at checkout.', true);
+      }
+      if (couponForm) couponForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const code = (couponInput && couponInput.value || '').trim().toUpperCase();
+        if (code === 'GET20') {
+          sessionStorage.setItem('coupon_code', code);
+          showCouponFeedback('GET20 applied — 20% off your items at checkout.', true);
+        } else {
+          sessionStorage.removeItem('coupon_code');
+          showCouponFeedback('That coupon code is not available. Try GET20.', false);
+        }
+      });
       // Hide the demo total IMMEDIATELY so it never flashes before real data loads
       if (totalWrap) totalWrap.style.display = 'none';
       let data;
@@ -484,7 +512,12 @@
       }
       function updateTotal() {
         const totalEl = $('.cart-amount-area .cart-total');
-        if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const discount = sessionStorage.getItem('coupon_code') === 'GET20' ? subtotal * 0.2 : 0;
+        const discountNote = $('.checkout-discount-note');
+        if (discountNote) discountNote.textContent = discount
+          ? 'GET20 applied: you save ' + money(discount) + ' on your items.'
+          : '';
+        if (totalEl) totalEl.textContent = (subtotal - discount + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // Only reveal the total bar once it holds the REAL cart total
         if (checkoutTotal && subtotal > 0) checkoutTotal.style.display = '';
       }

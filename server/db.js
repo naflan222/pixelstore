@@ -270,6 +270,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   rating     INTEGER NOT NULL,
   comment    TEXT DEFAULT '',
+  is_visible INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -371,6 +372,7 @@ CREATE TABLE IF NOT EXISTS read_messages (
   addColumn('products', 'sku', 'sku TEXT');
   addColumn('products', 'status', "status TEXT NOT NULL DEFAULT 'active'");
   addColumn('products', 'brand', "brand TEXT DEFAULT ''");
+  addColumn('reviews', 'is_visible', 'is_visible INTEGER NOT NULL DEFAULT 1');
   addColumn('users', 'is_active', 'is_active INTEGER NOT NULL DEFAULT 1');
 
   db.exec(`

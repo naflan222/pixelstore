@@ -1215,12 +1215,29 @@ router.delete('/reviews/:id', supportAccess, (req, res) => {
   if (!review) return res.status(404).json({ error: 'Review not found.' });
   db.transaction(() => {
     db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
-    const aggregate = db.prepare('SELECT AVG(rating) AS average, COUNT(*) AS count FROM reviews WHERE product_id = ?').get(review.product_id);
+    const aggregate = db.prepare('SELECT AVG(rating) AS average, COUNT(*) AS count FROM reviews WHERE product_id = ? AND is_visible = 1').get(review.product_id);
     db.prepare('UPDATE products SET rating = ?, rating_count = ? WHERE id = ?')
       .run(aggregate.count ? Math.round(aggregate.average * 10) / 10 : 0, aggregate.count, review.product_id);
   })();
   audit(req, 'deleted', 'review', id, review.product_id);
   res.json({ ok: true });
+});
+
+router.put('/reviews/:id/visibility', supportAccess, (req, res) => {
+  const id = productId(req.params.id);
+  const isVisible = req.body && (req.body.is_visible === true || req.body.is_visible === false)
+    ? Number(req.body.is_visible) : null;
+  if (!id || isVisible === null) return res.status(400).json({ error: 'Provide a valid review visibility value.' });
+  const review = db.prepare('SELECT id, product_id FROM reviews WHERE id = ?').get(id);
+  if (!review) return res.status(404).json({ error: 'Review not found.' });
+  db.transaction(() => {
+    db.prepare('UPDATE reviews SET is_visible = ? WHERE id = ?').run(isVisible, id);
+    const aggregate = db.prepare('SELECT AVG(rating) AS average, COUNT(*) AS count FROM reviews WHERE product_id = ? AND is_visible = 1').get(review.product_id);
+    db.prepare('UPDATE products SET rating = ?, rating_count = ? WHERE id = ?')
+      .run(aggregate.count ? Math.round(aggregate.average * 10) / 10 : 0, aggregate.count, review.product_id);
+  })();
+  audit(req, isVisible ? 'published' : 'hidden', 'review', id, review.product_id);
+  res.json({ ok: true, is_visible: Boolean(isVisible) });
 });
 
 module.exports = router;

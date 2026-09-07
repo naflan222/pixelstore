@@ -46,8 +46,15 @@ function requireAuth(req, res, next) {
 // Guard for admin-only API endpoints
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  if (!['owner', 'admin', 'order_manager', 'catalog_manager', 'support'].includes(req.user.role)) return res.status(403).json({ error: 'Admin access required' });
   next();
 }
 
-module.exports = { createSession, getUserByToken, destroySession, attachUser, requireAuth, requireAdmin };
+function requirePermission(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'You do not have permission for this action' });
+    next();
+  };
+}
+
+module.exports = { createSession, getUserByToken, destroySession, attachUser, requireAuth, requireAdmin, requirePermission };

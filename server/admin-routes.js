@@ -2,12 +2,21 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const { requireAdmin } = require('./auth');
+const { requireAdmin, requirePermission } = require('./auth');
 
 const router = express.Router();
 
 // All admin routes require admin role
 router.use(requireAdmin);
+
+const owners = requirePermission('owner', 'admin');
+const orderAccess = requirePermission('owner', 'admin', 'order_manager');
+const catalogAccess = requirePermission('owner', 'admin', 'catalog_manager');
+const supportAccess = requirePermission('owner', 'admin', 'support');
+const audit = (req, action, entityType, entityId, details = '') => {
+  db.prepare('INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)')
+    .run(req.user.id, action, entityType, String(entityId), details);
+};
 
 /* ---------------- DASHBOARD STATS ---------------- */
 router.get('/stats', (req, res) => {
@@ -40,7 +49,7 @@ router.get('/stats', (req, res) => {
 });
 
 /* ---------------- ORDERS ---------------- */
-router.get('/orders', (req, res) => {
+router.get('/orders', orderAccess, (req, res) => {
   const { status, search, page: pageNum } = req.query;
   const perPage = 20;
   const page = Math.max(1, parseInt(pageNum) || 1);
@@ -72,18 +81,25 @@ router.get('/orders', (req, res) => {
   });
 });
 
-router.get('/orders/:id', (req, res) => {
+router.get('/orders/:id', orderAccess, (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-  res.json({ order, items });
+  const history = db.prepare(`SELECT h.*, u.username AS changed_by_name FROM order_status_history h
+    LEFT JOIN users u ON u.id = h.changed_by WHERE h.order_id = ? ORDER BY h.id DESC`).all(order.id);
+  res.json({ order, items, history });
 });
 
-router.put('/orders/:id/status', (req, res) => {
-  const { status } = req.body || {};
+router.put('/orders/:id/status', orderAccess, (req, res) => {
+  const { status, note } = req.body || {};
   const valid = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
   if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  const existing = db.prepare('SELECT status FROM orders WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Order not found' });
   db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, req.params.id);
+  db.prepare('INSERT INTO order_status_history (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)')
+    .run(req.params.id, status, String(note || ''), req.user.id);
+  audit(req, 'updated status', 'order', req.params.id, `${existing.status} → ${status}`);
   // Notify user if they have an account
   const order = db.prepare('SELECT user_id, full_name FROM orders WHERE id = ?').get(req.params.id);
   if (order && order.user_id) {
@@ -93,8 +109,18 @@ router.put('/orders/:id/status', (req, res) => {
   res.json({ ok: true });
 });
 
+router.put('/orders/:id/fulfillment', orderAccess, (req, res) => {
+  const { carrier, tracking_number, internal_notes } = req.body || {};
+  const order = db.prepare('SELECT id FROM orders WHERE id = ?').get(req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  db.prepare('UPDATE orders SET carrier = ?, tracking_number = ?, internal_notes = ? WHERE id = ?')
+    .run(String(carrier || '').trim(), String(tracking_number || '').trim(), String(internal_notes || '').trim(), req.params.id);
+  audit(req, 'updated fulfillment', 'order', req.params.id, String(tracking_number || 'No tracking number'));
+  res.json({ ok: true });
+});
+
 /* ---------------- PRODUCTS ---------------- */
-router.get('/products', (req, res) => {
+router.get('/products', catalogAccess, (req, res) => {
   const { search, category } = req.query;
   let sql = 'SELECT * FROM products WHERE 1=1';
   const params = [];
@@ -105,7 +131,7 @@ router.get('/products', (req, res) => {
   res.json({ products });
 });
 
-router.post('/products', (req, res) => {
+router.post('/products', catalogAccess, (req, res) => {
   const { name, slug, price, old_price, image, description, category, badge, stock, featured, flash_sale } = req.body || {};
   if (!name || !slug || price == null || !image)
     return res.status(400).json({ error: 'Name, slug, price and image are required.' });
@@ -115,33 +141,60 @@ router.post('/products', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(slug, name, description || '', price, old_price || null, image, category || 'GoPro Accessories',
          badge || null, stock != null ? stock : 100, featured ? 1 : 0, flash_sale ? 1 : 0);
+  audit(req, 'created', 'product', slug, name);
   res.json({ ok: true });
 });
 
-router.put('/products/:id', (req, res) => {
-  const { name, slug, price, old_price, image, description, category, badge, stock, featured, flash_sale, rating } = req.body || {};
+router.put('/products/:id', catalogAccess, (req, res) => {
+  const { name, slug, price, old_price, image, description, category, badge, stock, featured, flash_sale, rating, reorder_threshold } = req.body || {};
   const existing = db.prepare('SELECT id FROM products WHERE slug = ? AND id != ?').get(slug, req.params.id);
   if (existing) return res.status(409).json({ error: 'Another product already uses this slug.' });
   db.prepare(`UPDATE products SET
     name = ?, slug = ?, description = ?, price = ?, old_price = ?, image = ?,
-    category = ?, badge = ?, stock = ?, featured = ?, flash_sale = ?, rating = ?
+    category = ?, badge = ?, stock = ?, featured = ?, flash_sale = ?, rating = ?, reorder_threshold = ?
     WHERE id = ?`)
     .run(name, slug, description || '', price, old_price || null, image,
          category || 'GoPro Accessories', badge || null, stock != null ? stock : 0,
-         featured ? 1 : 0, flash_sale ? 1 : 0, rating || 4.5, req.params.id);
+         featured ? 1 : 0, flash_sale ? 1 : 0, rating || 4.5, Math.max(0, Number(reorder_threshold) || 0), req.params.id);
+  audit(req, 'updated', 'product', req.params.id, name);
   res.json({ ok: true });
 });
 
-router.delete('/products/:id', (req, res) => {
+router.delete('/products/:id', catalogAccess, (req, res) => {
   // Check if product is in any carts or orders
   const inCart = db.prepare('SELECT COUNT(*) c FROM carts WHERE product_id = ?').get(req.params.id).c;
   if (inCart) return res.status(400).json({ error: 'Cannot delete: product is in someone\'s cart. Remove it from carts first or set stock to 0.' });
   db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
+  audit(req, 'deleted', 'product', req.params.id);
+  res.json({ ok: true });
+});
+
+router.get('/inventory', catalogAccess, (req, res) => {
+  const products = db.prepare('SELECT id, name, image, stock, reorder_threshold FROM products ORDER BY stock ASC, name').all();
+  const movements = db.prepare(`SELECT m.*, p.name AS product_name, u.username AS changed_by_name FROM inventory_movements m
+    JOIN products p ON p.id = m.product_id LEFT JOIN users u ON u.id = m.changed_by ORDER BY m.id DESC LIMIT 50`).all();
+  res.json({ products, movements });
+});
+
+router.post('/inventory/:id/adjust', catalogAccess, (req, res) => {
+  const { change, reason, note } = req.body || {};
+  const amount = Number.parseInt(change, 10);
+  if (!Number.isInteger(amount) || amount === 0) return res.status(400).json({ error: 'Enter a non-zero whole stock adjustment.' });
+  if (!String(reason || '').trim()) return res.status(400).json({ error: 'A reason is required.' });
+  const product = db.prepare('SELECT id, name, stock FROM products WHERE id = ?').get(req.params.id);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (product.stock + amount < 0) return res.status(400).json({ error: 'Stock cannot fall below zero.' });
+  db.transaction(() => {
+    db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?').run(amount, product.id);
+    db.prepare('INSERT INTO inventory_movements (product_id, change, reason, note, changed_by) VALUES (?, ?, ?, ?, ?)')
+      .run(product.id, amount, String(reason).trim(), String(note || '').trim(), req.user.id);
+  })();
+  audit(req, 'adjusted inventory', 'product', product.id, `${product.name}: ${amount > 0 ? '+' : ''}${amount}`);
   res.json({ ok: true });
 });
 
 /* ---------------- USERS ---------------- */
-router.get('/users', (req, res) => {
+router.get('/users', owners, (req, res) => {
   const { search } = req.query;
   let sql = `SELECT id, username, email, full_name, phone, address, role, balance, created_at,
     (SELECT COUNT(*) FROM orders WHERE user_id = users.id) AS order_count
@@ -153,11 +206,19 @@ router.get('/users', (req, res) => {
   res.json({ users: db.prepare(sql).all(...params) });
 });
 
-router.put('/users/:id/role', (req, res) => {
+router.put('/users/:id/role', owners, (req, res) => {
   const { role } = req.body || {};
-  if (!['customer', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  if (!['customer', 'owner', 'admin', 'order_manager', 'catalog_manager', 'support'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  if (Number(req.params.id) === req.user.id && role !== req.user.role) return res.status(400).json({ error: 'You cannot change your own role.' });
   db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, req.params.id);
+  audit(req, 'changed role', 'user', req.params.id, role);
   res.json({ ok: true });
+});
+
+router.get('/audit-logs', owners, (req, res) => {
+  const logs = db.prepare(`SELECT l.*, u.username AS actor_name FROM audit_logs l
+    LEFT JOIN users u ON u.id = l.actor_id ORDER BY l.id DESC LIMIT 100`).all();
+  res.json({ logs });
 });
 
 /* ---------------- CONTACT MESSAGES ---------------- */

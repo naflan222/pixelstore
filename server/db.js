@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS products (
   rating_count INTEGER DEFAULT 0,
   featured    INTEGER DEFAULT 0,
   flash_sale  INTEGER DEFAULT 0,
+  reorder_threshold INTEGER DEFAULT 10,
   created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -84,6 +85,38 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_fee REAL NOT NULL DEFAULT 0,
   total       REAL NOT NULL,
   status      TEXT DEFAULT 'pending',
+  carrier     TEXT DEFAULT '',
+  tracking_number TEXT DEFAULT '',
+  internal_notes TEXT DEFAULT '',
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS order_status_history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  status      TEXT NOT NULL,
+  note        TEXT DEFAULT '',
+  changed_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  change      INTEGER NOT NULL,
+  reason      TEXT NOT NULL,
+  note        TEXT DEFAULT '',
+  changed_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action      TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id   TEXT NOT NULL,
+  details     TEXT DEFAULT '',
   created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -228,6 +261,14 @@ CREATE TABLE IF NOT EXISTS read_messages (
     db.exec('ALTER TABLE orders ADD COLUMN guest_id TEXT');
   }
 
+  const addColumn = (table, column, definition) => {
+    if (tableSql(table) && !hasCol(table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+  };
+  addColumn('orders', 'carrier', "carrier TEXT DEFAULT ''");
+  addColumn('orders', 'tracking_number', "tracking_number TEXT DEFAULT ''");
+  addColumn('orders', 'internal_notes', "internal_notes TEXT DEFAULT ''");
+  addColumn('products', 'reorder_threshold', 'reorder_threshold INTEGER DEFAULT 10');
+
   db.exec('PRAGMA legacy_alter_table = OFF');
   db.exec('PRAGMA foreign_keys = ON');
 })();
@@ -235,7 +276,7 @@ CREATE TABLE IF NOT EXISTS read_messages (
 // Ensure the demo user has admin role (for databases created before admin panel)
 const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@pixels.com'").get();
 if (demoUser) {
-  db.prepare("UPDATE users SET role = 'admin' WHERE id = ? AND role = 'customer'").run(demoUser.id);
+  db.prepare("UPDATE users SET role = 'owner' WHERE id = ? AND role IN ('customer', 'admin')").run(demoUser.id);
 }
 
 // ---------- Seed products ----------

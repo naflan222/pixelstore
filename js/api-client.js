@@ -26,6 +26,35 @@
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
+  function updateStockProgress(container, product) {
+    const progressBar = $('.progress-bar', container);
+    const progressTitle = $('.progress-title, .mb-1', container);
+    if (!progressBar || !progressTitle || product.stock == null) return;
+    const stock = Math.max(0, Number(product.stock));
+    const stockPercent = Math.min(100, stock);
+    progressTitle.textContent = stock + ' In Stock';
+    progressBar.style.width = stockPercent + '%';
+    progressBar.setAttribute('aria-valuenow', String(stockPercent));
+    progressBar.setAttribute('aria-label', stock + ' items in stock');
+    progressBar.classList.toggle('bg-danger', stock === 0);
+    progressBar.classList.toggle('bg-warning', stock > 0);
+  }
+
+  async function updateFlashSaleStockBars() {
+    const cards = $$('.flash-sale-card');
+    if (!cards.length) return;
+    try {
+      const { products } = await get('/products');
+      const productsBySlug = new Map(products.map((product) => [product.slug, product]));
+      cards.forEach((card) => {
+        const link = $('a[href$=".html"]', card);
+        const slug = link && link.getAttribute('href').replace(/\.html$/, '');
+        const product = productsBySlug.get(slug);
+        if (product) updateStockProgress(card, product);
+      });
+    } catch (_) {}
+  }
+
   function alertBox(form, message, type) {
     let box = $('.api-alert', form.parentElement || form);
     if (!box) {
@@ -521,6 +550,11 @@
         if (invoice) {
           invoice.href = '/api/orders/' + Number(order_id) + '/invoice';
           invoice.classList.remove('d-none');
+          const downloadedKey = 'invoice_downloaded_' + Number(order_id);
+          if (!sessionStorage.getItem(downloadedKey)) {
+            sessionStorage.setItem(downloadedKey, '1');
+            setTimeout(() => invoice.click(), 0);
+          }
         }
       } catch (_) {}
     },
@@ -660,18 +694,7 @@
       try {
         const { product: prod } = await get('/products/' + slug);
         const salesVolume = $('.sales-volume');
-        const progressBar = salesVolume && $('.progress-bar', salesVolume);
-        const progressTitle = salesVolume && $('.mb-1', salesVolume);
-        if (progressBar && progressTitle && prod.stock != null) {
-          const stock = Math.max(0, Number(prod.stock));
-          const stockPercent = Math.min(100, stock);
-          progressTitle.textContent = stock + ' In Stock';
-          progressBar.style.width = stockPercent + '%';
-          progressBar.setAttribute('aria-valuenow', String(stockPercent));
-          progressBar.setAttribute('aria-label', stock + ' items in stock');
-          progressBar.classList.toggle('bg-danger', stock === 0);
-          progressBar.classList.toggle('bg-warning', stock > 0);
-        }
+        if (salesVolume) updateStockProgress(salesVolume, prod);
         if (prod.stock != null && prod.stock <= 0) {
           // Show "Out of Stock" and disable the button
           const btn = cartForm.querySelector('button[type="submit"]');
@@ -823,6 +846,7 @@
     await loadSession();
     if (wiring[page]) await wiring[page]();
     wireProductDetail();
+    updateFlashSaleStockBars();
     bindProductButtons(document);
     initSearch();
   });

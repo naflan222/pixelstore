@@ -462,9 +462,8 @@
 
       // Shipping methods: radio id → { api method, fee }
       const SHIPPING = {
-        fastShipping: { method: 'express', fee: 500 },
-        normalShipping: { method: 'standard', fee: 250 },
-        courier: { method: 'pickup', fee: 0 },
+        standardShipping: { method: 'standard', fee: 500 },
+        storePickup: { method: 'pickup', fee: 0 },
       };
 
       let subtotal = 0;
@@ -480,7 +479,7 @@
       // Live total: subtotal + selected shipping fee, updates when user picks shipping
       function selectedShipping() {
         const checked = $('input[name="selector"]:checked');
-        return SHIPPING[checked ? checked.id : 'normalShipping'] || SHIPPING.normalShipping;
+        return SHIPPING[checked ? checked.id : 'standardShipping'] || SHIPPING.standardShipping;
       }
       function updateTotal() {
         const totalEl = $('.cart-amount-area .cart-total');
@@ -660,6 +659,19 @@
       // Fetch product to show stock status and disable add if out of stock
       try {
         const { product: prod } = await get('/products/' + slug);
+        const salesVolume = $('.sales-volume');
+        const progressBar = salesVolume && $('.progress-bar', salesVolume);
+        const progressTitle = salesVolume && $('.mb-1', salesVolume);
+        if (progressBar && progressTitle && prod.stock != null) {
+          const stock = Math.max(0, Number(prod.stock));
+          const stockPercent = Math.min(100, stock);
+          progressTitle.textContent = stock + ' In Stock';
+          progressBar.style.width = stockPercent + '%';
+          progressBar.setAttribute('aria-valuenow', String(stockPercent));
+          progressBar.setAttribute('aria-label', stock + ' items in stock');
+          progressBar.classList.toggle('bg-danger', stock === 0);
+          progressBar.classList.toggle('bg-warning', stock > 0);
+        }
         if (prod.stock != null && prod.stock <= 0) {
           // Show "Out of Stock" and disable the button
           const btn = cartForm.querySelector('button[type="submit"]');

@@ -35,7 +35,7 @@ function notify(userId, title, body, type = 'info') {
     .run(userId, title, body, type);
 }
 
-const SHIPPING_FEES = { standard: 250, express: 500, pickup: 0 };
+const SHIPPING_FEES = { standard: 500, pickup: 0 };
 const COUPON_CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
 
 function cartItems(req) {

@@ -14,9 +14,9 @@ function createSession(userId) {
 function getUserByToken(token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.email, u.full_name, u.phone, u.address, u.avatar, u.balance, u.role
+    SELECT u.id, u.username, u.email, u.full_name, u.phone, u.address, u.avatar, u.balance, u.role, u.is_active
     FROM sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token = ? AND s.expires_at > datetime('now')`).get(token);
+    WHERE s.token = ? AND u.is_active = 1 AND s.expires_at > datetime('now')`).get(token);
   return row || null;
 }
 

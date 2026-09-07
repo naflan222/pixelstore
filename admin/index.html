@@ -410,7 +410,7 @@ tr:last-child td{border-bottom:none}
         <div class="card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>#</th><th>Product</th><th>User</th><th>Rating</th><th>Comment</th><th>Date</th><th>Actions</th></tr></thead>
+              <thead><tr><th>#</th><th>Product</th><th>User</th><th>Rating</th><th>Comment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
               <tbody id="reviewsBody"></tbody>
             </table>
           </div>
@@ -1239,10 +1239,11 @@ async function loadReviews() {
         <td>${esc(r.username)}</td>
         <td>${'<i class="ti ti-star-filled" style="color:#f59e0b"></i>'.repeat(r.rating)} ${r.rating}/5</td>
         <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc(r.comment)}</td>
+        <td><span class="badge ${r.is_visible ? 'badge-success' : 'badge-warning'}">${r.is_visible ? 'Live' : 'Hidden'}</span></td>
         <td style="font-size:11px;color:var(--text2)">${r.created_at}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteReview(${r.id})"><i class="ti ti-trash"></i></button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="setReviewVisibility(${r.id}, ${r.is_visible ? 'false' : 'true'})">${r.is_visible ? 'Hide' : 'Publish'}</button> <button class="btn btn-danger btn-sm" onclick="deleteReview(${r.id})"><i class="ti ti-trash"></i></button></td>
       </tr>
-    `).join('') || '<tr><td colspan="7" class="empty">No reviews</td></tr>';
+    `).join('') || '<tr><td colspan="8" class="empty">No reviews</td></tr>';
   } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -1251,6 +1252,14 @@ async function deleteReview(id) {
   try {
     await apiDel('/admin/reviews/' + id);
     toast('Review deleted');
+    loadReviews();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function setReviewVisibility(id, isVisible) {
+  try {
+    await apiPut('/admin/reviews/' + id + '/visibility', { is_visible: isVisible });
+    toast(isVisible ? 'Review published' : 'Review hidden');
     loadReviews();
   } catch (err) { toast(err.message, 'error'); }
 }

@@ -511,15 +511,18 @@
     'checkout-bank.html': placeOrderPage('bank'),
     'checkout-paypal.html': placeOrderPage('paypal'),
 
-    // --- Success page: show the order number and total that was just placed ---
+    // --- Success page: make the invoice for the order just placed available to its owner ---
     'payment-success.html': function () {
       const info = sessionStorage.getItem('last_order');
       if (!info) return;
       try {
-        const { order_id, total } = JSON.parse(info);
-        const p = $('.order-success-wrapper p');
-        if (p) p.innerHTML = 'Order <strong>#' + order_id + '</strong> placed — Total <strong>' + money(total) + '</strong>.<br>We will notify you of all the details via email. Thank you!';
-        sessionStorage.removeItem('last_order');
+        const { order_id } = JSON.parse(info);
+        if (!Number.isSafeInteger(Number(order_id)) || Number(order_id) < 1) return;
+        const invoice = $('#invoiceDownload');
+        if (invoice) {
+          invoice.href = '/api/orders/' + Number(order_id) + '/invoice';
+          invoice.classList.remove('d-none');
+        }
       } catch (_) {}
     },
 

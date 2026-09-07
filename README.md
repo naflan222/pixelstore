@@ -29,7 +29,10 @@ For development with auto-restart: `npm run dev`
 | Contact / support | `contact.html` | Message inbox |
 | Notifications | `notifications.html`, sidenav badge | Real unread count, auto-generated on order/welcome |
 | AI chat | `message.html` | Gemini proxy — set `GEMINI_API_KEY` env var |
-| Owner stats | — | `GET /api/admin/stats` |
+| Admin operations | `admin/` | Role-aware dashboard, orders, products, inventory, users, inbox, vendors and reviews |
+| Order fulfillment | Admin order details | Carrier, tracking number, internal notes and status history |
+| Inventory controls | Admin inventory | Reorder thresholds, stock adjustments and movement history |
+| Administrative audit trail | Admin activity log | Records fulfillment, inventory, product and staff-role changes |
 
 ## Project Structure
 
@@ -74,6 +77,10 @@ POST   /api/contact                  { name, email, subject, message }
 GET    /api/notifications 🔒          POST /api/notifications/read 🔒
 POST   /api/chat                     { message } — needs GEMINI_API_KEY
 GET    /api/admin/stats              → users / products / orders / revenue counts
+GET    /api/admin/inventory          → products needing reorder + stock movement history
+POST   /api/admin/inventory/:id/adjust { change, reason, note }
+PUT    /api/admin/orders/:id/fulfillment { carrier, tracking_number, internal_notes }
+GET    /api/admin/audit-logs         → latest administrative activity
 ```
 
 🔒 = requires login (cookie session)
@@ -90,7 +97,7 @@ Any Node host works (Railway, Render, VPS, etc.):
 
 - Password reset codes are printed to the server console — hook up an email/SMS provider (e.g. Resend, Twilio)
 - Payments: `checkout-credit-card.html` / `checkout-paypal.html` record the method but don't charge — integrate Stripe/PayPal when ready
-- `api/admin/stats` is open — protect it with an admin role check before going live
+- Keep the owner account protected and assign the least-privileged staff role required: order manager, catalog manager, or support
 - Add rate limiting (e.g. `express-rate-limit`) on auth endpoints
 
 ## Email OTP Setup (Forgot Password)

@@ -52,6 +52,8 @@ a{text-decoration:none;color:inherit}
 .main{margin-left:240px;min-height:100vh;display:flex;flex-direction:column}
 .topbar{height:64px;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;background:var(--panel)}
 .topbar h2{font-size:18px;font-weight:700}
+.page-context{display:flex;flex-direction:column;gap:2px}
+.breadcrumb{color:var(--text2);font-size:11px}
 .topbar .right{display:flex;align-items:center;gap:16px}
 .topbar .avatar{width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
 .hamburger{display:none;font-size:24px;cursor:pointer;color:var(--text)}
@@ -166,6 +168,26 @@ tr:last-child td{border-bottom:none}
 }
 .dashboard-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}
 .order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:13px}
+.section-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.section-toolbar input,.section-toolbar select{padding:10px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:inherit;font-size:14px;outline:none}
+.section-toolbar input{min-width:220px;flex:1}
+.analytics-chart{display:flex;align-items:flex-end;gap:7px;height:190px;padding-top:22px}
+.analytics-chart .chart-bar{max-width:52px}
+.analytics-totals{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px;color:var(--text2);font-size:13px}
+.settings-section{margin-bottom:20px}
+.settings-section:last-child{margin-bottom:0}
+.settings-section h3{margin-bottom:6px}
+.settings-section>p{color:var(--text2);font-size:13px;line-height:1.5;margin:0 0 16px}
+.settings-notice{padding:12px 14px;border-radius:var(--radius-sm);background:rgba(59,130,246,.12);color:#bfdbfe;font-size:13px;line-height:1.5;margin-bottom:20px}
+.form-switch{display:flex;align-items:center;gap:10px;min-height:42px;color:var(--text);font-size:14px}
+.form-switch input{width:18px;height:18px;accent-color:var(--primary)}
+@media(max-width:768px){
+  .topbar{padding:0 14px}
+  .page-context h2{font-size:16px}
+  .form-actions{flex-wrap:wrap}
+  .form-actions .btn{flex:1;min-width:140px}
+  .table-wrap{margin:0 -2px}
+}
 </style>
 </head>
 <body>
@@ -196,12 +218,21 @@ tr:last-child td{border-bottom:none}
     <div class="logo">Pixel<span>House</span></div>
     <nav>
       <a class="active" data-tab="dashboard" onclick="showTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
-      <a data-tab="orders" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
-      <a data-tab="products" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
-      <a data-tab="users" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
-      <a data-tab="messages" onclick="showTab('messages')"><i class="ti ti-mail"></i> Messages</a>
+      <a data-tab="orders" data-roles="owner,admin,order_manager" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
+      <a data-tab="products" data-roles="owner,admin,catalog_manager" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
+      <a data-tab="categories" data-roles="owner,admin,catalog_manager" onclick="showTab('categories')"><i class="ti ti-category"></i> Categories</a>
+      <a data-tab="inventory" data-roles="owner,admin,catalog_manager" onclick="showTab('inventory')"><i class="ti ti-box-seam"></i> Inventory</a>
+      <a data-tab="users" data-roles="owner,admin" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
+      <a data-tab="customers" data-roles="owner,admin" onclick="showTab('customers')"><i class="ti ti-user-heart"></i> Customers</a>
+      <a data-tab="analytics" data-roles="owner,admin,order_manager" onclick="showTab('analytics')"><i class="ti ti-chart-line"></i> Analytics</a>
+      <a data-tab="marketing" data-roles="owner,admin,catalog_manager" onclick="showTab('marketing')"><i class="ti ti-speakerphone"></i> Marketing</a>
+      <a data-tab="messages" data-roles="owner,admin,support" onclick="showTab('messages')"><i class="ti ti-mail"></i> Messages</a>
       <a data-tab="vendors" onclick="showTab('vendors')"><i class="ti ti-building-store"></i> Vendors</a>
       <a data-tab="reviews" onclick="showTab('reviews')"><i class="ti ti-star"></i> Reviews</a>
+      <a data-tab="notifications" onclick="showTab('notifications')"><i class="ti ti-bell"></i> Notifications <span class="badge badge-danger" id="notificationUnread" style="margin-left:auto;display:none"></span></a>
+      <a data-tab="audit" data-roles="owner,admin" onclick="showTab('audit')"><i class="ti ti-history"></i> Activity Log</a>
+      <a data-tab="admin-users" data-roles="owner" onclick="showTab('admin-users')"><i class="ti ti-user-cog"></i> Admin Users</a>
+      <a data-tab="settings" data-roles="owner,admin" onclick="showTab('settings')"><i class="ti ti-settings"></i> Settings</a>
     </nav>
     <div class="logout"><a onclick="doLogout()"><i class="ti ti-logout"></i> Sign Out</a></div>
   </aside>
@@ -210,7 +241,7 @@ tr:last-child td{border-bottom:none}
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:12px">
         <span class="hamburger" onclick="toggleSidebar()"><i class="ti ti-menu-2"></i></span>
-        <h2 id="pageTitle">Dashboard</h2>
+        <div class="page-context"><div class="breadcrumb" id="breadcrumb">Admin / Dashboard</div><h2 id="pageTitle">Dashboard</h2></div>
       </div>
       <div class="right">
         <div class="avatar" id="userAvatar">A</div>
@@ -249,11 +280,16 @@ tr:last-child td{border-bottom:none}
           <select id="orderStatusFilter" onchange="loadOrders()">
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
+            <option value="processing">Processing</option>
+            <option value="packed">Packed</option>
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
+            <option value="refunded">Refunded</option>
           </select>
+          <select id="orderPaymentFilter" onchange="loadOrders()"><option value="all">All Payments</option><option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="bank">Bank Transfer</option><option value="paypal">PayPal</option></select>
+          <select id="orderPaymentStatusFilter" onchange="loadOrders()"><option value="all">Any payment status</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select>
+          <input type="date" id="orderDateFilter" aria-label="Order date" onchange="loadOrders()">
         </div>
         <div class="card">
           <div class="table-wrap">
@@ -270,12 +306,15 @@ tr:last-child td{border-bottom:none}
       <div class="tab" id="tab-products">
         <div class="search-bar">
           <input type="text" id="productSearch" placeholder="Search products..." onkeyup="searchProducts(event)">
+          <button class="btn btn-secondary" onclick="exportProducts()"><i class="ti ti-download"></i> Export CSV</button>
+          <button class="btn btn-secondary" onclick="$('#productImport').click()"><i class="ti ti-upload"></i> Import CSV</button><input id="productImport" type="file" accept=".csv,text/csv" hidden onchange="importProducts(this.files[0])">
           <button class="btn btn-primary" onclick="openProductModal()"><i class="ti ti-plus"></i> Add Product</button>
         </div>
+        <div class="section-toolbar" id="productBulkToolbar" style="display:none"><strong><span id="productSelectionCount">0</span> selected</strong><select id="bulkAction" onchange="toggleBulkFields()"><option value="">Choose bulk action</option><option value="status">Set status</option><option value="featured">Set featured</option><option value="category">Set category</option><option value="adjust_stock">Adjust stock</option><option value="delete">Delete selected</option></select><select id="bulkStatus" style="display:none"><option value="active">Active</option><option value="inactive">Inactive</option><option value="draft">Draft</option></select><select id="bulkFeatured" style="display:none"><option value="true">Featured</option><option value="false">Not featured</option></select><select id="bulkCategory" style="display:none"></select><input id="bulkStockChange" type="number" step="1" placeholder="Stock +/-" style="display:none;min-width:110px;flex:0"><input id="bulkStockReason" placeholder="Adjustment reason" style="display:none;min-width:180px;flex:0"><button class="btn btn-primary" onclick="applyBulkProducts()">Apply</button><button class="btn btn-secondary" onclick="clearProductSelection()">Clear</button></div>
         <div class="card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Price</th><th>Old Price</th><th>Stock</th><th>Category</th><th>Featured</th><th>Actions</th></tr></thead>
+              <thead><tr><th><input type="checkbox" id="selectAllProducts" onchange="toggleAllProducts(this.checked)" aria-label="Select all products"></th><th>Image</th><th>Name</th><th>Slug</th><th>Price</th><th>Old Price</th><th>Stock</th><th>Category</th><th>Featured</th><th>Actions</th></tr></thead>
               <tbody id="productsBody"></tbody>
             </table>
           </div>
@@ -294,6 +333,51 @@ tr:last-child td{border-bottom:none}
               <tbody id="usersBody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS -->
+      <div class="tab" id="tab-customers">
+        <div class="section-toolbar"><input type="search" id="customerSearch" placeholder="Search name, email, username or phone" oninput="debouncedCustomers()"><button class="btn btn-secondary" onclick="loadCustomers()"><i class="ti ti-refresh"></i> Refresh</button></div>
+        <div class="card"><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Contact</th><th>Account</th><th>Orders</th><th>Total spent</th><th>Last order</th><th>Registered</th><th></th></tr></thead><tbody id="customersBody"></tbody></table></div></div>
+      </div>
+
+      <!-- ANALYTICS -->
+      <div class="tab" id="tab-analytics">
+        <div class="section-toolbar"><select id="analyticsRange" onchange="toggleCustomAnalytics();loadAnalytics()"><option value="today">Today</option><option value="last_7_days">Last 7 days</option><option value="last_30_days" selected>Last 30 days</option><option value="this_month">This month</option><option value="last_month">Last month</option><option value="this_year">This year</option><option value="custom">Custom range</option></select><input type="date" id="analyticsStart" aria-label="Analytics start date" style="display:none"><input type="date" id="analyticsEnd" aria-label="Analytics end date" style="display:none"><button class="btn btn-primary" onclick="loadAnalytics()"><i class="ti ti-filter"></i> Apply</button></div>
+        <div class="stats-grid" id="analyticsStats"></div>
+        <div class="dashboard-grid"><div class="card"><h3><i class="ti ti-chart-bar"></i> Revenue and orders</h3><div class="analytics-chart" id="analyticsChart"></div><div class="analytics-totals" id="analyticsRangeTotals"></div></div><div class="card"><h3><i class="ti ti-trophy"></i> Best-selling products</h3><div class="table-wrap"><table><thead><tr><th>Product</th><th>Sold</th><th>Revenue</th></tr></thead><tbody id="analyticsProductsBody"></tbody></table></div></div></div>
+        <div class="card"><h3><i class="ti ti-category"></i> Best-performing categories</h3><div class="table-wrap"><table><thead><tr><th>Category</th><th>Units sold</th><th>Revenue</th></tr></thead><tbody id="analyticsCategoriesBody"></tbody></table></div></div>
+      </div>
+
+      <!-- MARKETING -->
+      <div class="tab" id="tab-marketing">
+        <div class="section-toolbar"><button class="btn btn-primary" onclick="openCouponModal()"><i class="ti ti-plus"></i> Add Coupon</button><button class="btn btn-secondary" onclick="openBannerModal()"><i class="ti ti-photo-plus"></i> Add Banner</button></div>
+        <div class="card"><h3><i class="ti ti-ticket"></i> Coupons</h3><div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Usage</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody id="couponsBody"></tbody></table></div></div>
+        <div class="card"><h3><i class="ti ti-photo"></i> Promotional banners</h3><div class="table-wrap"><table><thead><tr><th>Preview</th><th>Title</th><th>Schedule</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody id="bannersBody"></tbody></table></div></div>
+      </div>
+
+      <!-- INVENTORY -->
+      <div class="tab" id="tab-inventory">
+        <div class="dashboard-grid">
+          <div class="card">
+            <h3><i class="ti ti-alert-triangle"></i> Reorder Queue</h3>
+            <div id="reorderQueue"></div>
+          </div>
+          <div class="card">
+            <h3><i class="ti ti-adjustments"></i> Adjust Stock</h3>
+            <form id="inventoryForm" onsubmit="return false">
+              <div class="form-group"><label>Product</label><select id="inventoryProduct"></select></div>
+              <div class="form-group"><label>Adjustment</label><div style="display:flex;gap:8px"><select id="inventoryMode" style="max-width:120px"><option value="adjust">Add/remove</option><option value="set">Set exact</option></select><input type="number" id="inventoryChange" placeholder="e.g. 10 or -2" required></div></div>
+              <div class="form-group"><label>Reason</label><input type="text" id="inventoryReason" placeholder="e.g. Supplier delivery" required></div>
+              <div class="form-group"><label>Internal note</label><textarea id="inventoryNote" placeholder="Optional reference or note"></textarea></div>
+              <button class="btn btn-primary" onclick="adjustInventory()">Save adjustment</button>
+            </form>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i class="ti ti-list-details"></i> Recent Stock Movements</h3>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Change</th><th>Reason</th><th>Note</th><th>By</th></tr></thead><tbody id="inventoryMovementsBody"></tbody></table></div>
         </div>
       </div>
 
@@ -333,6 +417,77 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+      <!-- AUDIT LOG -->
+      <div class="tab" id="tab-audit">
+        <div class="section-toolbar"><select id="auditAdmin" onchange="loadAuditLogs(1)"><option value="">All admins</option></select><input id="auditAction" placeholder="Exact action" oninput="debouncedAudit()"><input id="auditEntity" placeholder="Entity type" oninput="debouncedAudit()"><input id="auditStart" type="date" onchange="loadAuditLogs(1)"><input id="auditEnd" type="date" onchange="loadAuditLogs(1)"><button class="btn btn-secondary" onclick="resetAuditFilters()">Reset</button></div>
+        <div class="card">
+          <h3><i class="ti ti-shield-check"></i> Administrative Activity</h3>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Team member</th><th>Action</th><th>Record</th><th>Details</th></tr></thead><tbody id="auditLogBody"></tbody></table></div>
+          <div class="pagination" id="auditPagination"></div>
+        </div>
+      </div>
+
+      <div class="tab" id="tab-notifications"><div class="section-toolbar"><select id="notificationRead" onchange="loadNotifications(1)"><option value="all">All notifications</option><option value="false">Unread</option><option value="true">Read</option></select><button class="btn btn-secondary" onclick="markAllNotificationsRead()">Mark all read</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Notification</th><th>Type</th><th>Related record</th><th>Date</th><th></th></tr></thead><tbody id="notificationsBody"></tbody></table></div><div class="pagination" id="notificationsPagination"></div></div></div>
+
+      <div class="tab" id="tab-admin-users"><div class="search-bar"><div></div><button class="btn btn-primary" onclick="openAdminUserModal()"><i class="ti ti-plus"></i> Add Admin</button></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Account</th><th>Contact</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody id="adminUsersBody"></tbody></table></div></div></div>
+
+      <!-- CATEGORIES -->
+      <div class="tab" id="tab-categories">
+        <div class="search-bar"><div></div><button class="btn btn-primary" onclick="openCategoryModal()"><i class="ti ti-plus"></i> Add Category</button></div>
+        <div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Slug</th><th>Description</th><th>Products</th><th>Status</th><th>Actions</th></tr></thead><tbody id="categoriesBody"></tbody></table></div></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="tab" id="tab-settings">
+        <form id="settingsForm">
+          <div id="settingsState" class="settings-notice" role="status">Loading settings…</div>
+          <div id="settingsContent" hidden>
+            <section class="card settings-section" aria-labelledby="storeSettingsHeading">
+              <h3 id="storeSettingsHeading"><i class="ti ti-building-store"></i> Store Settings</h3>
+              <p>Manage public store details shown to customers.</p>
+              <div class="form-grid">
+                <div class="form-group"><label for="settingStoreName">Store name</label><input id="settingStoreName" name="store_name" maxlength="120" autocomplete="organization"></div>
+                <div class="form-group"><label for="settingCurrency">Currency</label><select id="settingCurrency" name="currency"><option value="PKR">PKR — Pakistani rupee</option><option value="USD">USD — US dollar</option></select></div>
+                <div class="form-group"><label for="settingStoreEmail">Contact email</label><input id="settingStoreEmail" name="store_email" type="email" maxlength="254" autocomplete="email"></div>
+                <div class="form-group"><label for="settingStorePhone">Contact phone</label><input id="settingStorePhone" name="store_phone" maxlength="50" autocomplete="tel"></div>
+                <div class="form-group full"><label class="form-switch" for="settingStoreOpen"><input id="settingStoreOpen" name="store_open" type="checkbox"> Accept new orders</label></div>
+              </div>
+            </section>
+
+            <section class="card settings-section" aria-labelledby="paymentSettingsHeading">
+              <h3 id="paymentSettingsHeading"><i class="ti ti-credit-card"></i> Payment Settings</h3>
+              <p>Choose which existing payment options customers can use. Payment credentials remain securely stored on the server and are never displayed here.</p>
+              <div class="form-grid">
+                <div class="form-group"><label class="form-switch" for="settingCashEnabled"><input id="settingCashEnabled" name="cash_enabled" type="checkbox"> Cash on delivery</label></div>
+                <div class="form-group"><label class="form-switch" for="settingBankEnabled"><input id="settingBankEnabled" name="bank_enabled" type="checkbox"> Bank transfer</label></div>
+                <div class="form-group"><label class="form-switch" for="settingPaypalEnabled"><input id="settingPaypalEnabled" name="paypal_enabled" type="checkbox"> PayPal</label></div>
+              </div>
+            </section>
+
+            <section class="card settings-section" aria-labelledby="shippingSettingsHeading">
+              <h3 id="shippingSettingsHeading"><i class="ti ti-truck-delivery"></i> Shipping Settings</h3>
+              <p>Set the delivery methods and default fee applied to new orders.</p>
+              <div class="form-grid">
+                <div class="form-group"><label for="settingShippingFee">Default shipping fee</label><input id="settingShippingFee" name="shipping_fee" type="number" min="0" step="0.01" inputmode="decimal"></div>
+                <div class="form-group"><label class="form-switch" for="settingStandardDelivery"><input id="settingStandardDelivery" name="standard_delivery_enabled" type="checkbox"> Standard delivery</label></div>
+                <div class="form-group"><label class="form-switch" for="settingExpressDelivery"><input id="settingExpressDelivery" name="express_delivery_enabled" type="checkbox"> Express delivery</label></div>
+              </div>
+            </section>
+
+            <section class="card settings-section" aria-labelledby="notificationSettingsHeading">
+              <h3 id="notificationSettingsHeading"><i class="ti ti-bell"></i> Notification Settings</h3>
+              <p>Control which events create notifications in the admin workspace.</p>
+              <div class="form-grid">
+                <div class="form-group"><label class="form-switch" for="settingOrderNotifications"><input id="settingOrderNotifications" name="order_notifications" type="checkbox"> New order notifications</label></div>
+                <div class="form-group"><label class="form-switch" for="settingLowStockNotifications"><input id="settingLowStockNotifications" name="low_stock_notifications" type="checkbox"> Low stock notifications</label></div>
+                <div class="form-group"><label class="form-switch" for="settingVendorNotifications"><input id="settingVendorNotifications" name="vendor_notifications" type="checkbox"> Vendor application notifications</label></div>
+              </div>
+            </section>
+            <div class="form-actions"><button class="btn btn-primary" id="saveSettingsButton" type="submit"><i class="ti ti-device-floppy"></i> Save Settings</button></div>
+          </div>
+        </form>
+      </div>
+
     </div>
   </div>
 </div>
@@ -349,9 +504,13 @@ tr:last-child td{border-bottom:none}
         <div class="form-group"><label>Slug * (URL key, no spaces)</label><input type="text" id="prodSlug" required></div>
         <div class="form-group"><label>Price (Rs.) *</label><input type="number" step="0.01" id="prodPrice" required></div>
         <div class="form-group"><label>Old Price (Rs.)</label><input type="number" step="0.01" id="prodOldPrice"></div>
-        <div class="form-group"><label>Image Path *</label><input type="text" id="prodImage" placeholder="img/product/example.png" required></div>
-        <div class="form-group"><label>Category</label><input type="text" id="prodCategory" value="GoPro Accessories"></div>
+        <div class="form-group"><label>Legacy image path</label><input type="text" id="prodImage" placeholder="Optional: existing image path"></div>
+        <div class="form-group"><label>Category</label><select id="prodCategory"></select></div>
         <div class="form-group"><label>Stock</label><input type="number" id="prodStock" value="100"></div>
+        <div class="form-group"><label>Reorder at</label><input type="number" min="0" id="prodReorderThreshold" value="10"></div>
+        <div class="form-group"><label>SKU</label><input type="text" id="prodSku" placeholder="Optional unique SKU"></div>
+        <div class="form-group"><label>Brand</label><input type="text" id="prodBrand" placeholder="Optional brand"></div>
+        <div class="form-group"><label>Status</label><select id="prodStatus"><option value="active">Active</option><option value="draft">Draft</option><option value="inactive">Inactive</option></select></div>
         <div class="form-group"><label>Badge (e.g. Sale, New, -20%)</label><input type="text" id="prodBadge"></div>
         <div class="form-group"><label>Rating (0-5)</label><input type="number" step="0.1" id="prodRating" value="4.5"></div>
         <div class="form-group" style="display:flex;gap:20px;align-items:center;padding-top:30px">
@@ -359,6 +518,7 @@ tr:last-child td{border-bottom:none}
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="prodFlashSale"> Flash Sale</label>
         </div>
         <div class="form-group full"><label>Description</label><textarea id="prodDesc"></textarea></div>
+        <div class="form-group full"><label>Product images</label><input type="file" id="prodFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple onchange="previewProductFiles(this.files)"><div id="productImageGallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="saveProduct()">Save Product</button>
@@ -368,6 +528,11 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- Category Modal -->
+<div class="modal-overlay" id="categoryModal"><div class="modal"><span class="modal-close" onclick="closeCategoryModal()">&times;</span><h3 id="categoryModalTitle">Add Category</h3><form onsubmit="return false"><input type="hidden" id="categoryId"><div class="form-grid"><div class="form-group"><label>Name *</label><input id="categoryName" required></div><div class="form-group"><label>Slug *</label><input id="categorySlug" required></div><div class="form-group full"><label>Description</label><textarea id="categoryDescription"></textarea></div><div class="form-group"><label>Image path</label><input id="categoryImage" placeholder="Optional image path"></div><div class="form-group" style="padding-top:28px"><label><input type="checkbox" id="categoryActive" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveCategory()">Save Category</button><button class="btn btn-secondary" onclick="closeCategoryModal()">Cancel</button></div></form></div></div>
+
+<div class="modal-overlay" id="adminUserModal"><div class="modal"><span class="modal-close" onclick="closeAdminUserModal()">&times;</span><h3 id="adminUserModalTitle">Add Admin User</h3><form onsubmit="return false"><input id="adminUserId" type="hidden"><div class="form-grid"><div class="form-group"><label>Username *</label><input id="adminUsername" required></div><div class="form-group"><label>Email *</label><input id="adminEmail" type="email" required></div><div class="form-group"><label>Full name</label><input id="adminFullName"></div><div class="form-group"><label>Phone</label><input id="adminPhone"></div><div class="form-group"><label>Role *</label><select id="adminRole"><option value="admin">Admin</option><option value="order_manager">Order manager</option><option value="catalog_manager">Catalog manager</option><option value="support">Support</option><option value="owner">Owner</option></select></div><div class="form-group"><label id="adminPasswordLabel">Password *</label><input id="adminPassword" type="password" minlength="8"></div><div class="form-group"><label><input id="adminActive" type="checkbox" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveAdminUser()">Save Admin</button><button class="btn btn-secondary" onclick="closeAdminUserModal()">Cancel</button></div></form></div></div>
+
 <!-- Order Detail Modal -->
 <div class="modal-overlay" id="orderModal">
   <div class="modal">
@@ -376,6 +541,10 @@ tr:last-child td{border-bottom:none}
     <div id="orderDetail"></div>
   </div>
 </div>
+
+<div class="modal-overlay" id="customerModal"><div class="modal"><span class="modal-close" onclick="closeCustomerModal()">&times;</span><h3>Customer Details</h3><div id="customerDetail"></div></div></div>
+<div class="modal-overlay" id="couponModal"><div class="modal"><span class="modal-close" onclick="closeCouponModal()">&times;</span><h3 id="couponModalTitle">Add Coupon</h3><form onsubmit="return false"><input type="hidden" id="couponId"><div class="form-grid"><div class="form-group"><label>Code *</label><input id="couponCode" maxlength="32" required></div><div class="form-group"><label>Discount type *</label><select id="couponType" onchange="toggleCouponMaximum()"><option value="percentage">Percentage</option><option value="fixed">Fixed amount</option></select></div><div class="form-group"><label>Discount value *</label><input id="couponValue" type="number" min="0.01" step="0.01" required></div><div class="form-group"><label>Minimum order amount</label><input id="couponMinimum" type="number" min="0" step="0.01" value="0"></div><div class="form-group"><label>Maximum discount</label><input id="couponMaximum" type="number" min="0" step="0.01"></div><div class="form-group"><label>Usage limit</label><input id="couponLimit" type="number" min="0" step="1"></div><div class="form-group"><label>Expiry date</label><input id="couponExpires" type="datetime-local"></div><div class="form-group" style="padding-top:28px"><label><input type="checkbox" id="couponActive" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveCoupon()">Save Coupon</button><button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button></div></form></div></div>
+<div class="modal-overlay" id="bannerModal"><div class="modal"><span class="modal-close" onclick="closeBannerModal()">&times;</span><h3 id="bannerModalTitle">Add Promotional Banner</h3><form onsubmit="return false"><input type="hidden" id="bannerId"><div class="form-grid"><div class="form-group full"><label>Image URL/path *</label><input id="bannerImage" required placeholder="img/bg-img/promo.jpg"></div><div class="form-group"><label>Title *</label><input id="bannerTitle" maxlength="160" required></div><div class="form-group"><label>Button text</label><input id="bannerButtonText" maxlength="80"></div><div class="form-group full"><label>Description</label><textarea id="bannerDescription"></textarea></div><div class="form-group full"><label>Button URL</label><input id="bannerButtonUrl" placeholder="/shop-grid.html"></div><div class="form-group"><label>Display order</label><input id="bannerOrder" type="number" min="0" step="1" value="0"></div><div class="form-group"><label>Starts at</label><input id="bannerStarts" type="datetime-local"></div><div class="form-group"><label>Ends at</label><input id="bannerEnds" type="datetime-local"></div><div class="form-group" style="padding-top:28px"><label><input type="checkbox" id="bannerActive" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveBanner()">Save Banner</button><button class="btn btn-secondary" onclick="closeBannerModal()">Cancel</button></div></form></div></div>
 
 <script>
 /* ==================== ADMIN APP ==================== */
@@ -400,7 +569,7 @@ async function api(path, opts = {}) {
 }
 const apiPost = (p, b) => api(p, { method: 'POST', body: JSON.stringify(b || {}) });
 const apiPut = (p, b) => api(p, { method: 'PUT', body: JSON.stringify(b || {}) });
-const apiDel = (p) => api(p, { method: 'DELETE' });
+const apiDel = (p, opts = {}) => api(p, { ...opts, method: 'DELETE' });
 
 function toast(msg, type = 'success') {
   const t = document.createElement('div');
@@ -414,7 +583,7 @@ function toast(msg, type = 'success') {
 async function checkSession() {
   try {
     const data = await api('/auth/me');
-    if (data.user && data.user.role === 'admin') {
+    if (data.user && data.user.role !== 'customer') {
       adminUser = data.user;
       showApp();
       return;
@@ -432,6 +601,10 @@ function showApp() {
   $('#loginScreen').style.display = 'none';
   $('#app').style.display = 'block';
   $('#userAvatar').textContent = (adminUser.full_name || adminUser.username || 'A').charAt(0).toUpperCase();
+  $$('.sidebar nav a[data-roles]').forEach(link => {
+    link.style.display = link.dataset.roles.split(',').includes(adminUser.role) ? '' : 'none';
+  });
+  refreshNotificationCount();
   showTab('dashboard');
 }
 
@@ -447,7 +620,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
     const r = await apiPost('/auth/login', { username: u, password: p });
     // Check if user is admin
     const me = await api('/auth/me');
-    if (!me.user || me.user.role !== 'admin') {
+    if (!me.user || me.user.role === 'customer') {
       $('#loginErr').textContent = 'This account does not have admin access.';
       $('#loginErr').style.display = 'block';
       await apiPost('/auth/logout');
@@ -474,16 +647,26 @@ function showTab(tab) {
   $('#tab-' + tab).classList.add('active');
   $$('.sidebar nav a').forEach(a => a.classList.remove('active'));
   $$(`.sidebar nav a[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
-  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', users: 'Users', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews' };
+  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', categories: 'Categories', inventory: 'Inventory', users: 'Users', customers: 'Customers', analytics: 'Sales Analytics', marketing: 'Marketing', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', notifications: 'Notifications', audit: 'Activity Log', 'admin-users': 'Admin Users', settings: 'Settings' };
   $('#pageTitle').textContent = titles[tab] || tab;
+  $('#breadcrumb').textContent = 'Admin / ' + (titles[tab] || tab);
   // Load data
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'orders') loadOrders();
   if (tab === 'products') loadProducts();
+  if (tab === 'categories') loadCategories();
+  if (tab === 'inventory') loadInventory();
   if (tab === 'users') loadUsers();
+  if (tab === 'customers') loadCustomers();
+  if (tab === 'analytics') loadAnalytics();
+  if (tab === 'marketing') loadMarketing();
   if (tab === 'messages') loadMessages();
   if (tab === 'vendors') loadVendors();
   if (tab === 'reviews') loadReviews();
+  if (tab === 'notifications') loadNotifications(1);
+  if (tab === 'audit') loadAuditLogs();
+  if (tab === 'admin-users') loadAdminUsers();
+  if (tab === 'settings') loadSettings();
   // Close sidebar on mobile
   $('#sidebar').classList.remove('open');
   $('#overlay').classList.remove('show');
@@ -563,10 +746,16 @@ async function loadDashboard() {
 async function loadOrders() {
   const status = $('#orderStatusFilter').value;
   const search = $('#orderSearch').value.trim();
+  const payment = $('#orderPaymentFilter').value;
+  const paymentStatus = $('#orderPaymentStatusFilter').value;
+  const date = $('#orderDateFilter').value;
   try {
     const params = new URLSearchParams();
     if (status !== 'all') params.set('status', status);
     if (search) params.set('search', search);
+    if (payment !== 'all') params.set('payment_method', payment);
+    if (paymentStatus !== 'all') params.set('payment_status', paymentStatus);
+    if (date) params.set('date', date);
     params.set('page', orderPage);
     const data = await api('/admin/orders?' + params.toString());
     $('#ordersBody').innerHTML = data.orders.map(o => `
@@ -576,8 +765,8 @@ async function loadOrders() {
         <td>${esc(o.phone)}</td>
         <td>${o.items.length} item(s)</td>
         <td>${money(o.total)}</td>
-        <td>${esc(o.payment_method)}</td>
-        <td>${esc(o.shipping_method)}</td>
+        <td>${esc(o.payment_method)}<br><span class="badge badge-${o.payment_status === 'paid' ? 'success' : 'warning'}">${esc(o.payment_status || 'pending')}</span></td>
+        <td>${esc(o.shipping_method)}${o.tracking_number ? `<br><span style="font-size:11px;color:var(--text2)">${esc(o.carrier || 'Tracking')}: ${esc(o.tracking_number)}</span>` : ''}</td>
         <td><span class="badge badge-${o.status}">${o.status}</span></td>
         <td style="font-size:11px;color:var(--text2)">${o.created_at}</td>
         <td style="white-space:nowrap">
@@ -585,10 +774,12 @@ async function loadOrders() {
           <select onchange="updateOrderStatus(${o.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
             <option value="">Set Status...</option>
             <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
+            <option value="processing">Processing</option>
+            <option value="packed">Packed</option>
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
+            <option value="refunded">Refunded</option>
           </select>
         </td>
       </tr>
@@ -616,7 +807,7 @@ function searchOrders(e) { if (e.key === 'Enter') { orderPage = 1; loadOrders();
 
 async function viewOrder(id) {
   try {
-    const { order, items } = await api('/admin/orders/' + id);
+    const { order, payment, items, history } = await api('/admin/orders/' + id);
     $('#orderDetail').innerHTML = `
       <div class="order-detail-grid">
         <div><strong>Order #:</strong> ${order.id}</div>
@@ -626,7 +817,10 @@ async function viewOrder(id) {
         <div><strong>Phone:</strong> ${esc(order.phone)}</div>
         <div><strong>Address:</strong> ${esc(order.address)}</div>
         <div><strong>Shipping:</strong> ${esc(order.shipping_method)}</div>
-        <div><strong>Payment:</strong> ${esc(order.payment_method)}</div>
+        <div><strong>Payment:</strong> ${esc(payment.payment_method || order.payment_method)} (${esc(payment.payment_status || 'pending')})</div>
+        <div><strong>Paid:</strong> ${payment.paid_at ? esc(payment.paid_at) : 'Not paid'}</div>
+        <div><strong>Carrier:</strong> ${esc(order.carrier || 'Not set')}</div>
+        <div><strong>Tracking:</strong> ${esc(order.tracking_number || 'Not set')}</div>
         <div><strong>Date:</strong> ${order.created_at}</div>
         <div><strong>Guest:</strong> ${order.guest_id ? 'Yes' : 'No'}</div>
       </div>
@@ -635,7 +829,7 @@ async function viewOrder(id) {
         <table>
           <thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Subtotal</th></tr></thead>
           <tbody>
-            ${items.map(i => `<tr><td>${esc(i.name)}</td><td>${money(i.price)}</td><td>${i.quantity}</td><td>${money(i.price * i.quantity)}</td></tr>`).join('')}
+            ${items.map(i => `<tr><td style="display:flex;align-items:center;gap:8px">${i.image ? `<img src="../${esc(i.image)}" class="prod-img" alt="">` : ''}${esc(i.name)}</td><td>${money(i.price)}</td><td>${i.quantity}</td><td>${money(i.price * i.quantity)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -648,7 +842,23 @@ async function viewOrder(id) {
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
         <span>Total:</span><span style="color:var(--green)">${money(order.total)}</span>
       </div>
+      <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
+        <h4 style="margin-bottom:12px;font-size:14px">Fulfillment</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Carrier</label><input id="carrier-${order.id}" value="${esc(order.carrier)}" placeholder="e.g. TCS"></div>
+          <div class="form-group"><label>Tracking number</label><input id="tracking-${order.id}" value="${esc(order.tracking_number)}" placeholder="Courier tracking ID"></div>
+          <div class="form-group"><label>Shipping status</label><select id="shipping-status-${order.id}"><option value="pending">Pending</option><option value="preparing">Preparing</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="returned">Returned</option></select></div>
+          <div class="form-group"><label>Shipping notes</label><input id="shipping-notes-${order.id}" value="${esc(order.shipping_notes)}" placeholder="Delivery instructions"></div>
+          <div class="form-group full"><label>Internal notes</label><textarea id="notes-${order.id}" placeholder="Visible only to the admin team">${esc(order.internal_notes)}</textarea></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveFulfillment(${order.id})">Save fulfillment</button>
+      </div>
+      <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
+        <h4 style="margin-bottom:12px;font-size:14px">Status history</h4>
+        ${(history || []).map(h => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="badge badge-${h.status}">${esc(h.status)}</span> ${esc(h.note || '')}<span style="color:var(--text2);float:right">${esc(h.changed_by_name || 'System')} · ${h.created_at}</span></div>`).join('') || '<div class="empty">No status changes recorded yet</div>'}
+      </div>
     `;
+    $('#shipping-status-' + order.id).value = order.shipping_status || 'pending';
     $('#orderModal').classList.add('active');
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -663,12 +873,32 @@ async function updateOrderStatus(id, status) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+async function saveFulfillment(id) {
+  try {
+    await apiPut('/admin/orders/' + id + '/fulfillment', {
+      carrier: $('#carrier-' + id).value.trim(),
+      tracking_number: $('#tracking-' + id).value.trim(),
+      shipping_status: $('#shipping-status-' + id).value,
+      shipping_notes: $('#shipping-notes-' + id).value.trim(),
+      internal_notes: $('#notes-' + id).value.trim(),
+    });
+    toast('Fulfillment details saved');
+    viewOrder(id);
+    loadOrders();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
 /* ---------- PRODUCTS ---------- */
 let allProducts = [];
+let selectedProductIds = new Set();
+let categories = [];
+let pendingProductFiles = [];
 async function loadProducts() {
   try {
-    const data = await api('/admin/products');
+    const [data, categoryData] = await Promise.all([api('/admin/products'), api('/admin/categories')]);
     allProducts = data.products;
+    selectedProductIds = new Set([...selectedProductIds].filter(id => allProducts.some(product => product.id === id)));
+    categories = categoryData.categories;
     renderProducts(data.products);
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -676,6 +906,7 @@ async function loadProducts() {
 function renderProducts(products) {
   $('#productsBody').innerHTML = products.map(p => `
     <tr>
+      <td><input type="checkbox" class="product-select" value="${p.id}" ${selectedProductIds.has(p.id) ? 'checked' : ''} onchange="toggleProductSelection(${p.id}, this.checked)" aria-label="Select ${esc(p.name)}"></td>
       <td><img src="../${p.image}" class="prod-img" alt=""></td>
       <td style="font-weight:600">${esc(p.name)}</td>
       <td style="font-size:12px;color:var(--text2)">${esc(p.slug)}</td>
@@ -689,7 +920,9 @@ function renderProducts(products) {
         <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="ti ti-trash"></i></button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="9" class="empty">No products found</td></tr>';
+  `).join('') || '<tr><td colspan="10" class="empty">No products found</td></tr>';
+  $('#selectAllProducts').checked = products.length > 0 && products.every(p => selectedProductIds.has(p.id));
+  updateProductSelection();
 }
 
 function searchProducts(e) {
@@ -698,13 +931,26 @@ function searchProducts(e) {
   renderProducts(allProducts.filter(p => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)));
 }
 
+function toggleProductSelection(id, selected) { selected ? selectedProductIds.add(id) : selectedProductIds.delete(id); updateProductSelection(); }
+function toggleAllProducts(selected) { allProducts.forEach(product => selected ? selectedProductIds.add(product.id) : selectedProductIds.delete(product.id)); renderProducts($('#productSearch').value.trim() ? allProducts.filter(p => p.name.toLowerCase().includes($('#productSearch').value.trim().toLowerCase()) || p.slug.toLowerCase().includes($('#productSearch').value.trim().toLowerCase())) : allProducts); }
+function clearProductSelection() { selectedProductIds.clear(); renderProducts(allProducts); }
+function updateProductSelection() { const count = selectedProductIds.size; $('#productSelectionCount').textContent = count; $('#productBulkToolbar').style.display = count ? 'flex' : 'none'; }
+function toggleBulkFields() { const action = $('#bulkAction').value; ['bulkStatus', 'bulkFeatured', 'bulkCategory', 'bulkStockChange', 'bulkStockReason'].forEach(id => $('#' + id).style.display = 'none'); if (action === 'status') $('#bulkStatus').style.display = ''; if (action === 'featured') $('#bulkFeatured').style.display = ''; if (action === 'category') { $('#bulkCategory').innerHTML = '<option value="">Choose category</option>' + categories.filter(c => c.is_active).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join(''); $('#bulkCategory').style.display = ''; } if (action === 'adjust_stock') { $('#bulkStockChange').style.display = ''; $('#bulkStockReason').style.display = ''; } }
+async function applyBulkProducts() { const action = $('#bulkAction').value; if (!action) return toast('Choose a bulk action.', 'error'); const body = { ids: [...selectedProductIds], action }; if (action === 'delete') { if (!confirm(`Delete ${body.ids.length} selected product(s)? This cannot be undone.`)) return; body.confirm = true; } if (action === 'status') body.status = $('#bulkStatus').value; if (action === 'featured') body.featured = $('#bulkFeatured').value === 'true'; if (action === 'category') { body.category_id = Number($('#bulkCategory').value); if (!body.category_id) return toast('Choose a category.', 'error'); } if (action === 'adjust_stock') { body.change = Number($('#bulkStockChange').value); body.reason = $('#bulkStockReason').value.trim(); if (!Number.isSafeInteger(body.change) || !body.change || !body.reason) return toast('Provide a non-zero stock change and reason.', 'error'); } try { const result = await apiPost('/admin/products/bulk', body); toast(`${result.count} product(s) updated`); selectedProductIds.clear(); $('#bulkAction').value = ''; loadProducts(); } catch (err) { toast(err.message, 'error'); } }
+async function exportProducts() { try { const response = await fetch(API + '/admin/products/export', { credentials: 'same-origin' }); if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'Export failed.'); } const link = document.createElement('a'); link.href = URL.createObjectURL(await response.blob()); link.download = 'products.csv'; link.click(); URL.revokeObjectURL(link.href); } catch (err) { toast(err.message, 'error'); } }
+async function importProducts(file) { $('#productImport').value = ''; if (!file) return; if (!/\.csv$/i.test(file.name) || file.size > 5 * 1024 * 1024) return toast('Choose a CSV file no larger than 5 MB.', 'error'); try { const response = await fetch(API + '/admin/products/import', { method: 'POST', headers: { 'Content-Type': 'text/csv' }, credentials: 'same-origin', body: await file.text() }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error([data.error, ...(data.errors || [])].filter(Boolean).join('\n')); toast(`${data.count} product(s) imported`); loadProducts(); } catch (err) { toast(err.message, 'error'); } }
+
 function openProductModal() {
   $('#productModalTitle').textContent = 'Add Product';
   $('#productForm').reset();
   $('#prodId').value = '';
-  $('#prodCategory').value = 'GoPro Accessories';
+  pendingProductFiles = [];
+  $('#productImageGallery').innerHTML = '';
+  renderCategoryOptions();
   $('#prodStock').value = '100';
+  $('#prodReorderThreshold').value = '10';
   $('#prodRating').value = '4.5';
+  $('#prodStatus').value = 'active';
   $('#productModal').classList.add('active');
 }
 
@@ -718,10 +964,16 @@ function editProduct(id) {
   $('#prodPrice').value = p.price;
   $('#prodOldPrice').value = p.old_price || '';
   $('#prodImage').value = p.image;
-  $('#prodCategory').value = p.category;
+  renderCategoryOptions(p.category_id);
   $('#prodBadge').value = p.badge || '';
   $('#prodStock').value = p.stock;
+  $('#prodReorderThreshold').value = p.reorder_threshold ?? 10;
   $('#prodRating').value = p.rating;
+  $('#prodSku').value = p.sku || '';
+  $('#prodBrand').value = p.brand || '';
+  $('#prodStatus').value = p.status || 'active';
+  pendingProductFiles = [];
+  loadProductImages(p.id);
   $('#prodFeatured').checked = !!p.featured;
   $('#prodFlashSale').checked = !!p.flash_sale;
   $('#prodDesc').value = p.description || '';
@@ -740,28 +992,55 @@ async function saveProduct() {
     image: $('#prodImage').value.trim(),
     description: $('#prodDesc').value.trim(),
     category: $('#prodCategory').value.trim(),
+    category_id: $('#prodCategory').value || null,
     badge: $('#prodBadge').value.trim() || null,
     stock: parseInt($('#prodStock').value) || 0,
+    reorder_threshold: parseInt($('#prodReorderThreshold').value) || 0,
+    sku: $('#prodSku').value.trim() || null,
+    brand: $('#prodBrand').value.trim(),
+    status: $('#prodStatus').value,
     rating: parseFloat($('#prodRating').value) || 4.5,
     featured: $('#prodFeatured').checked,
     flash_sale: $('#prodFlashSale').checked,
   };
-  if (!body.name || !body.slug || !body.image || body.price == null) {
-    toast('Name, slug, price and image are required', 'error');
+  if (!body.name || !body.slug || body.price == null) {
+    toast('Name, slug and price are required', 'error');
     return;
   }
   try {
+    let productId = id;
     if (id) {
       await apiPut('/admin/products/' + id, body);
       toast('Product updated');
     } else {
-      await apiPost('/admin/products', body);
+      const result = await apiPost('/admin/products', body);
+      productId = result.id;
       toast('Product added');
+    }
+    for (const file of pendingProductFiles) {
+      await apiPost('/admin/products/' + productId + '/images', { data: await fileToDataUrl(file), file_name: file.name, is_primary: false });
     }
     closeProductModal();
     loadProducts();
   } catch (err) { toast(err.message, 'error'); }
 }
+
+function renderCategoryOptions(selectedId) {
+  $('#prodCategory').innerHTML = '<option value="">Uncategorized</option>' + categories.filter(c => c.is_active || c.id === selectedId).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+}
+
+function fileToDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+function previewProductFiles(files) {
+  const accepted = Array.from(files).filter(file => ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) && file.size <= 5 * 1024 * 1024);
+  if (accepted.length !== files.length) toast('Only PNG, JPEG, WebP, or GIF images under 5 MB are accepted.', 'error');
+  pendingProductFiles.push(...accepted);
+  $('#productImageGallery').innerHTML = pendingProductFiles.map((file, index) => `<div style="position:relative"><img src="${URL.createObjectURL(file)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px" alt="Preview"><button type="button" class="btn btn-danger btn-sm" style="position:absolute;top:2px;right:2px;padding:2px 5px" onclick="removePendingImage(${index})">×</button></div>`).join('');
+}
+function removePendingImage(index) { pendingProductFiles.splice(index, 1); $('#productImageGallery').innerHTML = ''; previewProductFiles([]); }
+async function loadProductImages(id) { const { images } = await api('/admin/products/' + id + '/images'); $('#productImageGallery').innerHTML = images.map((image, index) => `<div style="position:relative"><img src="${esc(image.image_data)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:${image.is_primary ? '2px solid var(--primary)' : 'none'}" alt=""><div style="display:flex;gap:3px;margin-top:3px"><button type="button" class="btn btn-secondary btn-sm" onclick="moveProductImage(${id},${index},-1)" ${index ? '' : 'disabled'}>←</button><button type="button" class="btn btn-secondary btn-sm" onclick="moveProductImage(${id},${index},1)" ${index < images.length - 1 ? '' : 'disabled'}>→</button><button type="button" class="btn btn-secondary btn-sm" onclick="setPrimaryImage(${id},${image.id})">${image.is_primary ? 'Main' : 'Main'}</button><button type="button" class="btn btn-danger btn-sm" onclick="deleteProductImage(${id},${image.id})">×</button></div></div>`).join(''); window.currentProductImages = images; }
+async function setPrimaryImage(productId, imageId) { await apiPut('/admin/products/' + productId + '/images/' + imageId + '/primary'); loadProductImages(productId); }
+async function deleteProductImage(productId, imageId) { if (!confirm('Delete this image?')) return; try { await apiDel('/admin/products/' + productId + '/images/' + imageId); loadProductImages(productId); } catch (err) { toast(err.message, 'error'); } }
+async function moveProductImage(productId, index, direction) { const images = window.currentProductImages || []; const target = index + direction; if (target < 0 || target >= images.length) return; [images[index], images[target]] = [images[target], images[index]]; try { await apiPut('/admin/products/' + productId + '/images/reorder', { image_ids: images.map(image => image.id) }); loadProductImages(productId); } catch (err) { toast(err.message, 'error'); } }
 
 async function deleteProduct(id) {
   if (!confirm('Are you sure you want to delete this product?')) return;
@@ -771,6 +1050,20 @@ async function deleteProduct(id) {
     loadProducts();
   } catch (err) { toast(err.message, 'error'); }
 }
+
+/* ---------- CATEGORIES ---------- */
+async function loadCategories() {
+  try {
+    const data = await api('/admin/categories');
+    categories = data.categories;
+    $('#categoriesBody').innerHTML = categories.map(c => `<tr><td style="font-weight:600">${esc(c.name)}</td><td>${esc(c.slug)}</td><td style="max-width:280px">${esc(c.description)}</td><td>${c.product_count}</td><td><span class="badge ${c.is_active ? 'badge-success' : 'badge-warning'}">${c.is_active ? 'Active' : 'Inactive'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editCategory(${c.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No categories yet</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+function openCategoryModal() { $('#categoryModalTitle').textContent = 'Add Category'; $('#categoryId').value = ''; $('#categoryName').value = ''; $('#categorySlug').value = ''; $('#categoryDescription').value = ''; $('#categoryImage').value = ''; $('#categoryActive').checked = true; $('#categoryModal').classList.add('active'); }
+function closeCategoryModal() { $('#categoryModal').classList.remove('active'); }
+function editCategory(id) { const c = categories.find(category => category.id === id); if (!c) return; $('#categoryModalTitle').textContent = 'Edit Category'; $('#categoryId').value = id; $('#categoryName').value = c.name; $('#categorySlug').value = c.slug; $('#categoryDescription').value = c.description || ''; $('#categoryImage').value = c.image || ''; $('#categoryActive').checked = !!c.is_active; $('#categoryModal').classList.add('active'); }
+async function saveCategory() { const id = $('#categoryId').value; const body = { name: $('#categoryName').value.trim(), slug: $('#categorySlug').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), description: $('#categoryDescription').value.trim(), image: $('#categoryImage').value.trim(), is_active: $('#categoryActive').checked }; if (!body.name || !body.slug) return toast('Category name and slug are required.', 'error'); try { id ? await apiPut('/admin/categories/' + id, body) : await apiPost('/admin/categories', body); closeCategoryModal(); toast('Category saved'); loadCategories(); } catch (err) { toast(err.message, 'error'); } }
+async function deleteCategory(id) { const category = categories.find(c => c.id === id); if (!category || !confirm(`Delete ${category.name}?`)) return; let reassign_to; if (category.product_count) { const choices = categories.filter(c => c.id !== id).map(c => `${c.id}: ${c.name}`).join('\n'); const answer = prompt(`This category has ${category.product_count} product(s). Enter the replacement category ID:\n${choices}`); if (!answer) return; reassign_to = Number(answer); } try { await apiDel('/admin/categories/' + id, reassign_to ? { body: JSON.stringify({ reassign_to }), headers: { 'Content-Type': 'application/json' } } : {}); toast('Category deleted'); loadCategories(); } catch (err) { toast(err.message, 'error'); } }
 
 /* ---------- USERS ---------- */
 async function loadUsers() {
@@ -789,12 +1082,16 @@ function renderUsers(users) {
       <td style="font-size:12px">${esc(u.email)}</td>
       <td style="font-size:12px">${esc(u.phone)}</td>
       <td>${u.order_count}</td>
-      <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-warning'}">${u.role}</span></td>
+      <td><span class="badge ${['owner', 'admin'].includes(u.role) ? 'badge-success' : u.role === 'customer' ? 'badge-warning' : 'badge-confirmed'}">${esc(u.role)}</span></td>
       <td style="font-size:11px;color:var(--text2)">${u.created_at}</td>
       <td>
         <select onchange="updateUserRole(${u.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
           <option value="customer" ${u.role === 'customer' ? 'selected' : ''}>Customer</option>
+          <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Owner</option>
           <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="order_manager" ${u.role === 'order_manager' ? 'selected' : ''}>Order manager</option>
+          <option value="catalog_manager" ${u.role === 'catalog_manager' ? 'selected' : ''}>Catalog manager</option>
+          <option value="support" ${u.role === 'support' ? 'selected' : ''}>Support</option>
         </select>
       </td>
     </tr>
@@ -815,6 +1112,61 @@ async function updateUserRole(id, role) {
     toast('User role updated to ' + role);
   } catch (err) { toast(err.message, 'error'); }
 }
+
+/* ---------- INVENTORY ---------- */
+async function loadInventory() {
+  try {
+    const data = await api('/admin/inventory');
+    $('#inventoryProduct').innerHTML = data.products.map(p => `<option value="${p.id}">${esc(p.name)} (${p.stock} in stock)</option>`).join('');
+    const needsReorder = data.products.filter(p => p.stock <= p.reorder_threshold);
+    $('#reorderQueue').innerHTML = needsReorder.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><img src="../${p.image}" class="prod-img" alt=""><div style="flex:1;font-size:13px;font-weight:600">${esc(p.name)}<div style="font-size:11px;color:var(--text2);font-weight:400">Reorder at ${p.reorder_threshold}</div></div><span class="badge ${p.stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.stock} left</span></div>`).join('') || '<div class="empty">All products are above their reorder level.</div>';
+    $('#inventoryMovementsBody').innerHTML = data.movements.map(m => `<tr><td style="font-size:11px;color:var(--text2)">${m.created_at}</td><td>${esc(m.product_name)}</td><td><span class="badge ${m.change > 0 ? 'badge-success' : 'badge-danger'}">${m.change > 0 ? '+' : ''}${m.change}</span></td><td>${esc(m.reason)}</td><td>${esc(m.note)}</td><td>${esc(m.changed_by_name || 'Unknown')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No stock adjustments recorded</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function adjustInventory() {
+  const productId = $('#inventoryProduct').value;
+  try {
+    await apiPost('/admin/inventory/' + productId + '/adjust', { change: $('#inventoryChange').value, mode: $('#inventoryMode').value, reason: $('#inventoryReason').value.trim(), note: $('#inventoryNote').value.trim() });
+    $('#inventoryForm').reset();
+    toast('Stock adjustment recorded');
+    loadInventory();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- AUDIT LOG ---------- */
+let auditTimer;
+function debouncedAudit() { clearTimeout(auditTimer); auditTimer = setTimeout(() => loadAuditLogs(1), 300); }
+function resetAuditFilters() { ['auditAdmin', 'auditAction', 'auditEntity', 'auditStart', 'auditEnd'].forEach(id => $('#' + id).value = ''); loadAuditLogs(1); }
+async function loadAuditLogs(page = 1) {
+  const body = $('#auditLogBody'); body.innerHTML = '<tr><td colspan="5" class="empty">Loading activity…</td></tr>';
+  try {
+    const params = new URLSearchParams({ page, limit: 25 });
+    const values = { admin: $('#auditAdmin').value, action: $('#auditAction').value.trim(), entity_type: $('#auditEntity').value.trim(), start_date: $('#auditStart').value, end_date: $('#auditEnd').value };
+    Object.entries(values).forEach(([key, value]) => value && params.set(key, value));
+    const data = await api('/admin/audit-logs?' + params);
+    body.innerHTML = data.logs.map(l => `<tr><td style="font-size:11px;color:var(--text2)">${esc(l.created_at)}</td><td>${esc(l.actor_name || 'System')}</td><td>${esc(l.action)}</td><td>${esc(l.entity_type)} #${esc(l.entity_id)}</td><td>${esc(l.details)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No activity matches these filters</td></tr>';
+    $('#auditPagination').innerHTML = pagination(data.page, data.pages, 'loadAuditLogs');
+    if (!$('#auditAdmin').dataset.loaded) { const admins = await api('/admin/admin-users'); $('#auditAdmin').innerHTML += admins.users.map(user => `<option value="${user.id}">${esc(user.full_name || user.username)}</option>`).join(''); $('#auditAdmin').dataset.loaded = 'true'; }
+  } catch (err) { body.innerHTML = '<tr><td colspan="5" class="empty">Unable to load activity</td></tr>'; toast(err.message, 'error'); }
+}
+
+function pagination(page, pages, callback) { return pages > 1 ? `<button class="btn btn-secondary btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="${callback}(${page - 1})">Previous</button><span style="padding:0 10px">Page ${page} of ${pages}</span><button class="btn btn-secondary btn-sm" ${page >= pages ? 'disabled' : ''} onclick="${callback}(${page + 1})">Next</button>` : ''; }
+
+/* ---------- NOTIFICATIONS ---------- */
+async function refreshNotificationCount() { try { const data = await api('/admin/notifications?limit=1'); const badge = $('#notificationUnread'); badge.textContent = data.unread; badge.style.display = data.unread ? '' : 'none'; } catch (_) {} }
+async function loadNotifications(page = 1) { const body = $('#notificationsBody'); body.innerHTML = '<tr><td colspan="5" class="empty">Loading notifications…</td></tr>'; try { const data = await api('/admin/notifications?' + new URLSearchParams({ page, limit: 25, read: $('#notificationRead').value })); body.innerHTML = data.notifications.map(n => `<tr${n.read ? '' : ' style="font-weight:600"'}><td><strong>${esc(n.title)}</strong>${n.body ? '<br><span style="font-size:12px;color:var(--text2);font-weight:400">' + esc(n.body) + '</span>' : ''}</td><td>${esc(n.type)}</td><td>${esc(n.entity_type || '—')}${n.entity_id ? ' #' + esc(n.entity_id) : ''}</td><td style="font-size:12px">${esc(n.created_at)}</td><td>${n.read ? 'Read' : `<button class="btn btn-secondary btn-sm" onclick="markNotificationRead(${n.id})">Mark read</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No notifications found</td></tr>'; $('#notificationsPagination').innerHTML = pagination(data.page, data.pages, 'loadNotifications'); refreshNotificationCount(); } catch (err) { body.innerHTML = '<tr><td colspan="5" class="empty">Unable to load notifications</td></tr>'; toast(err.message, 'error'); } }
+async function markNotificationRead(id) { try { await apiPut('/admin/notifications/' + id + '/read'); loadNotifications(); } catch (err) { toast(err.message, 'error'); } }
+async function markAllNotificationsRead() { try { await apiPost('/admin/notifications/read'); toast('All notifications marked as read'); loadNotifications(); } catch (err) { toast(err.message, 'error'); } }
+
+/* ---------- ADMIN USERS ---------- */
+let adminUsers = [];
+async function loadAdminUsers() { const body = $('#adminUsersBody'); body.innerHTML = '<tr><td colspan="6" class="empty">Loading admin users…</td></tr>'; try { const data = await api('/admin/admin-users'); adminUsers = data.users; body.innerHTML = adminUsers.map(user => `<tr><td><strong>${esc(user.full_name || user.username)}</strong><br><span style="font-size:11px;color:var(--text2)">@${esc(user.username)}</span></td><td>${esc(user.email)}${user.phone ? '<br><span style="font-size:11px;color:var(--text2)">' + esc(user.phone) + '</span>' : ''}</td><td><span class="badge badge-confirmed">${esc(user.role)}</span></td><td><span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">${user.is_active ? 'Active' : 'Disabled'}</span></td><td style="font-size:12px">${esc(user.created_at)}</td><td><button class="btn btn-secondary btn-sm" onclick="editAdminUser(${user.id})"><i class="ti ti-edit"></i></button> <button class="btn ${user.is_active ? 'btn-danger' : 'btn-green'} btn-sm" onclick="setAdminUserEnabled(${user.id},${user.is_active ? 'false' : 'true'})">${user.is_active ? 'Disable' : 'Enable'}</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No admin users found</td></tr>'; } catch (err) { body.innerHTML = '<tr><td colspan="6" class="empty">Unable to load admin users</td></tr>'; toast(err.message, 'error'); } }
+function openAdminUserModal() { $('#adminUserModalTitle').textContent = 'Add Admin User'; $('#adminUserId').value = ''; ['adminUsername', 'adminEmail', 'adminFullName', 'adminPhone', 'adminPassword'].forEach(id => $('#' + id).value = ''); $('#adminRole').value = 'admin'; $('#adminActive').checked = true; $('#adminPassword').required = true; $('#adminPasswordLabel').textContent = 'Password *'; $('#adminUserModal').classList.add('active'); }
+function closeAdminUserModal() { $('#adminUserModal').classList.remove('active'); }
+function editAdminUser(id) { const user = adminUsers.find(item => item.id === id); if (!user) return; $('#adminUserModalTitle').textContent = 'Edit Admin User'; $('#adminUserId').value = user.id; $('#adminUsername').value = user.username; $('#adminEmail').value = user.email; $('#adminFullName').value = user.full_name || ''; $('#adminPhone').value = user.phone || ''; $('#adminRole').value = user.role; $('#adminActive').checked = !!user.is_active; $('#adminPassword').value = ''; $('#adminPassword').required = false; $('#adminPasswordLabel').textContent = 'New password (optional)'; $('#adminUserModal').classList.add('active'); }
+async function saveAdminUser() { const id = $('#adminUserId').value; const body = { username: $('#adminUsername').value.trim(), email: $('#adminEmail').value.trim(), full_name: $('#adminFullName').value.trim(), phone: $('#adminPhone').value.trim(), role: $('#adminRole').value, is_active: $('#adminActive').checked }; if ($('#adminPassword').value) body.password = $('#adminPassword').value; if (!body.username || !body.email || (!id && !body.password)) return toast('Username, email, and a password are required.', 'error'); try { await (id ? apiPut('/admin/admin-users/' + id, body) : apiPost('/admin/admin-users', body)); toast('Admin user saved'); closeAdminUserModal(); loadAdminUsers(); } catch (err) { toast(err.message, 'error'); } }
+async function setAdminUserEnabled(id, isActive) { if (!confirm(`${isActive ? 'Enable' : 'Disable'} this admin account?`)) return; try { await apiPut('/admin/admin-users/' + id + '/enabled', { is_active: isActive }); toast('Admin account updated'); loadAdminUsers(); } catch (err) { toast(err.message, 'error'); } }
 
 /* ---------- MESSAGES ---------- */
 async function loadMessages() {
@@ -902,6 +1254,142 @@ async function deleteReview(id) {
     loadReviews();
   } catch (err) { toast(err.message, 'error'); }
 }
+
+/* ---------- CUSTOMERS ---------- */
+let customerSearchTimer;
+function debouncedCustomers() { clearTimeout(customerSearchTimer); customerSearchTimer = setTimeout(loadCustomers, 250); }
+async function loadCustomers() {
+  const body = $('#customersBody');
+  body.innerHTML = '<tr><td colspan="8" class="empty">Loading customers...</td></tr>';
+  try {
+    const query = $('#customerSearch').value.trim();
+    const data = await api('/admin/customers' + (query ? '?search=' + encodeURIComponent(query) : ''));
+    body.innerHTML = data.customers.map(c => `<tr>
+      <td><strong>${esc(c.full_name || c.username)}</strong><br><span style="font-size:11px;color:var(--text2)">@${esc(c.username)}</span></td>
+      <td>${esc(c.email)}${c.phone ? '<br><span style="font-size:11px;color:var(--text2)">' + esc(c.phone) + '</span>' : ''}</td>
+      <td><span class="badge badge-success">${esc(c.account_status)}</span></td><td>${c.order_count}</td><td>${money(c.total_spent)}</td>
+      <td style="font-size:12px">${esc(c.last_order_date || '—')}</td><td style="font-size:12px">${esc(c.created_at)}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewCustomer(${c.id})"><i class="ti ti-eye"></i></button></td>
+    </tr>`).join('') || '<tr><td colspan="8" class="empty">No customers found</td></tr>';
+  } catch (err) { body.innerHTML = '<tr><td colspan="8" class="empty">Unable to load customers</td></tr>'; toast(err.message, 'error'); }
+}
+async function viewCustomer(id) {
+  try {
+    const { customer, summary, orders } = await api('/admin/customers/' + id);
+    $('#customerDetail').innerHTML = `<div class="order-detail-grid"><div><strong>Name:</strong> ${esc(customer.full_name || customer.username)}</div><div><strong>Account:</strong> <span class="badge badge-success">${esc(customer.account_status)}</span></div><div><strong>Email:</strong> ${esc(customer.email)}</div><div><strong>Phone:</strong> ${esc(customer.phone || '—')}</div><div><strong>Address:</strong> ${esc(customer.address || '—')}</div><div><strong>Registered:</strong> ${esc(customer.created_at)}</div><div><strong>Total orders:</strong> ${summary.total_orders}</div><div><strong>Total spent:</strong> ${money(summary.total_spent)}</div></div><h4 style="margin-bottom:12px;font-size:14px">Order history</h4><div class="table-wrap"><table><thead><tr><th>#</th><th>Date</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orders.map(o => `<tr><td>#${o.id}</td><td>${esc(o.created_at)}</td><td>${o.item_count}</td><td>${money(o.total)}</td><td>${esc(o.payment_method)}</td><td><span class="badge badge-${o.status}">${esc(o.status)}</span></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No orders yet</td></tr>'}</tbody></table></div>`;
+    $('#customerModal').classList.add('active');
+  } catch (err) { toast(err.message, 'error'); }
+}
+function closeCustomerModal() { $('#customerModal').classList.remove('active'); }
+
+/* ---------- ANALYTICS ---------- */
+function toggleCustomAnalytics() { const custom = $('#analyticsRange').value === 'custom'; $('#analyticsStart').style.display = custom ? '' : 'none'; $('#analyticsEnd').style.display = custom ? '' : 'none'; }
+async function loadAnalytics() {
+  const range = $('#analyticsRange').value;
+  const params = new URLSearchParams({ range });
+  if (range === 'custom') { if (!$('#analyticsStart').value || !$('#analyticsEnd').value) { toast('Choose a start and end date.', 'error'); return; } params.set('start_date', $('#analyticsStart').value); params.set('end_date', $('#analyticsEnd').value); }
+  $('#analyticsStats').innerHTML = '<div class="empty">Loading analytics...</div>';
+  try {
+    const data = await api('/admin/analytics?' + params);
+    const s = data.summary;
+    const stats = [['ti-cash', money(s.total_revenue), 'Total revenue'], ['ti-calendar', money(s.today_revenue), "Today's revenue"], ['ti-calendar-month', money(s.this_month_revenue), "This month's revenue"], ['ti-shopping-bag', s.total_orders, 'Total orders'], ['ti-clock-pause', s.pending_orders, 'Pending orders'], ['ti-users', s.total_customers, 'Customers'], ['ti-packages', s.total_products, 'Products'], ['ti-alert-triangle', s.low_stock_products, 'Low stock']];
+    $('#analyticsStats').innerHTML = stats.map(([icon, val, label]) => `<div class="stat-card"><div class="icon" style="background:rgba(98,90,250,.15);color:var(--primary)"><i class="ti ${icon}"></i></div><div class="val">${val}</div><div class="lbl">${label}</div></div>`).join('');
+    const points = data.sales_by_day.length ? data.sales_by_day : data.sales_by_month;
+    const maximum = Math.max(...points.map(p => Number(p.revenue)), 1);
+    $('#analyticsChart').innerHTML = points.map(p => `<div class="chart-bar" style="height:${Math.max(4, Number(p.revenue) / maximum * 160)}px"><span class="tip">${money(p.revenue)} · ${p.orders} orders</span><span class="date">${esc((p.date || p.month).slice(-5))}</span></div>`).join('') || '<div class="empty">No sales in this period</div>';
+    $('#analyticsRangeTotals').innerHTML = `<span>${esc(data.range.start)} – ${esc(data.range.end)}</span><span><strong>${money(s.range_revenue)}</strong> revenue</span><span><strong>${s.range_orders}</strong> orders</span><span>Average: <strong>${money(s.average_order_value)}</strong></span>`;
+    $('#analyticsProductsBody').innerHTML = data.top_products.map(p => `<tr><td>${esc(p.name)}</td><td>${p.quantity_sold}</td><td>${money(p.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">No product sales in this period</td></tr>';
+    $('#analyticsCategoriesBody').innerHTML = data.top_categories.map(c => `<tr><td>${esc(c.name)}</td><td>${c.quantity_sold}</td><td>${money(c.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">No category sales in this period</td></tr>';
+  } catch (err) { $('#analyticsStats').innerHTML = '<div class="empty">Unable to load analytics</div>'; toast(err.message, 'error'); }
+}
+
+/* ---------- MARKETING ---------- */
+let coupons = [], banners = [];
+const inputDateTime = value => value ? String(value).replace(' ', 'T').slice(0, 16) : '';
+async function loadMarketing() {
+  $('#couponsBody').innerHTML = '<tr><td colspan="7" class="empty">Loading coupons...</td></tr>';
+  $('#bannersBody').innerHTML = '<tr><td colspan="6" class="empty">Loading banners...</td></tr>';
+  try {
+    const data = await Promise.all([api('/admin/coupons'), api('/admin/promotional-banners')]); coupons = data[0].coupons; banners = data[1].banners;
+    $('#couponsBody').innerHTML = coupons.map(c => `<tr><td><strong>${esc(c.code)}</strong></td><td>${c.discount_type === 'percentage' ? c.discount_value + '%' : money(c.discount_value)}${c.maximum_discount != null ? '<br><span style="font-size:11px;color:var(--text2)">Max ' + money(c.maximum_discount) + '</span>' : ''}</td><td>${money(c.minimum_order_amount)}</td><td>${c.usage_count}${c.usage_limit == null ? '' : ' / ' + c.usage_limit}</td><td>${esc(c.expires_at || 'Never')}</td><td><span class="badge ${c.is_active ? 'badge-success' : 'badge-danger'}">${c.is_active ? 'Active' : 'Disabled'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editCoupon(${c.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteCoupon(${c.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No coupons created yet</td></tr>';
+    $('#bannersBody').innerHTML = banners.map(b => `<tr><td><img class="prod-img" src="../${esc(b.image)}" alt=""></td><td><strong>${esc(b.title)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(b.button_url || '')}</span></td><td style="font-size:12px">${esc(b.starts_at || 'Immediately')}<br>${esc(b.ends_at || 'No end date')}</td><td>${b.display_order}</td><td><span class="badge ${b.is_active ? 'badge-success' : 'badge-danger'}">${b.is_active ? 'Active' : 'Disabled'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editBanner(${b.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteBanner(${b.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No promotional banners created yet</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+function toggleCouponMaximum() { $('#couponMaximum').disabled = $('#couponType').value === 'fixed'; if ($('#couponMaximum').disabled) $('#couponMaximum').value = ''; }
+function openCouponModal() { $('#couponModalTitle').textContent = 'Add Coupon'; ['couponId','couponCode','couponValue','couponMaximum','couponLimit','couponExpires'].forEach(id => $('#' + id).value = ''); $('#couponMinimum').value = 0; $('#couponType').value = 'percentage'; $('#couponActive').checked = true; toggleCouponMaximum(); $('#couponModal').classList.add('active'); }
+function editCoupon(id) { const c = coupons.find(x => x.id === id); if (!c) return; $('#couponModalTitle').textContent = 'Edit Coupon'; $('#couponId').value = c.id; $('#couponCode').value = c.code; $('#couponType').value = c.discount_type; $('#couponValue').value = c.discount_value; $('#couponMinimum').value = c.minimum_order_amount; $('#couponMaximum').value = c.maximum_discount == null ? '' : c.maximum_discount; $('#couponLimit').value = c.usage_limit == null ? '' : c.usage_limit; $('#couponExpires').value = inputDateTime(c.expires_at); $('#couponActive').checked = !!c.is_active; toggleCouponMaximum(); $('#couponModal').classList.add('active'); }
+function closeCouponModal() { $('#couponModal').classList.remove('active'); }
+async function saveCoupon() { const id = $('#couponId').value; const payload = { code: $('#couponCode').value.trim(), discount_type: $('#couponType').value, discount_value: $('#couponValue').value, minimum_order_amount: $('#couponMinimum').value, maximum_discount: $('#couponMaximum').value, usage_limit: $('#couponLimit').value, expires_at: $('#couponExpires').value, is_active: $('#couponActive').checked }; try { await (id ? apiPut('/admin/coupons/' + id, payload) : apiPost('/admin/coupons', payload)); toast('Coupon saved'); closeCouponModal(); loadMarketing(); } catch (err) { toast(err.message, 'error'); } }
+async function deleteCoupon(id) { if (!confirm('Delete this coupon?')) return; try { await apiDel('/admin/coupons/' + id); toast('Coupon deleted'); loadMarketing(); } catch (err) { toast(err.message, 'error'); } }
+function openBannerModal() { $('#bannerModalTitle').textContent = 'Add Promotional Banner'; ['bannerId','bannerImage','bannerTitle','bannerButtonText','bannerDescription','bannerButtonUrl','bannerStarts','bannerEnds'].forEach(id => $('#' + id).value = ''); $('#bannerOrder').value = 0; $('#bannerActive').checked = true; $('#bannerModal').classList.add('active'); }
+function editBanner(id) { const b = banners.find(x => x.id === id); if (!b) return; $('#bannerModalTitle').textContent = 'Edit Promotional Banner'; $('#bannerId').value = b.id; $('#bannerImage').value = b.image; $('#bannerTitle').value = b.title; $('#bannerButtonText').value = b.button_text || ''; $('#bannerDescription').value = b.description || ''; $('#bannerButtonUrl').value = b.button_url || ''; $('#bannerOrder').value = b.display_order; $('#bannerStarts').value = inputDateTime(b.starts_at); $('#bannerEnds').value = inputDateTime(b.ends_at); $('#bannerActive').checked = !!b.is_active; $('#bannerModal').classList.add('active'); }
+function closeBannerModal() { $('#bannerModal').classList.remove('active'); }
+async function saveBanner() { const id = $('#bannerId').value; const payload = { image: $('#bannerImage').value.trim(), title: $('#bannerTitle').value.trim(), description: $('#bannerDescription').value.trim(), button_text: $('#bannerButtonText').value.trim(), button_url: $('#bannerButtonUrl').value.trim(), display_order: $('#bannerOrder').value, starts_at: $('#bannerStarts').value, ends_at: $('#bannerEnds').value, is_active: $('#bannerActive').checked }; try { await (id ? apiPut('/admin/promotional-banners/' + id, payload) : apiPost('/admin/promotional-banners', payload)); toast('Promotional banner saved'); closeBannerModal(); loadMarketing(); } catch (err) { toast(err.message, 'error'); } }
+async function deleteBanner(id) { if (!confirm('Delete this promotional banner?')) return; try { await apiDel('/admin/promotional-banners/' + id); toast('Promotional banner deleted'); loadMarketing(); } catch (err) { toast(err.message, 'error'); } }
+
+/* ---------- SETTINGS ---------- */
+const settingsFields = {
+  store_name: 'settingStoreName', currency: 'settingCurrency', store_email: 'settingStoreEmail', store_phone: 'settingStorePhone', store_open: 'settingStoreOpen',
+  cash_enabled: 'settingCashEnabled', bank_enabled: 'settingBankEnabled', paypal_enabled: 'settingPaypalEnabled', shipping_fee: 'settingShippingFee',
+  standard_delivery_enabled: 'settingStandardDelivery', express_delivery_enabled: 'settingExpressDelivery', order_notifications: 'settingOrderNotifications',
+  low_stock_notifications: 'settingLowStockNotifications', vendor_notifications: 'settingVendorNotifications'
+};
+
+function settingsState(message, type = 'info') {
+  const state = $('#settingsState');
+  state.hidden = false;
+  state.textContent = message;
+  state.style.background = type === 'error' ? 'rgba(239,68,68,.12)' : 'rgba(59,130,246,.12)';
+  state.style.color = type === 'error' ? '#fecaca' : '#bfdbfe';
+}
+
+function populateSettings(data) {
+  const settings = data.settings || data;
+  const values = Object.assign({}, settings, settings.store, settings.payment, settings.shipping, settings.notifications);
+  Object.entries(settingsFields).forEach(([name, id]) => {
+    const input = $('#' + id);
+    if (values[name] === undefined || values[name] === null) return;
+    if (input.type === 'checkbox') input.checked = values[name] === true || values[name] === 1 || values[name] === '1' || values[name] === 'true';
+    else input.value = values[name];
+  });
+}
+
+async function loadSettings() {
+  const content = $('#settingsContent');
+  content.hidden = true;
+  settingsState('Loading settings…');
+  try {
+    populateSettings(await api('/admin/settings'));
+    $('#settingsState').hidden = true;
+    content.hidden = false;
+  } catch (err) {
+    settingsState('Unable to load settings. ' + err.message, 'error');
+  }
+}
+
+$('#settingsForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('#saveSettingsButton');
+  const payload = {};
+  Object.entries(settingsFields).forEach(([name, id]) => {
+    const input = $('#' + id);
+    payload[name] = input.type === 'checkbox' ? input.checked : input.value.trim();
+  });
+  payload.shipping_fee = Number(payload.shipping_fee || 0);
+  if (!Number.isFinite(payload.shipping_fee) || payload.shipping_fee < 0) return toast('Shipping fee must be zero or greater.', 'error');
+  button.disabled = true;
+  button.innerHTML = '<i class="ti ti-loader"></i> Saving…';
+  try {
+    const response = await apiPut('/admin/settings', payload);
+    if (response.settings) populateSettings(response);
+    toast('Settings saved');
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="ti ti-device-floppy"></i> Save Settings';
+  }
+});
 
 /* ---------- BOOT ---------- */
 checkSession();

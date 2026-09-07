@@ -26,6 +26,35 @@
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
+  function updateStockProgress(container, product) {
+    const progressBar = $('.progress-bar', container);
+    const progressTitle = $('.progress-title, .mb-1', container);
+    if (!progressBar || !progressTitle || product.stock == null) return;
+    const stock = Math.max(0, Number(product.stock));
+    const stockPercent = Math.min(100, stock);
+    progressTitle.textContent = stock + ' In Stock';
+    progressBar.style.width = stockPercent + '%';
+    progressBar.setAttribute('aria-valuenow', String(stockPercent));
+    progressBar.setAttribute('aria-label', stock + ' items in stock');
+    progressBar.classList.toggle('bg-danger', stock === 0);
+    progressBar.classList.toggle('bg-warning', stock > 0);
+  }
+
+  async function updateFlashSaleStockBars() {
+    const cards = $$('.flash-sale-card');
+    if (!cards.length) return;
+    try {
+      const { products } = await get('/products');
+      const productsBySlug = new Map(products.map((product) => [product.slug, product]));
+      cards.forEach((card) => {
+        const link = $('a[href$=".html"]', card);
+        const slug = link && link.getAttribute('href').replace(/\.html$/, '');
+        const product = productsBySlug.get(slug);
+        if (product) updateStockProgress(card, product);
+      });
+    } catch (_) {}
+  }
+
   function alertBox(form, message, type) {
     let box = $('.api-alert', form.parentElement || form);
     if (!box) {
@@ -462,9 +491,8 @@
 
       // Shipping methods: radio id → { api method, fee }
       const SHIPPING = {
-        fastShipping: { method: 'express', fee: 500 },
-        normalShipping: { method: 'standard', fee: 250 },
-        courier: { method: 'pickup', fee: 0 },
+        standardShipping: { method: 'standard', fee: 500 },
+        storePickup: { method: 'pickup', fee: 0 },
       };
 
       let subtotal = 0;
@@ -480,7 +508,7 @@
       // Live total: subtotal + selected shipping fee, updates when user picks shipping
       function selectedShipping() {
         const checked = $('input[name="selector"]:checked');
-        return SHIPPING[checked ? checked.id : 'normalShipping'] || SHIPPING.normalShipping;
+        return SHIPPING[checked ? checked.id : 'standardShipping'] || SHIPPING.standardShipping;
       }
       function updateTotal() {
         const totalEl = $('.cart-amount-area .cart-total');
@@ -511,15 +539,23 @@
     'checkout-bank.html': placeOrderPage('bank'),
     'checkout-paypal.html': placeOrderPage('paypal'),
 
-    // --- Success page: show the order number and total that was just placed ---
+    // --- Success page: make the invoice for the order just placed available to its owner ---
     'payment-success.html': function () {
       const info = sessionStorage.getItem('last_order');
       if (!info) return;
       try {
-        const { order_id, total } = JSON.parse(info);
-        const p = $('.order-success-wrapper p');
-        if (p) p.innerHTML = 'Order <strong>#' + order_id + '</strong> placed — Total <strong>' + money(total) + '</strong>.<br>We will notify you of all the details via email. Thank you!';
-        sessionStorage.removeItem('last_order');
+        const { order_id } = JSON.parse(info);
+        if (!Number.isSafeInteger(Number(order_id)) || Number(order_id) < 1) return;
+        const invoice = $('#invoiceDownload');
+        if (invoice) {
+          invoice.href = '/api/orders/' + Number(order_id) + '/invoice';
+          invoice.classList.remove('d-none');
+          const downloadedKey = 'invoice_downloaded_' + Number(order_id);
+          if (!sessionStorage.getItem(downloadedKey)) {
+            sessionStorage.setItem(downloadedKey, '1');
+            setTimeout(() => invoice.click(), 0);
+          }
+        }
       } catch (_) {}
     },
 
@@ -657,6 +693,8 @@
       // Fetch product to show stock status and disable add if out of stock
       try {
         const { product: prod } = await get('/products/' + slug);
+        const salesVolume = $('.sales-volume');
+        if (salesVolume) updateStockProgress(salesVolume, prod);
         if (prod.stock != null && prod.stock <= 0) {
           // Show "Out of Stock" and disable the button
           const btn = cartForm.querySelector('button[type="submit"]');
@@ -808,6 +846,7 @@
     await loadSession();
     if (wiring[page]) await wiring[page]();
     wireProductDetail();
+    updateFlashSaleStockBars();
     bindProductButtons(document);
     initSearch();
   });

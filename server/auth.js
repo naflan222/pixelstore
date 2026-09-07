@@ -14,9 +14,9 @@ function createSession(userId) {
 function getUserByToken(token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.email, u.full_name, u.phone, u.address, u.avatar, u.balance, u.role
+    SELECT u.id, u.username, u.email, u.full_name, u.phone, u.address, u.avatar, u.balance, u.role, u.is_active
     FROM sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token = ? AND s.expires_at > datetime('now')`).get(token);
+    WHERE s.token = ? AND u.is_active = 1 AND s.expires_at > datetime('now')`).get(token);
   return row || null;
 }
 
@@ -46,8 +46,15 @@ function requireAuth(req, res, next) {
 // Guard for admin-only API endpoints
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  if (!['owner', 'admin', 'order_manager', 'catalog_manager', 'support'].includes(req.user.role)) return res.status(403).json({ error: 'Admin access required' });
   next();
 }
 
-module.exports = { createSession, getUserByToken, destroySession, attachUser, requireAuth, requireAdmin };
+function requirePermission(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'You do not have permission for this action' });
+    next();
+  };
+}
+
+module.exports = { createSession, getUserByToken, destroySession, attachUser, requireAuth, requireAdmin, requirePermission };

@@ -738,6 +738,48 @@
     });
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+  }
+
+  async function wireProductReviews() {
+    const slug = page.replace('.html', '');
+    const form = $('.ratings-submit-form form');
+    const list = $('.rating-review-content ul');
+    if (!slug || !form || !list) return;
+
+    const renderReviews = async () => {
+      const { reviews } = await get('/products/' + slug);
+      list.innerHTML = reviews.map((review) => (
+        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt=""></div>' +
+        '<div class="rating-comment"><div class="rating">' + '<i class="ti ti-star-filled"></i>'.repeat(review.rating) +
+        '</div><p class="comment mb-0">' + escapeHtml(review.comment) + '</p><span class="name-date">' +
+        escapeHtml(review.username) + ' · ' + escapeHtml(review.created_at) + '</span></div></li>'
+      )).join('') || '<li class="single-user-review">No reviews yet.</li>';
+    };
+
+    try { await renderReviews(); } catch (_) {}
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!requireLogin()) return;
+      const selectedRating = $('input[name="star"]:checked', form);
+      const rating = selectedRating ? Number(selectedRating.id.replace('star', '')) : 0;
+      const comment = $('textarea[name="comment"]', form).value.trim();
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        alertBox(form, 'Please select a rating.', 'danger');
+        return;
+      }
+      try {
+        await post('/products/' + slug + '/reviews', { rating, comment });
+        form.reset();
+        await renderReviews();
+        alertBox(form, 'Your review is now live.', 'success');
+      } catch (error) { alertBox(form, error.message, 'danger'); }
+    });
+  }
+
   /* ---------- live product search with suggestions ---------- */
   function initSearch() {
     const forms = $$('.search-form form');
@@ -846,6 +888,7 @@
     await loadSession();
     if (wiring[page]) await wiring[page]();
     wireProductDetail();
+    wireProductReviews();
     updateFlashSaleStockBars();
     bindProductButtons(document);
     initSearch();

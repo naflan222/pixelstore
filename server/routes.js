@@ -207,7 +207,7 @@ router.get('/products/:slug', (req, res) => {
   const reviews = db.prepare(`
     SELECT r.rating, r.comment, r.created_at, u.username
     FROM reviews r JOIN users u ON u.id = r.user_id
-    WHERE r.product_id = ? ORDER BY r.id DESC`).all(product.id);
+    WHERE r.product_id = ? AND r.is_visible = 1 ORDER BY r.id DESC`).all(product.id);
   res.json({ product, related, reviews });
 });
 
@@ -490,13 +490,17 @@ router.post('/notifications/read', requireAuth, (req, res) => {
 
 router.post('/products/:slug/reviews', requireAuth, (req, res) => {
   const { rating, comment = '' } = req.body || {};
-  const ratingNum = Math.min(5, Math.max(1, parseInt(rating) || 0));
-  if (!ratingNum) return res.status(400).json({ error: 'Rating (1-5) is required.' });
+  const ratingNum = Number(rating);
+  const reviewComment = String(comment).trim();
+  if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5)
+    return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+  if (reviewComment.length > 200)
+    return res.status(400).json({ error: 'Reviews must be 200 characters or fewer.' });
   const product = db.prepare('SELECT id FROM products WHERE slug = ?').get(req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   const review = db.prepare('INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)')
-    .run(req.user.id, product.id, ratingNum, comment);
-  const agg = db.prepare('SELECT AVG(rating) AS avg, COUNT(*) AS c FROM reviews WHERE product_id = ?').get(product.id);
+    .run(req.user.id, product.id, ratingNum, reviewComment);
+  const agg = db.prepare('SELECT AVG(rating) AS avg, COUNT(*) AS c FROM reviews WHERE product_id = ? AND is_visible = 1').get(product.id);
   db.prepare('UPDATE products SET rating = ?, rating_count = ? WHERE id = ?')
     .run(Math.round(agg.avg * 10) / 10, agg.c, product.id);
   createAdminNotification({ type: 'review', title: 'New product review', body: 'A customer submitted a product review.', entityType: 'review', entityId: review.lastInsertRowid });

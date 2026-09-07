@@ -196,12 +196,14 @@ tr:last-child td{border-bottom:none}
     <div class="logo">Pixel<span>House</span></div>
     <nav>
       <a class="active" data-tab="dashboard" onclick="showTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
-      <a data-tab="orders" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
-      <a data-tab="products" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
-      <a data-tab="users" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
-      <a data-tab="messages" onclick="showTab('messages')"><i class="ti ti-mail"></i> Messages</a>
+      <a data-tab="orders" data-roles="owner,admin,order_manager" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
+      <a data-tab="products" data-roles="owner,admin,catalog_manager" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
+      <a data-tab="inventory" data-roles="owner,admin,catalog_manager" onclick="showTab('inventory')"><i class="ti ti-box-seam"></i> Inventory</a>
+      <a data-tab="users" data-roles="owner,admin" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
+      <a data-tab="messages" data-roles="owner,admin,support" onclick="showTab('messages')"><i class="ti ti-mail"></i> Messages</a>
       <a data-tab="vendors" onclick="showTab('vendors')"><i class="ti ti-building-store"></i> Vendors</a>
       <a data-tab="reviews" onclick="showTab('reviews')"><i class="ti ti-star"></i> Reviews</a>
+      <a data-tab="audit" data-roles="owner,admin" onclick="showTab('audit')"><i class="ti ti-history"></i> Activity Log</a>
     </nav>
     <div class="logout"><a onclick="doLogout()"><i class="ti ti-logout"></i> Sign Out</a></div>
   </aside>
@@ -297,6 +299,30 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+      <!-- INVENTORY -->
+      <div class="tab" id="tab-inventory">
+        <div class="dashboard-grid">
+          <div class="card">
+            <h3><i class="ti ti-alert-triangle"></i> Reorder Queue</h3>
+            <div id="reorderQueue"></div>
+          </div>
+          <div class="card">
+            <h3><i class="ti ti-adjustments"></i> Adjust Stock</h3>
+            <form id="inventoryForm" onsubmit="return false">
+              <div class="form-group"><label>Product</label><select id="inventoryProduct"></select></div>
+              <div class="form-group"><label>Adjustment</label><input type="number" id="inventoryChange" placeholder="e.g. 10 or -2" required></div>
+              <div class="form-group"><label>Reason</label><input type="text" id="inventoryReason" placeholder="e.g. Supplier delivery" required></div>
+              <div class="form-group"><label>Internal note</label><textarea id="inventoryNote" placeholder="Optional reference or note"></textarea></div>
+              <button class="btn btn-primary" onclick="adjustInventory()">Save adjustment</button>
+            </form>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i class="ti ti-list-details"></i> Recent Stock Movements</h3>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Change</th><th>Reason</th><th>Note</th><th>By</th></tr></thead><tbody id="inventoryMovementsBody"></tbody></table></div>
+        </div>
+      </div>
+
       <!-- MESSAGES -->
       <div class="tab" id="tab-messages">
         <div class="card">
@@ -333,6 +359,14 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+      <!-- AUDIT LOG -->
+      <div class="tab" id="tab-audit">
+        <div class="card">
+          <h3><i class="ti ti-shield-check"></i> Administrative Activity</h3>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Team member</th><th>Action</th><th>Record</th><th>Details</th></tr></thead><tbody id="auditLogBody"></tbody></table></div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -352,6 +386,7 @@ tr:last-child td{border-bottom:none}
         <div class="form-group"><label>Image Path *</label><input type="text" id="prodImage" placeholder="img/product/example.png" required></div>
         <div class="form-group"><label>Category</label><input type="text" id="prodCategory" value="GoPro Accessories"></div>
         <div class="form-group"><label>Stock</label><input type="number" id="prodStock" value="100"></div>
+        <div class="form-group"><label>Reorder at</label><input type="number" min="0" id="prodReorderThreshold" value="10"></div>
         <div class="form-group"><label>Badge (e.g. Sale, New, -20%)</label><input type="text" id="prodBadge"></div>
         <div class="form-group"><label>Rating (0-5)</label><input type="number" step="0.1" id="prodRating" value="4.5"></div>
         <div class="form-group" style="display:flex;gap:20px;align-items:center;padding-top:30px">
@@ -414,7 +449,7 @@ function toast(msg, type = 'success') {
 async function checkSession() {
   try {
     const data = await api('/auth/me');
-    if (data.user && data.user.role === 'admin') {
+    if (data.user && data.user.role !== 'customer') {
       adminUser = data.user;
       showApp();
       return;
@@ -432,6 +467,9 @@ function showApp() {
   $('#loginScreen').style.display = 'none';
   $('#app').style.display = 'block';
   $('#userAvatar').textContent = (adminUser.full_name || adminUser.username || 'A').charAt(0).toUpperCase();
+  $$('.sidebar nav a[data-roles]').forEach(link => {
+    link.style.display = link.dataset.roles.split(',').includes(adminUser.role) ? '' : 'none';
+  });
   showTab('dashboard');
 }
 
@@ -447,7 +485,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
     const r = await apiPost('/auth/login', { username: u, password: p });
     // Check if user is admin
     const me = await api('/auth/me');
-    if (!me.user || me.user.role !== 'admin') {
+    if (!me.user || me.user.role === 'customer') {
       $('#loginErr').textContent = 'This account does not have admin access.';
       $('#loginErr').style.display = 'block';
       await apiPost('/auth/logout');
@@ -474,16 +512,18 @@ function showTab(tab) {
   $('#tab-' + tab).classList.add('active');
   $$('.sidebar nav a').forEach(a => a.classList.remove('active'));
   $$(`.sidebar nav a[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
-  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', users: 'Users', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews' };
+  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', inventory: 'Inventory', users: 'Users', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', audit: 'Activity Log' };
   $('#pageTitle').textContent = titles[tab] || tab;
   // Load data
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'orders') loadOrders();
   if (tab === 'products') loadProducts();
+  if (tab === 'inventory') loadInventory();
   if (tab === 'users') loadUsers();
   if (tab === 'messages') loadMessages();
   if (tab === 'vendors') loadVendors();
   if (tab === 'reviews') loadReviews();
+  if (tab === 'audit') loadAuditLogs();
   // Close sidebar on mobile
   $('#sidebar').classList.remove('open');
   $('#overlay').classList.remove('show');
@@ -577,7 +617,7 @@ async function loadOrders() {
         <td>${o.items.length} item(s)</td>
         <td>${money(o.total)}</td>
         <td>${esc(o.payment_method)}</td>
-        <td>${esc(o.shipping_method)}</td>
+        <td>${esc(o.shipping_method)}${o.tracking_number ? `<br><span style="font-size:11px;color:var(--text2)">${esc(o.carrier || 'Tracking')}: ${esc(o.tracking_number)}</span>` : ''}</td>
         <td><span class="badge badge-${o.status}">${o.status}</span></td>
         <td style="font-size:11px;color:var(--text2)">${o.created_at}</td>
         <td style="white-space:nowrap">
@@ -616,7 +656,7 @@ function searchOrders(e) { if (e.key === 'Enter') { orderPage = 1; loadOrders();
 
 async function viewOrder(id) {
   try {
-    const { order, items } = await api('/admin/orders/' + id);
+    const { order, items, history } = await api('/admin/orders/' + id);
     $('#orderDetail').innerHTML = `
       <div class="order-detail-grid">
         <div><strong>Order #:</strong> ${order.id}</div>
@@ -627,6 +667,8 @@ async function viewOrder(id) {
         <div><strong>Address:</strong> ${esc(order.address)}</div>
         <div><strong>Shipping:</strong> ${esc(order.shipping_method)}</div>
         <div><strong>Payment:</strong> ${esc(order.payment_method)}</div>
+        <div><strong>Carrier:</strong> ${esc(order.carrier || 'Not set')}</div>
+        <div><strong>Tracking:</strong> ${esc(order.tracking_number || 'Not set')}</div>
         <div><strong>Date:</strong> ${order.created_at}</div>
         <div><strong>Guest:</strong> ${order.guest_id ? 'Yes' : 'No'}</div>
       </div>
@@ -648,6 +690,19 @@ async function viewOrder(id) {
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
         <span>Total:</span><span style="color:var(--green)">${money(order.total)}</span>
       </div>
+      <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
+        <h4 style="margin-bottom:12px;font-size:14px">Fulfillment</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Carrier</label><input id="carrier-${order.id}" value="${esc(order.carrier)}" placeholder="e.g. TCS"></div>
+          <div class="form-group"><label>Tracking number</label><input id="tracking-${order.id}" value="${esc(order.tracking_number)}" placeholder="Courier tracking ID"></div>
+          <div class="form-group full"><label>Internal notes</label><textarea id="notes-${order.id}" placeholder="Visible only to the admin team">${esc(order.internal_notes)}</textarea></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveFulfillment(${order.id})">Save fulfillment</button>
+      </div>
+      <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
+        <h4 style="margin-bottom:12px;font-size:14px">Status history</h4>
+        ${(history || []).map(h => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="badge badge-${h.status}">${esc(h.status)}</span> ${esc(h.note || '')}<span style="color:var(--text2);float:right">${esc(h.changed_by_name || 'System')} · ${h.created_at}</span></div>`).join('') || '<div class="empty">No status changes recorded yet</div>'}
+      </div>
     `;
     $('#orderModal').classList.add('active');
   } catch (err) { toast(err.message, 'error'); }
@@ -659,6 +714,19 @@ async function updateOrderStatus(id, status) {
   try {
     await apiPut('/admin/orders/' + id + '/status', { status });
     toast('Order #' + id + ' marked as ' + status);
+    loadOrders();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function saveFulfillment(id) {
+  try {
+    await apiPut('/admin/orders/' + id + '/fulfillment', {
+      carrier: $('#carrier-' + id).value.trim(),
+      tracking_number: $('#tracking-' + id).value.trim(),
+      internal_notes: $('#notes-' + id).value.trim(),
+    });
+    toast('Fulfillment details saved');
+    viewOrder(id);
     loadOrders();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -704,6 +772,7 @@ function openProductModal() {
   $('#prodId').value = '';
   $('#prodCategory').value = 'GoPro Accessories';
   $('#prodStock').value = '100';
+  $('#prodReorderThreshold').value = '10';
   $('#prodRating').value = '4.5';
   $('#productModal').classList.add('active');
 }
@@ -721,6 +790,7 @@ function editProduct(id) {
   $('#prodCategory').value = p.category;
   $('#prodBadge').value = p.badge || '';
   $('#prodStock').value = p.stock;
+  $('#prodReorderThreshold').value = p.reorder_threshold ?? 10;
   $('#prodRating').value = p.rating;
   $('#prodFeatured').checked = !!p.featured;
   $('#prodFlashSale').checked = !!p.flash_sale;
@@ -742,6 +812,7 @@ async function saveProduct() {
     category: $('#prodCategory').value.trim(),
     badge: $('#prodBadge').value.trim() || null,
     stock: parseInt($('#prodStock').value) || 0,
+    reorder_threshold: parseInt($('#prodReorderThreshold').value) || 0,
     rating: parseFloat($('#prodRating').value) || 4.5,
     featured: $('#prodFeatured').checked,
     flash_sale: $('#prodFlashSale').checked,
@@ -789,12 +860,16 @@ function renderUsers(users) {
       <td style="font-size:12px">${esc(u.email)}</td>
       <td style="font-size:12px">${esc(u.phone)}</td>
       <td>${u.order_count}</td>
-      <td><span class="badge ${u.role === 'admin' ? 'badge-success' : 'badge-warning'}">${u.role}</span></td>
+      <td><span class="badge ${['owner', 'admin'].includes(u.role) ? 'badge-success' : u.role === 'customer' ? 'badge-warning' : 'badge-confirmed'}">${esc(u.role)}</span></td>
       <td style="font-size:11px;color:var(--text2)">${u.created_at}</td>
       <td>
         <select onchange="updateUserRole(${u.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
           <option value="customer" ${u.role === 'customer' ? 'selected' : ''}>Customer</option>
+          <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Owner</option>
           <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="order_manager" ${u.role === 'order_manager' ? 'selected' : ''}>Order manager</option>
+          <option value="catalog_manager" ${u.role === 'catalog_manager' ? 'selected' : ''}>Catalog manager</option>
+          <option value="support" ${u.role === 'support' ? 'selected' : ''}>Support</option>
         </select>
       </td>
     </tr>
@@ -813,6 +888,35 @@ async function updateUserRole(id, role) {
   try {
     await apiPut('/admin/users/' + id + '/role', { role });
     toast('User role updated to ' + role);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- INVENTORY ---------- */
+async function loadInventory() {
+  try {
+    const data = await api('/admin/inventory');
+    $('#inventoryProduct').innerHTML = data.products.map(p => `<option value="${p.id}">${esc(p.name)} (${p.stock} in stock)</option>`).join('');
+    const needsReorder = data.products.filter(p => p.stock <= p.reorder_threshold);
+    $('#reorderQueue').innerHTML = needsReorder.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><img src="../${p.image}" class="prod-img" alt=""><div style="flex:1;font-size:13px;font-weight:600">${esc(p.name)}<div style="font-size:11px;color:var(--text2);font-weight:400">Reorder at ${p.reorder_threshold}</div></div><span class="badge ${p.stock === 0 ? 'badge-danger' : 'badge-warning'}">${p.stock} left</span></div>`).join('') || '<div class="empty">All products are above their reorder level.</div>';
+    $('#inventoryMovementsBody').innerHTML = data.movements.map(m => `<tr><td style="font-size:11px;color:var(--text2)">${m.created_at}</td><td>${esc(m.product_name)}</td><td><span class="badge ${m.change > 0 ? 'badge-success' : 'badge-danger'}">${m.change > 0 ? '+' : ''}${m.change}</span></td><td>${esc(m.reason)}</td><td>${esc(m.note)}</td><td>${esc(m.changed_by_name || 'Unknown')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No stock adjustments recorded</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function adjustInventory() {
+  const productId = $('#inventoryProduct').value;
+  try {
+    await apiPost('/admin/inventory/' + productId + '/adjust', { change: $('#inventoryChange').value, reason: $('#inventoryReason').value.trim(), note: $('#inventoryNote').value.trim() });
+    $('#inventoryForm').reset();
+    toast('Stock adjustment recorded');
+    loadInventory();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/* ---------- AUDIT LOG ---------- */
+async function loadAuditLogs() {
+  try {
+    const { logs } = await api('/admin/audit-logs');
+    $('#auditLogBody').innerHTML = logs.map(l => `<tr><td style="font-size:11px;color:var(--text2)">${l.created_at}</td><td>${esc(l.actor_name || 'System')}</td><td>${esc(l.action)}</td><td>${esc(l.entity_type)} #${esc(l.entity_id)}</td><td>${esc(l.details)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No activity has been recorded</td></tr>';
   } catch (err) { toast(err.message, 'error'); }
 }
 

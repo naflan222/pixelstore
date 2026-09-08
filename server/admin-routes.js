@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const db = require('./db');
 const { requireAdmin, requirePermission } = require('./auth');
+const { sendInvoice } = require('./invoice');
 
 const router = express.Router();
 
@@ -552,6 +553,16 @@ router.get('/orders/:id', orderAccess, (req, res) => {
   const payment = db.prepare(`SELECT payment_method, payment_status, transaction_id, paid_at, amount_paid, created_at
     FROM payments WHERE order_id = ?`).get(id) || { payment_method: order.payment_method, payment_status: 'pending', amount_paid: 0 };
   res.json({ order, payment, items, history });
+});
+
+router.get('/orders/:id/invoice', orderAccess, (req, res) => {
+  const id = productId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid order ID.' });
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+  if (!order) return res.status(404).json({ error: 'Order not found.' });
+  const items = db.prepare('SELECT name, price, quantity FROM order_items WHERE order_id = ?').all(id);
+  audit(req, 'downloaded invoice', 'order', id);
+  sendInvoice(res, order, items);
 });
 
 router.put('/orders/:id/status', orderAccess, (req, res) => {

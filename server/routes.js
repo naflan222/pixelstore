@@ -6,6 +6,7 @@ const db = require('./db');
 const { createSession, destroySession, requireAuth } = require('./auth');
 const { emailEnabled, sendOtpEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
+const { sendInvoice } = require('./invoice');
 
 const router = express.Router();
 
@@ -440,19 +441,8 @@ router.get('/orders/:id/invoice', (req, res) => {
     : db.prepare('SELECT * FROM orders WHERE id = ? AND guest_id = ?').get(orderId, req.guestId);
   if (!order) return res.status(404).json({ error: 'Invoice not found.' });
 
-  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[character]);
-  const formatAmount = (amount) => `Rs. ${Number(amount || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const items = db.prepare('SELECT name, price, quantity FROM order_items WHERE order_id = ?').all(order.id);
-  const rows = items.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.quantity}</td><td>${formatAmount(item.price)}</td><td>${formatAmount(item.price * item.quantity)}</td></tr>`).join('');
-
-  res.set({
-    'Content-Type': 'text/html; charset=utf-8',
-    'Content-Disposition': `attachment; filename="pixelhouse-invoice-${order.id}.html"`,
-    'X-Content-Type-Options': 'nosniff',
-  });
-  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Invoice #${order.id}</title><style>body{font-family:Arial,sans-serif;color:#1f2937;margin:40px}header{display:flex;justify-content:space-between;border-bottom:2px solid #625AFA;padding-bottom:16px}h1{color:#625AFA;margin:0}table{width:100%;border-collapse:collapse;margin:28px 0}th,td{text-align:left;padding:10px;border-bottom:1px solid #d1d5db}th{background:#f3f4f6}.total{margin-left:auto;width:280px}.total div{display:flex;justify-content:space-between;padding:6px 0}.grand{font-size:18px;font-weight:bold;border-top:2px solid #1f2937;margin-top:6px;padding-top:10px!important}</style></head><body><header><div><h1>PixelHouse</h1><p>Invoice #${order.id}</p></div><div><strong>Order date</strong><br>${escapeHtml(order.created_at)}<br><strong>Payment</strong><br>${escapeHtml(order.payment_method)}</div></header><h2>Bill to</h2><p>${escapeHtml(order.full_name)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.phone)}<br>${escapeHtml(order.address)}</p><table><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="total"><div><span>Subtotal</span><span>${formatAmount(order.subtotal)}</span></div><div><span>Discount</span><span>-${formatAmount(order.discount_amount)}</span></div><div><span>Shipping</span><span>${formatAmount(order.shipping_fee)}</span></div><div class="grand"><span>Total</span><span>${formatAmount(order.total)}</span></div></div></body></html>`);
+  sendInvoice(res, order, items);
 });
 
 /* ---------------- VENDOR / CONTACT / NOTIFICATIONS / REVIEWS ---------------- */

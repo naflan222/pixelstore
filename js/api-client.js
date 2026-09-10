@@ -183,7 +183,14 @@
             shipping_method: sessionStorage.getItem('shipping_method') || 'standard',
             payment_method: paymentMethod,
           });
-          sessionStorage.setItem('last_order', JSON.stringify({ order_id: r.order_id, total: r.total }));
+          sessionStorage.setItem('last_order', JSON.stringify({
+            order_id: r.order_id,
+            total: r.total,
+            payment_method: paymentMethod,
+            invoice_number: r.invoice_number || '',
+            invoice_file: r.invoice_file || '',
+            invoice_url: r.invoice_url || ('/api/orders/' + r.order_id + '/invoice'),
+          }));
           sessionStorage.removeItem('guest_billing');
           location.href = r.redirect || 'payment-success.html';
         } catch (err) {
@@ -539,22 +546,41 @@
     'checkout-bank.html': placeOrderPage('bank'),
     'checkout-paypal.html': placeOrderPage('paypal'),
 
-    // --- Success page: make the invoice for the order just placed available to its owner ---
+    // --- Success page: the order's branded PDF invoice downloads itself ---
     'payment-success.html': function () {
       const info = sessionStorage.getItem('last_order');
       if (!info) return;
       try {
-        const { order_id } = JSON.parse(info);
-        if (!Number.isSafeInteger(Number(order_id)) || Number(order_id) < 1) return;
-        const invoice = $('#invoiceDownload');
-        if (invoice) {
-          invoice.href = '/api/orders/' + Number(order_id) + '/invoice';
-          invoice.classList.remove('d-none');
-          const downloadedKey = 'invoice_downloaded_' + Number(order_id);
-          if (!sessionStorage.getItem(downloadedKey)) {
+        const order = JSON.parse(info) || {};
+        const orderId = Number(order.order_id);
+        if (!Number.isSafeInteger(orderId) || orderId < 1) return;
+
+        const invoiceUrl = order.invoice_url || ('/api/orders/' + orderId + '/invoice');
+        const download = $('#invoiceDownload');
+        if (!download) return;
+        download.href = invoiceUrl;
+        // Keeps the saved file name identical to the one the server suggests.
+        download.setAttribute('download', order.invoice_file || ('PixelHouse-Invoice-' + orderId + '.pdf'));
+
+        const preview = $('#invoicePreview');
+        if (preview) preview.href = invoiceUrl + '?view=1';
+
+        const text = (sel, value) => { const el = $(sel); if (el) el.textContent = value; };
+        const receipt = $('#invoiceReceipt');
+        if (receipt) receipt.classList.remove('d-none');
+        text('#invoiceNumber', order.invoice_number || ('Order #' + orderId));
+        text('#invoiceOrderNo', '#' + orderId);
+        text('#invoiceTotal', money(order.total));
+        text('#invoicePaymentMethod', order.payment_method ? '· paid with ' + String(order.payment_method).replace('-', ' ') : '');
+
+        const downloadedKey = 'invoice_downloaded_' + orderId;
+        if (sessionStorage.getItem(downloadedKey)) {
+          text('#invoiceNote', 'Invoice already downloaded for this order — use the button above to save another copy.');
+        } else {
+          setTimeout(() => {
             sessionStorage.setItem(downloadedKey, '1');
-            setTimeout(() => invoice.click(), 0);
-          }
+            download.click();
+          }, 400);
         }
       } catch (_) {}
     },
@@ -573,6 +599,7 @@
             '<p class="mb-1 text-muted" style="font-size:12px">' + o.created_at + ' · ' + o.payment_method + '</p>' +
             o.items.map((i) => '<div class="d-flex justify-content-between" style="font-size:13px"><span>' + i.name + ' × ' + i.quantity + '</span><span>' + money(i.price * i.quantity) + '</span></div>').join('') +
             '<hr><div class="d-flex justify-content-between"><strong>Total</strong><strong>' + money(o.total) + '</strong></div>' +
+            '<div class="text-right mt-2"><a class="btn btn-sm btn-outline-primary" href="/api/orders/' + o.id + '/invoice" download title="Download the PDF invoice for order #' + o.id + '"><i class="ti ti-file-download"></i> Invoice (PDF)</a></div>' +
           '</div></div>'
         )).join('');
       } catch (_) {}

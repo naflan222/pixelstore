@@ -105,11 +105,18 @@ Any Node host works (Railway, Render, VPS, etc.):
 - Keep the owner account protected and assign the least-privileged staff role required: order manager, catalog manager, or support
 - Add rate limiting (e.g. `express-rate-limit`) on auth endpoints
 
-## Email OTP Setup (Forgot Password)
+## Email (OTP + Order Confirmations)
 
-The forgot-password flow sends a real 6-digit code by email over SMTP, then the user
+The store sends real emails once a mail transport is configured:
+
+- **Forgot password** — a 6-digit code by email over SMTP, then the user
 enters the code (`otp-confirm.html`) and picks a new password (`change-password.html`).
 Old sessions are killed on reset, so the user must log in again with the new password.
+- **Order confirmation** — sent automatically right after checkout to the
+customer's email address (guests included), with a short professional message and
+the **branded invoice PDF attached** (`server/mailer.js` → `sendOrderConfirmationEmail`).
+The email is sent *after* the checkout response, so a mail outage can never delay
+or fail an order; if PDF rendering fails, the email still goes out with the invoice link.
 
 **Flow:** `forget-password.html` → email with 6-digit code (15-min expiry) → `otp-confirm.html`
 (verify code) → `change-password.html` (new password) → `forget-password-success.html`.
@@ -127,7 +134,9 @@ works even on hosts that block SMTP ports. Get a key: Brevo → ⚙ Account sett
 Railway → your service → **Variables** tab → add → **Redeploy**:
 ```
 BREVO_API_KEY = <your v3 API key>
-MAIL_FROM = mnaflan295@gmail.com     # sender address, verified in Brevo
+MAIL_FROM = support@lankalens.online # sender address, verified in Brevo
+MAIL_FROM_NAME = PixelHouse          # optional From display name
+MAIL_REPLY_TO = support@lankalens.online # optional; where customer replies land
 ```
 
 **Option B — Brevo SMTP** (used when no API key is set):
@@ -136,7 +145,9 @@ SMTP_HOST = smtp-relay.brevo.com
 SMTP_PORT = 587
 SMTP_USER = <SMTP login shown in Brevo: Transactions → SMTP>
 SMTP_PASS = <SMTP password from Brevo: Transactions → SMTP>
-MAIL_FROM = mnaflan295@gmail.com     # sender address, verified in Brevo
+MAIL_FROM = support@lankalens.online # sender address, verified in Brevo
+MAIL_FROM_NAME = PixelHouse          # optional From display name
+MAIL_REPLY_TO = support@lankalens.online # optional; where customer replies land
 ```
 
 Notes:
@@ -175,13 +186,22 @@ and a public endpoint (no secrets) shows the live state:
 ```
 GET https://<your-app>/api/email/status
 → {"email_enabled":true,"transport":"smtp","smtp_host":"smtp-relay.brevo.com",
-   "smtp_port":587,"smtp_user":"...","mail_from":"mnaflan295@gmail.com",...}
+   "smtp_port":587,"smtp_user":"...","mail_from":"support@lankalens.online",...}
 ```
 
 If `email_enabled` is `false` on Railway, the env vars did not arrive (check the
 Variables tab and redeploy). When a reset email fails, the Railway logs show
 `[EMAIL ERROR]` with a specific hint (550 = sender not verified, 535 = wrong SMTP
 password, socket = connectivity — in which case use `BREVO_API_KEY` instead).
+
+### Emails going to spam?
+
+See **[EMAIL-DELIVERABILITY.md](EMAIL-DELIVERABILITY.md)** for the full fix — the
+short version: authenticate your sender domain in Brevo (SPF/DKIM/DMARC records),
+keep `MAIL_FROM` the same address everywhere, and verify with a 10/10 score on
+[mail-tester.com](https://www.mail-tester.com). The code already sends
+well-formed mail (multipart text+HTML, branded From, Reply-To, calm subjects)
+and prints a console warning if the From address looks like spoofing.
 
 ## Branded PDF Invoices
 

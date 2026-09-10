@@ -167,6 +167,22 @@ the server loads it automatically and never overrides real environment variables
 Without any SMTP configured, the code prints to the server logs instead (dev mode), so
 you can still test the whole flow offline.
 
+### Checking the mail config on a live deployment
+
+The server logs its mail configuration on startup (`[MAIL] enabled — transport: ...`),
+and a public endpoint (no secrets) shows the live state:
+
+```
+GET https://<your-app>/api/email/status
+→ {"email_enabled":true,"transport":"smtp","smtp_host":"smtp-relay.brevo.com",
+   "smtp_port":587,"smtp_user":"...","mail_from":"mnaflan295@gmail.com",...}
+```
+
+If `email_enabled` is `false` on Railway, the env vars did not arrive (check the
+Variables tab and redeploy). When a reset email fails, the Railway logs show
+`[EMAIL ERROR]` with a specific hint (550 = sender not verified, 535 = wrong SMTP
+password, socket = connectivity — in which case use `BREVO_API_KEY` instead).
+
 ## Branded PDF Invoices
 
 When an order is placed the store generates the customer's invoice and the confirmation page downloads it

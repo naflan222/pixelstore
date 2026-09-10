@@ -21,6 +21,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 
 const { attachUser } = require('./auth');
+const { describeConfig: describeMailConfig } = require('./mailer');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./db');
@@ -128,4 +129,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => console.log(`Pixels server running at http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Pixels server running at http://localhost:${PORT}`);
+  const mail = describeMailConfig();
+  if (mail.email_enabled) {
+    const where = mail.transport === 'brevo_api'
+      ? 'Brevo HTTP API (api.brevo.com, HTTPS)'
+      : `SMTP ${mail.smtp_host}:${mail.smtp_port} as ${mail.smtp_user}`;
+    console.log(`[MAIL] enabled — transport: ${where}, from: ${mail.mail_from || '(SMTP user)'}` +
+      (mail.force_dev_codes ? ', FORCE_DEV_CODES=1 (dev mode — codes returned in API, no mail sent)' : ''));
+  } else {
+    console.log('[MAIL] NOT configured — reset codes will be printed to this log (dev mode). Set SMTP_* or BREVO_API_KEY env vars.');
+  }
+});

@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
 const { createSession, destroySession, requireAuth } = require('./auth');
-const { emailEnabled, sendOtpEmail } = require('./mailer');
+const { emailEnabled, describeConfig, sendOtpEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
 const { sendInvoice, invoiceNumberFor } = require('./invoice');
 
@@ -66,6 +66,14 @@ function couponDiscount(coupon, subtotal) {
     amount = Math.min(amount, Number(coupon.maximum_discount));
   return { amount: Math.max(0, Math.min(subtotal, Math.round(amount * 100) / 100)) };
 }
+
+/* ---------------- DIAGNOSTICS ---------------- */
+
+// Public, secret-free mail config summary — lets you verify on the deployed
+// service that the SMTP/API env vars arrived: GET /api/email/status
+router.get('/email/status', (req, res) => {
+  res.json({ ok: true, ...describeConfig() });
+});
 
 /* ---------------- AUTH ---------------- */
 

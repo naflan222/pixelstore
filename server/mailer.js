@@ -56,6 +56,22 @@ function emailEnabled() {
   return brevoApiConfigured() || smtpConfigured();
 }
 
+// Public (no secrets) summary of the mail configuration — used by the
+// startup log and GET /api/email/status so operators can verify on the
+// deployed service that the env vars actually arrived.
+function describeConfig() {
+  const port = Number(process.env.SMTP_PORT || 465);
+  return {
+    email_enabled: emailEnabled(),
+    transport: brevoApiConfigured() ? 'brevo_api' : smtpConfigured() ? 'smtp' : null,
+    smtp_host: process.env.SMTP_HOST || null,
+    smtp_port: smtpConfigured() ? port : null,
+    smtp_user: process.env.SMTP_USER || null,
+    mail_from: process.env.MAIL_FROM || null,
+    force_dev_codes: process.env.FORCE_DEV_CODES === '1',
+  };
+}
+
 function describeError(e) {
   const msg = String(e && e.message || e);
   // Help operators fix the most common SMTP/API misconfigurations
@@ -140,4 +156,4 @@ async function sendOtpEmail(toEmail, code) {
   }
 }
 
-module.exports = { emailEnabled, sendOtpEmail };
+module.exports = { emailEnabled, describeConfig, sendOtpEmail };

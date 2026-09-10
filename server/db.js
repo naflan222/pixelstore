@@ -260,6 +260,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
   email   TEXT NOT NULL,
   code    TEXT NOT NULL,
   used    INTEGER DEFAULT 0,
+  attempts INTEGER DEFAULT 0,
   expires_at TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -374,6 +375,7 @@ CREATE TABLE IF NOT EXISTS read_messages (
   addColumn('products', 'brand', "brand TEXT DEFAULT ''");
   addColumn('reviews', 'is_visible', 'is_visible INTEGER NOT NULL DEFAULT 1');
   addColumn('users', 'is_active', 'is_active INTEGER NOT NULL DEFAULT 1');
+  addColumn('password_resets', 'attempts', 'attempts INTEGER DEFAULT 0');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS categories (

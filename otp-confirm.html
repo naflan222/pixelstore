@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <!-- The above tags *must* come first in the head, any other head content must come *after* these tags -->
     <!-- Title -->
-    <title>PixelHouse - GoPro & Action Camera Accessories Store</title>
+    <title>Reset Password - PixelHouse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&amp;display=swap" rel="stylesheet">
@@ -46,24 +46,27 @@
         <div class="row justify-content-center">
           <div class="col-10 col-lg-8">
             <div class="text-start rtl-text-right">
-              <h5 class="mb-1 text-white">Verify Phone Number</h5>
-              <p class="mb-4 text-white">Enter the OTP code sent to email</p>
+              <h5 class="mb-1 text-white">Reset Your Password</h5>
+              <p class="mb-4 text-white">Enter the 6-digit code we sent to your email</p>
             </div>
             <!-- OTP Verify Form-->
             <div class="otp-verify-form mt-5">
-              <form action="home.html" method="">
+              <form action="change-password.html" method="">
                 <div class="d-flex justify-content-between mb-5 rtl-flex-d-row-r">
-                  <input class="single-otp-input form-control" type="text" value="" placeholder="-" maxlength="1">
-                  <input class="single-otp-input form-control" type="text" value="" placeholder="-" maxlength="1">
-                  <input class="single-otp-input form-control" type="text" value="" placeholder="-" maxlength="1">
-                  <input class="single-otp-input form-control" type="text" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" autocomplete="one-time-code" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" value="" placeholder="-" maxlength="1">
+                  <input class="single-otp-input form-control" type="text" inputmode="numeric" value="" placeholder="-" maxlength="1">
                 </div>
                 <button class="btn btn-warning btn-lg w-100" type="submit">Verify &amp; Proceed</button>
               </form>
             </div>
-            <!-- Term & Privacy Info-->
+            <!-- Resend / Back Info-->
             <div class="login-meta-data">
-              <p class="mt-3 mb-0">Don't received the OTP?<span class="otp-sec mx-1 text-white" id="resendOTP"></span></p>
+              <p class="mt-3 mb-0">Didn't receive the code?<span class="otp-sec mx-1 text-white" id="resendOTP"></span></p>
+              <p class="mt-2 mb-0"><a class="text-white" href="forget-password.html">Use a different email?</a></p>
             </div>
           </div>
         </div>

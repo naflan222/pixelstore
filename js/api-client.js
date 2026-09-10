@@ -317,15 +317,26 @@
       const form = $('form');
       if (!form) return;
       form.removeAttribute('action');
-      const input = $('input[type="email"], input[type="text"]', form);
+      const input = $('input', form);
+      const btn = form.querySelector('button[type="submit"]');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const email = (input && input.value || '').trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          alertBox(form, 'Please enter a valid email address.');
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Sending code...'; }
         try {
-          const r = await post('/auth/forgot-password', { email: input.value.trim() });
-          sessionStorage.setItem('reset_email', input.value.trim());
+          const r = await post('/auth/forgot-password', { email });
+          sessionStorage.setItem('reset_email', email);
+          sessionStorage.removeItem('reset_code');
           alertBox(form, r.message + (r.dev_code ? ' Code: ' + r.dev_code : ''), 'success');
-          setTimeout(() => { location.href = 'otp-confirm.html'; }, 1500);
-        } catch (err) { alertBox(form, err.message); }
+          setTimeout(() => { location.href = 'otp-confirm.html'; }, 2500);
+        } catch (err) {
+          alertBox(form, err.message);
+          if (btn) { btn.disabled = false; btn.textContent = 'Reset Password'; }
+        }
       });
     },
 
@@ -333,40 +344,102 @@
       const form = $('form');
       if (!form) return;
       form.removeAttribute('action');
+      const codeInputs = $$('.single-otp-input', form);
+      const btn = form.querySelector('button[type="submit"]');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const code = $$('input', form).map((i) => i.value.trim()).join('').replace(/\s/g, '');
-        sessionStorage.setItem('reset_code', code);
-        location.href = 'change-password.html';
+        const code = codeInputs.map((i) => i.value).join('').trim();
+        if (code.length !== 6) {
+          alertBox(form, 'Please enter the full 6-digit code from your email.');
+          return;
+        }
+        const email = sessionStorage.getItem('reset_email');
+        if (!email) {
+          alertBox(form, 'No email on file. Please request a new code first.');
+          setTimeout(() => { location.href = 'forget-password.html'; }, 1500);
+          return;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+        try {
+          // Check the code right away so a wrong code is caught here,
+          // before the user types a new password.
+          await post('/auth/verify-code', { email, code });
+          sessionStorage.setItem('reset_code', code);
+          location.href = 'change-password.html';
+        } catch (err) {
+          alertBox(form, err.message);
+          if (btn) { btn.disabled = false; btn.textContent = 'Verify & Proceed'; }
+          codeInputs.forEach((i) => { i.value = ''; });
+          if (codeInputs[0]) codeInputs[0].focus();
+        }
       });
+
+      // "Resend OTP" link (appears after the 60s countdown in otp-timer.js)
+      const host = $('#resendOTP');
+      if (host) {
+        host.addEventListener('click', async (e) => {
+          const link = e.target.closest('.resendOTP');
+          if (!link) return;
+          e.preventDefault();
+          const email = sessionStorage.getItem('reset_email');
+          if (!email) { alertBox(form, 'No email on file. Please start over.'); return; }
+          try {
+            const r = await post('/auth/forgot-password', { email });
+            alertBox(form, r.message, 'success');
+            if (window.__restartOtpTimer) window.__restartOtpTimer();
+          } catch (err) { alertBox(form, err.message); }
+        });
+      }
     },
 
     'change-password.html': function () {
       const form = $('form');
       if (!form) return;
       form.removeAttribute('action');
+      const fields = $$('input[type="password"]', form);
+      const email = sessionStorage.getItem('reset_email');
+      const code = sessionStorage.getItem('reset_code');
+      const isReset = !!(email && code);
+      if (isReset) {
+        // Reset mode: the email OTP replaces the "Old Password" field.
+        const oldField = fields[0] && fields[0].closest('.mb-3');
+        if (oldField) oldField.style.display = 'none';
+        const title = $('.page-heading h6');
+        if (title) title.textContent = 'Reset Password';
+      }
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const inputs = $$('input[type="password"]', form);
-        const email = sessionStorage.getItem('reset_email');
-        const code = sessionStorage.getItem('reset_code');
-        try {
-          if (email && code) {
-            const r = await post('/auth/reset-password', {
-              email, code, password: inputs[0].value,
-            });
+        if (isReset) {
+          const newPwd = fields[1].value;
+          const confirmPwd = fields[2] ? fields[2].value : newPwd;
+          if (newPwd.length < 6) { alertBox(form, 'New password must be at least 6 characters.'); return; }
+          if (newPwd !== confirmPwd) { alertBox(form, 'New passwords do not match.'); return; }
+          try {
+            const r = await post('/auth/reset-password', { email, code, password: newPwd });
             sessionStorage.removeItem('reset_email');
             sessionStorage.removeItem('reset_code');
             location.href = r.redirect || 'forget-password-success.html';
-          } else {
-            if (!requireLogin()) return;
+          } catch (err) {
+            alertBox(form, err.message);
+            if (/invalid or expired|too many attempts/i.test(err.message)) {
+              sessionStorage.removeItem('reset_email');
+              sessionStorage.removeItem('reset_code');
+            }
+          }
+        } else {
+          if (!requireLogin()) return;
+          const current = fields[0].value;
+          const newPwd = fields[1] ? fields[1].value : current;
+          const confirmPwd = fields[2] ? fields[2].value : newPwd;
+          if (newPwd !== confirmPwd) { alertBox(form, 'New passwords do not match.'); return; }
+          try {
             await post('/auth/change-password', {
-              current_password: inputs[0].value,
-              new_password: inputs[1] ? inputs[1].value : inputs[0].value,
+              current_password: current,
+              new_password: newPwd,
             });
             alertBox(form, 'Password changed successfully.', 'success');
-          }
-        } catch (err) { alertBox(form, err.message); }
+          } catch (err) { alertBox(form, err.message); }
+        }
       });
     },
 

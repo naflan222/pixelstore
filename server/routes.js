@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
 const { createSession, destroySession, requireAuth } = require('./auth');
-const { emailEnabled, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
+const { emailEnabled, describeConfig, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
 const { sendInvoice, invoiceNumberFor, buildInvoiceModel, renderPdf } = require('./invoice');
 
@@ -94,6 +94,14 @@ function couponDiscount(coupon, subtotal) {
   return { amount: Math.max(0, Math.min(subtotal, Math.round(amount * 100) / 100)) };
 }
 
+/* ---------------- DIAGNOSTICS ---------------- */
+
+// Public, secret-free mail config summary — lets you verify on the deployed
+// service that the SMTP/API env vars arrived: GET /api/email/status
+router.get('/email/status', (req, res) => {
+  res.json({ ok: true, ...describeConfig() });
+});
+
 /* ---------------- AUTH ---------------- */
 
 router.post('/auth/register', (req, res) => {
@@ -151,41 +159,88 @@ router.get('/auth/me', (req, res) => {
   res.json({ user: req.user, unread_notifications: notifCount, cart_count: cartCount });
 });
 
+// Max reset-code requests per email within the code's 15-minute lifetime.
+const FORGOT_MAX_REQUESTS = 3;
+// Max verification attempts per code before it is locked out.
+const RESET_MAX_ATTEMPTS = 5;
+
 router.post('/auth/forgot-password', async (req, res) => {
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Email is required.' });
-  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+
+  // Housekeeping: drop codes that expired more than a day ago.
+  db.prepare(`DELETE FROM password_resets WHERE expires_at < datetime('now', '-1 day')`).run();
+
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
   // Always succeed to avoid leaking which emails exist
   if (user) {
+    const recent = db.prepare(`SELECT COUNT(*) AS c FROM password_resets
+      WHERE email = ? AND created_at > datetime('now', '-15 minutes')`).get(email).c;
+    if (recent >= FORGOT_MAX_REQUESTS)
+      return res.status(429).json({ error: 'Too many reset requests. Please wait 15 minutes and try again.' });
+
+    // A new code supersedes any previous unused ones for this email.
+    db.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').run(email);
     const code = String(crypto.randomInt(100000, 999999));
     db.prepare(`INSERT INTO password_resets (email, code, expires_at) VALUES (?, ?, datetime('now', '+15 minutes'))`)
-      .run(email.toLowerCase(), code);
-    if (emailEnabled()) {
+      .run(email, code);
+    if (emailEnabled() && process.env.FORCE_DEV_CODES !== '1') {
       try {
-        await sendOtpEmail(email.toLowerCase(), code);
-        return res.json({ ok: true, message: 'A 6-digit reset code has been sent to your email.' });
+        await sendOtpEmail(email, code);
+        return res.json({ ok: true, message: 'A 6-digit reset code has been sent to your email. Check your inbox (and spam folder).' });
       } catch (e) {
         console.error('[EMAIL ERROR]', e.message);
         return res.status(500).json({ error: 'Could not send the email. Please try again later.' });
       }
     }
-    console.log(`[PASSWORD RESET] code for ${email}: ${code}`); // Dev fallback when SMTP not configured
-    return res.json({ ok: true, message: 'Reset code generated (check server console in dev mode).', dev_code: code });
+    console.log(`[PASSWORD RESET] dev mode (no email sent) — code for ${email}: ${code}`);
+    return res.json({ ok: true, message: 'Reset code generated (dev mode — no email sent, code shown here).', dev_code: code });
   }
   res.json({ ok: true, message: 'If that email exists, a reset code has been sent.' });
 });
 
+// Verify a reset code WITHOUT consuming it — lets the OTP page give
+// instant feedback before the user types a new password.
+router.post('/auth/verify-code', (req, res) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const code = String((req.body || {}).code || '').trim();
+  if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
+  const row = db.prepare(`SELECT id, attempts FROM password_resets
+    WHERE email = ? AND code = ? AND used = 0 AND expires_at > datetime('now')
+    ORDER BY id DESC LIMIT 1`).get(email, code);
+  if (!row) return res.status(400).json({ error: 'Invalid or expired reset code. Please check the code in your email.' });
+  if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
+    return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
+  db.prepare('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?').run(row.id);
+  res.json({ ok: true });
+});
+
 router.post('/auth/reset-password', (req, res) => {
-  const { email, code, password } = req.body || {};
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const code = String((req.body || {}).code || '').trim();
+  const password = String((req.body || {}).password || '');
   if (!email || !code || !password)
     return res.status(400).json({ error: 'Email, code and new password are required.' });
-  const row = db.prepare(`SELECT id FROM password_resets
+  if (password.length < 6)
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+
+  const row = db.prepare(`SELECT id, attempts FROM password_resets
     WHERE email = ? AND code = ? AND used = 0 AND expires_at > datetime('now')
-    ORDER BY id DESC LIMIT 1`).get(email.toLowerCase(), code);
+    ORDER BY id DESC LIMIT 1`).get(email, code);
   if (!row) return res.status(400).json({ error: 'Invalid or expired reset code.' });
-  db.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').run(row.id);
+  if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
+    return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
+
+  db.prepare('UPDATE password_resets SET used = 1, attempts = attempts + 1 WHERE id = ?').run(row.id);
   db.prepare('UPDATE users SET password_hash = ? WHERE email = ?')
-    .run(bcrypt.hashSync(password, 10), email.toLowerCase());
+    .run(bcrypt.hashSync(password, 10), email);
+
+  // Force a fresh login everywhere with the new password.
+  const uid = db.prepare('SELECT id FROM users WHERE email = ?').get(email).id;
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(uid);
+
+  notify(uid, 'Password changed', 'Your password was reset. If this was not you, contact support immediately.', 'security');
   res.json({ ok: true, redirect: 'forget-password-success.html' });
 });
 

@@ -31,6 +31,7 @@ For development with auto-restart: `npm run dev`
 | AI chat | `message.html` | Gemini proxy — set `GEMINI_API_KEY` env var |
 | Admin operations | `admin/` | Role-aware dashboard, orders, products, inventory, users, inbox, vendors and reviews |
 | Order fulfillment | Admin order details | Carrier, tracking number, internal notes and status history |
+| Branded invoice on every purchase | `payment-success.html`, `my-order.html`, admin orders | Print-ready A4 PDF with the PixelHouse logo, downloaded automatically when the order is placed |
 | Inventory controls | Admin inventory | Reorder thresholds, stock adjustments and movement history |
 | Administrative audit trail | Admin activity log | Records fulfillment, inventory, product and staff-role changes |
 
@@ -81,6 +82,9 @@ GET    /api/admin/inventory          → products needing reorder + stock moveme
 POST   /api/admin/inventory/:id/adjust { change, reason, note }
 PUT    /api/admin/orders/:id/fulfillment { carrier, tracking_number, internal_notes }
 GET    /api/admin/audit-logs         → latest administrative activity
+
+GET    /api/orders/:id/invoice 🔒     → PDF invoice (add ?view=1 to open in the browser, ?format=html for the print-page version)
+GET    /api/admin/orders/:id/invoice  → same PDF invoice, for staff (audited)
 ```
 
 🔒 = requires login (cookie session)
@@ -115,3 +119,29 @@ SMTP_PASS = your-16-char-Gmail-App-Password
 **Get a Gmail App Password:** myaccount.google.com → Security → turn ON 2-Step Verification → search "App passwords" → create one for "Mail" → copy the 16-letter code (no spaces).
 
 Without SMTP configured, the code prints to the server logs instead (dev mode).
+
+## Branded PDF Invoices
+
+When an order is placed the store generates the customer's invoice and the confirmation page downloads it
+automatically (`server/invoice.js`).
+
+- **Letterhead** — `img/core-img/pixelhouse-logo-print.png` sits on a dark brand band with the invoice number
+  and a payment-status pill (`PAID IN FULL` / `DUE ON DELIVERY` / `CANCELLED`). That file is a trimmed,
+  background-matched export of `pixelhouse-logo.jpg`; regenerate it after a logo change:
+  ```bash
+  convert img/core-img/pixelhouse-logo.jpg -resize 1400x -strip \
+    -fuzz 8% -fill '#0B0B0C' -opaque '#000000' -fuzz 3% -trim +repage \
+    -colors 256 -dither None -define png:compression-level=9 png8:img/core-img/pixelhouse-logo-print.png
+  ```
+  Point `INVOICE_LOGO_PATH` at another PNG/JPG to use a different logo (transparent, or on `#0B0B0C`, so the
+  band stays seamless).
+- **Store identity** — store name, currency and the contact line in the footer come from
+  Admin → Settings (`store_settings`), and `PUBLIC_URL` / `SITE_URL` is printed as the website when set.
+- **Content** — billed-to and deliver-to blocks, courier + tracking number when filled in, itemised lines with
+  the product SKU, subtotal / discount with the coupon code / delivery / amount due, payment terms, the
+  transaction reference once paid, and page numbers. Internal admin notes are never printed.
+- **Numbering** — `PH-INV-<year>-<order id, 5 digits>`; the same number is returned by `POST /api/orders` and
+  shown on `payment-success.html`, and the file is saved as `PixelHouse-Invoice-<year>-<id>.pdf`.
+- **Fallbacks** — the document is rendered with `pdfkit` (pure JS, no system binaries). If it is ever missing,
+  the endpoint still serves a styled, printable HTML invoice instead of failing. Request
+  `?format=html` to get that page on purpose, `?view=1` to open the PDF in the browser rather than download it.

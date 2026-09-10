@@ -6,7 +6,7 @@ const db = require('./db');
 const { createSession, destroySession, requireAuth } = require('./auth');
 const { emailEnabled, sendOtpEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
-const { sendInvoice } = require('./invoice');
+const { sendInvoice, invoiceNumberFor } = require('./invoice');
 
 const router = express.Router();
 
@@ -412,7 +412,20 @@ router.post('/orders', (req, res) => {
 
   try {
     const order = placeOrder();
-    res.json({ ok: true, order_id: order.orderId, total: order.total, discount_amount: order.discountAmount, redirect: 'payment-success.html' });
+    // Hand the customer the invoice number and download link up front, so the
+    // confirmation page can reference the exact document it auto-downloads.
+    const placed = db.prepare('SELECT created_at FROM orders WHERE id = ?').get(order.orderId);
+    const invoice = invoiceNumberFor(order.orderId, placed?.created_at);
+    res.json({
+      ok: true,
+      order_id: order.orderId,
+      total: order.total,
+      discount_amount: order.discountAmount,
+      invoice_number: invoice.number,
+      invoice_file: `PixelHouse-Invoice-${invoice.fileKey}.pdf`,
+      invoice_url: `/api/orders/${order.orderId}/invoice`,
+      redirect: 'payment-success.html',
+    });
   } catch (error) {
     res.status(400).json({ error: error.message || 'Could not place order.' });
   }
@@ -441,7 +454,11 @@ router.get('/orders/:id/invoice', (req, res) => {
     : db.prepare('SELECT * FROM orders WHERE id = ? AND guest_id = ?').get(orderId, req.guestId);
   if (!order) return res.status(404).json({ error: 'Invoice not found.' });
 
-  const items = db.prepare('SELECT name, price, quantity FROM order_items WHERE order_id = ?').all(order.id);
+  // The product join only feeds the printed item code, so the invoice still works
+  // for orders whose product has since been removed from the catalog.
+  const items = db.prepare(`SELECT oi.name, oi.price, oi.quantity, p.sku
+    FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+    WHERE oi.order_id = ? ORDER BY oi.id`).all(order.id);
   sendInvoice(res, order, items);
 });
 

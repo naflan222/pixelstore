@@ -45,10 +45,107 @@
       <div class="content">
         <h5 class="text-white">Payment successful</h5>
         <p class="text-white opacity-75">Thank you. Your order has been received.</p>
-        <a class="btn btn-primary mt-3" href="home.html">Shopping Again</a>
-        <a class="btn btn-outline-light d-block mx-auto mt-2 d-none" id="invoiceDownload" download>Invoice</a>
+        <!-- Branded invoice card: the PDF invoice is downloaded automatically -->
+        <div class="invoice-receipt d-none" id="invoiceReceipt">
+          <div class="invoice-receipt-head">
+            <span class="invoice-receipt-label">Invoice</span>
+            <span class="invoice-receipt-no" id="invoiceNumber">—</span>
+          </div>
+          <div class="invoice-receipt-row">
+            <span>Order</span>
+            <strong id="invoiceOrderNo">—</strong>
+          </div>
+          <div class="invoice-receipt-row">
+            <span>Total <em id="invoicePaymentMethod"></em></span>
+            <strong id="invoiceTotal">—</strong>
+          </div>
+          <p class="invoice-receipt-note mb-0" id="invoiceNote">Your branded PDF invoice is downloading…</p>
+          <div class="invoice-receipt-actions">
+            <a class="btn btn-light" id="invoiceDownload" download><i class="ti ti-file-download"></i> Invoice (PDF)</a>
+            <a class="btn btn-outline-light" id="invoicePreview" target="_blank" rel="noopener" href="#">View invoice</a>
+          </div>
+        </div>
+        <div class="mt-3">
+          <a class="btn btn-primary" href="home.html">Shopping Again</a>
+          <a class="btn btn-outline-light" href="my-order.html">My Orders</a>
+        </div>
       </div>
     </div>
+    <style>
+      /* Kept next to the markup it belongs to so the template styles stay untouched */
+      .invoice-receipt {
+        max-width: 380px;
+        margin: 0 auto 1.5rem;
+        padding: 1.1rem 1.25rem 1.25rem;
+        text-align: left;
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 0.75rem;
+        box-shadow: 0 18px 40px rgba(13, 20, 40, 0.22);
+      }
+      .invoice-receipt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding-bottom: 0.6rem;
+        margin-bottom: 0.6rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .invoice-receipt-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #fff;
+        background: #f97316;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.3rem;
+      }
+      .invoice-receipt-no {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: 0.02em;
+      }
+      .invoice-receipt-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.75);
+        padding: 0.15rem 0;
+      }
+      .invoice-receipt-row strong {
+        color: #fff;
+        font-size: 0.88rem;
+      }
+      .invoice-receipt-row em {
+        font-style: normal;
+        opacity: 0.8;
+      }
+      .invoice-receipt-note {
+        margin: 0.7rem 0 0.85rem;
+        font-size: 0.74rem;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.72);
+      }
+      .invoice-receipt-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .invoice-receipt-actions .btn {
+        font-size: 0.78rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.45rem;
+      }
+      .invoice-receipt-actions .btn-light {
+        color: #111827;
+        font-weight: 700;
+      }
+    </style>
     <!-- All JavaScript Files-->
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/jquery.min.js"></script>

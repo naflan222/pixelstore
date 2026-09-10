@@ -560,7 +560,9 @@ router.get('/orders/:id/invoice', orderAccess, (req, res) => {
   if (!id) return res.status(400).json({ error: 'Invalid order ID.' });
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   if (!order) return res.status(404).json({ error: 'Order not found.' });
-  const items = db.prepare('SELECT name, price, quantity FROM order_items WHERE order_id = ?').all(id);
+  const items = db.prepare(`SELECT oi.name, oi.price, oi.quantity, p.sku
+    FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+    WHERE oi.order_id = ? ORDER BY oi.id`).all(id);
   audit(req, 'downloaded invoice', 'order', id);
   sendInvoice(res, order, items);
 });

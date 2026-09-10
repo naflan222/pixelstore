@@ -771,7 +771,7 @@ async function loadOrders() {
         <td style="font-size:11px;color:var(--text2)">${o.created_at}</td>
         <td style="white-space:nowrap">
           <button class="btn btn-secondary btn-sm" onclick="viewOrder(${o.id})" title="View order" aria-label="View order #${o.id}"><i class="ti ti-eye"></i></button>
-          <a class="btn btn-secondary btn-sm" href="/api/admin/orders/${o.id}/invoice" download title="Download invoice" aria-label="Download invoice for order #${o.id}"><i class="ti ti-download"></i></a>
+          <a class="btn btn-secondary btn-sm" href="/api/admin/orders/${o.id}/invoice" download title="Download PDF invoice" aria-label="Download PDF invoice for order #${o.id}"><i class="ti ti-download"></i></a>
           <select onchange="updateOrderStatus(${o.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
             <option value="">Set Status...</option>
             <option value="pending">Pending</option>
@@ -843,7 +843,8 @@ async function viewOrder(id) {
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
         <span>Total:</span><span style="color:var(--green)">${money(order.total)}</span>
       </div>
-      <div style="margin-top:16px"><a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice" download><i class="ti ti-download"></i> Download invoice</a></div>
+      <div style="margin-top:16px"><a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice" download><i class="ti ti-file-download"></i> Download invoice (PDF)</a>
+      <a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice?view=1" target="_blank" rel="noopener"><i class="ti ti-eye"></i> Preview invoice</a></div>
       <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
         <h4 style="margin-bottom:12px;font-size:14px">Fulfillment</h4>
         <div class="form-grid">

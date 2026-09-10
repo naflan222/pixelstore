@@ -4,9 +4,9 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./db');
 const { createSession, destroySession, requireAuth } = require('./auth');
-const { emailEnabled, sendOtpEmail } = require('./mailer');
+const { emailEnabled, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
-const { sendInvoice, invoiceNumberFor } = require('./invoice');
+const { sendInvoice, invoiceNumberFor, buildInvoiceModel, renderPdf } = require('./invoice');
 
 const router = express.Router();
 
@@ -34,6 +34,33 @@ function mergeGuestData(req, userId) {
 function notify(userId, title, body, type = 'info') {
   db.prepare('INSERT INTO notifications (user_id, title, body, type) VALUES (?, ?, ?, ?)')
     .run(userId, title, body, type);
+}
+
+/**
+ * Email the customer their order confirmation with the invoice PDF attached.
+ * Fire-and-forget: an SMTP hiccup must never delay the checkout response or
+ * fail an order that was already placed. Guests are included — the email comes
+ * from the address typed at checkout.
+ */
+function emailOrderConfirmation(orderId) {
+  const task = (async () => {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    if (!order || !order.email) return;
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(orderId);
+    const model = buildInvoiceModel(order, items);
+    let pdfBuffer = null;
+    try {
+      pdfBuffer = await renderPdf(model);
+    } catch (e) {
+      // PDF rendering failed (e.g. pdfkit missing) — send the message with the
+      // invoice download link instead of skipping the email entirely.
+      console.error(`[EMAIL] invoice PDF for order #${orderId} failed, sending link only:`, e.message);
+    }
+    await sendOrderConfirmationEmail(order.email, { order, model, pdfBuffer });
+    console.log(`[EMAIL] order confirmation for order #${orderId} sent to ${order.email}`);
+  })();
+  task.catch((e) => console.error(`[EMAIL] order confirmation for order #${orderId} failed:`, e.message));
+  return task;
 }
 
 const SHIPPING_FEES = { standard: 500, pickup: 0 };
@@ -426,6 +453,8 @@ router.post('/orders', (req, res) => {
       invoice_url: `/api/orders/${order.orderId}/invoice`,
       redirect: 'payment-success.html',
     });
+    // Confirmation email with the invoice attached — after the response, never blocking it.
+    if (emailEnabled()) emailOrderConfirmation(order.orderId);
   } catch (error) {
     res.status(400).json({ error: error.message || 'Could not place order.' });
   }

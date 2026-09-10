@@ -99,26 +99,39 @@ Any Node host works (Railway, Render, VPS, etc.):
 
 ## Production TODOs (currently dev-mode)
 
-- Password reset codes are printed to the server console — hook up an email/SMS provider (e.g. Resend, Twilio)
 - Payments: `checkout-credit-card.html` / `checkout-paypal.html` record the method but don't charge — integrate Stripe/PayPal when ready
 - Keep the owner account protected and assign the least-privileged staff role required: order manager, catalog manager, or support
 - Add rate limiting (e.g. `express-rate-limit`) on auth endpoints
 
-## Email OTP Setup (Forgot Password)
+## Email (SMTP)
 
-The forgot-password flow sends a real 6-digit code by email once SMTP is configured.
+Once SMTP is configured the store sends real emails automatically:
 
-**Railway:** Variables tab → add these 4 variables → redeploy:
+- **Forgot password** — a 6-digit reset code (`forget-password.html`)
+- **Order confirmation** — sent right after checkout to the customer's email
+  (works for guests too, using the address typed at checkout) with a short
+  professional message and the **branded invoice PDF attached**
+  (`server/mailer.js` → `sendOrderConfirmationEmail`)
+
+**Railway:** Variables tab → add these variables → redeploy:
 ```
 SMTP_HOST = smtp.gmail.com
 SMTP_PORT = 465
 SMTP_USER = your-email@gmail.com
 SMTP_PASS = your-16-char-Gmail-App-Password
+MAIL_FROM_NAME = PixelHouse            # optional display name (default "PixelHouse")
+MAIL_REPLY_TO = support@yourdomain.com # optional; where replies go
+MAIL_FROM   = same as SMTP_USER        # keep equal, or see the deliverability guide
 ```
 
 **Get a Gmail App Password:** myaccount.google.com → Security → turn ON 2-Step Verification → search "App passwords" → create one for "Mail" → copy the 16-letter code (no spaces).
 
-Without SMTP configured, the code prints to the server logs instead (dev mode).
+Without SMTP configured, the reset code prints to the server logs instead (dev mode) and order emails are skipped.
+
+**Emails going to spam?** See **[EMAIL-DELIVERABILITY.md](EMAIL-DELIVERABILITY.md)** —
+the short version: keep `MAIL_FROM` equal to `SMTP_USER`, and if you send from a
+custom domain, publish **SPF + DKIM + DMARC** DNS records (the guide has copy-paste
+values and a 10/10 [mail-tester.com](https://www.mail-tester.com) checklist).
 
 ## Branded PDF Invoices
 

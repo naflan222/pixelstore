@@ -1,9 +1,27 @@
 // Pixels store — Express server (API + static frontend)
-const express = require('express');
+const fs = require('fs');
 const path = require('path');
+
+// Minimal .env loader (no dependency) — only fills variables that are not
+// already set, so platform-provided env vars (e.g. on Railway) always win.
+(function loadDotEnv() {
+  const file = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!m || line.trim().startsWith('#')) continue;
+    let value = m[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+      value = value.slice(1, -1);
+    if (process.env[m[1]] === undefined) process.env[m[1]] = value;
+  }
+})();
+
+const express = require('express');
 const cookieParser = require('cookie-parser');
 
 const { attachUser } = require('./auth');
+const { describeConfig: describeMailConfig } = require('./mailer');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./db');
@@ -111,4 +129,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => console.log(`Pixels server running at http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Pixels server running at http://localhost:${PORT}`);
+  const mail = describeMailConfig();
+  if (mail.email_enabled) {
+    const where = mail.transport === 'brevo_api'
+      ? 'Brevo HTTP API (api.brevo.com, HTTPS)'
+      : `SMTP ${mail.smtp_host}:${mail.smtp_port} as ${mail.smtp_user}`;
+    console.log(`[MAIL] enabled — transport: ${where}, from: ${mail.mail_from || '(SMTP user)'}` +
+      (mail.force_dev_codes ? ', FORCE_DEV_CODES=1 (dev mode — codes returned in API, no mail sent)' : ''));
+  } else {
+    console.log('[MAIL] NOT configured — reset codes will be printed to this log (dev mode). Set SMTP_* or BREVO_API_KEY env vars.');
+  }
+});

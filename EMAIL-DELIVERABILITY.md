@@ -8,31 +8,51 @@ send *as your address*. No code change can replace this step.
 
 ## 1. Brevo (what this deployment uses)
 
-You are sending from `mnaflan295@gmail.com` **via Brevo**. Two things fix
-deliverability here, in order of impact:
+You are sending from `support@lankalens.online` **via Brevo** — a custom domain is
+exactly the right setup. One step makes mailbox providers fully trust it:
 
-### a) Authenticate your own domain in Brevo (best fix)
+### Authenticate `lankalens.online` in Brevo (do this once)
 
-Sending from a `@gmail.com` address through a third-party relay is the weakest
-setup — Gmail's DMARC makes any relayed mail look suspicious. Instead:
+Until this is done, Brevo signs mail with *its own* domain and `lankalens.online`
+publishes nothing — so Gmail/Outlook have no proof the address is yours, and mail
+can still land in spam. Fix it permanently:
 
-1. Get a cheap domain (or use one you own, e.g. `pixelhouse.lk`).
-2. In Brevo: **Senders, Domains & Dedicated IPs → Domains → Add a domain**.
-3. Brevo gives you **DKIM (2 TXT records) + SPF (include `_spf.sendinblue.com` in
-   your SPF) + DMARC** records — copy them into your DNS provider (Cloudflare,
-   Namecheap, GoDaddy, cPanel…) and click *Verify* in Brevo.
-4. Create a sender like `orders@yourdomain.com`, verify it, and set
-   `MAIL_FROM = orders@yourdomain.com` on Railway (keep `MAIL_FROM_NAME = PixelHouse`).
+1. **Add the domain**: Brevo → *Senders, Domains & Dedicated IPs* → **Domains**
+   → *Add a domain* → `lankalens.online`.
+2. **Publish the records Brevo shows you** at the DNS host for `lankalens.online`.
+   They look like this (use Brevo's exact values):
 
-After this, Brevo signs every email with your domain's DKIM — the single biggest
-jump out of spam. Your address also stops depending on `@gmail.com` reputation.
+   | Record | Name | Value |
+   |---|---|---|
+   | DKIM #1 | `mail._domainkey` | (Brevo gives a long TXT value) |
+   | DKIM #2 | `mail2._domainkey` | (Brevo gives a long TXT value) |
+   | SPF | `@` | `v=spf1 include:_spf.sendinblue.com ~all` |
+   | DMARC | `_dmarc` | `v=DMARC1; p=quarantine; rua=mailto:support@lankalens.online; adkim=s; aspf=s` |
 
-### b) If you must keep the plain `@gmail.com` sender
+3. **Verify** in Brevo (green check on all records).
+4. **Verify the sender**: Brevo → *Senders* → add `support@lankalens.online`
+   → click the confirmation email Brevo sends. Without this the relay rejects
+   mail with a 550 error.
+5. **Railway variables** → redeploy:
+   ```
+   MAIL_FROM = support@lankalens.online
+   MAIL_FROM_NAME = PixelHouse
+   MAIL_REPLY_TO = support@lankalens.online
+   ```
+6. **Test it**: send yourself a password-reset email addressed to the test address
+   at [mail-tester.com](https://www.mail-tester.com) — aim for **10/10**. Then send
+   a real test order confirmation and check it hits the inbox.
 
-- In Brevo, make sure the address stays **verified** (unverified senders get 550s).
+After step 3, every email (OTP + order confirmation with invoice) is DKIM-signed
+as `lankalens.online` — the single biggest jump out of spam.
+
+### If you ever fall back to the plain `@gmail.com` sender
+
+- In Brevo, keep the address **verified** (unverified senders get 550s).
 - Ask a few early customers to hit *Report not spam* once and add the sender to
   contacts — engagement signals matter most for small senders.
-- Expect Gmail-to-Gmail delivery to stay inconsistent; step (a) is the real fix.
+- Expect Gmail-to-Gmail delivery to stay inconsistent; the domain above is the
+  real fix.
 
 ## 2. Gmail SMTP (direct, no Brevo)
 

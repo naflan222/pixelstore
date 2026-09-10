@@ -134,9 +134,9 @@ works even on hosts that block SMTP ports. Get a key: Brevo → ⚙ Account sett
 Railway → your service → **Variables** tab → add → **Redeploy**:
 ```
 BREVO_API_KEY = <your v3 API key>
-MAIL_FROM = mnaflan295@gmail.com     # sender address, verified in Brevo
+MAIL_FROM = support@lankalens.online # sender address, verified in Brevo
 MAIL_FROM_NAME = PixelHouse          # optional From display name
-MAIL_REPLY_TO = your-inbox@gmail.com # optional; where customer replies land
+MAIL_REPLY_TO = support@lankalens.online # optional; where customer replies land
 ```
 
 **Option B — Brevo SMTP** (used when no API key is set):
@@ -145,9 +145,9 @@ SMTP_HOST = smtp-relay.brevo.com
 SMTP_PORT = 587
 SMTP_USER = <SMTP login shown in Brevo: Transactions → SMTP>
 SMTP_PASS = <SMTP password from Brevo: Transactions → SMTP>
-MAIL_FROM = mnaflan295@gmail.com     # sender address, verified in Brevo
+MAIL_FROM = support@lankalens.online # sender address, verified in Brevo
 MAIL_FROM_NAME = PixelHouse          # optional From display name
-MAIL_REPLY_TO = your-inbox@gmail.com # optional; where customer replies land
+MAIL_REPLY_TO = support@lankalens.online # optional; where customer replies land
 ```
 
 Notes:
@@ -186,7 +186,7 @@ and a public endpoint (no secrets) shows the live state:
 ```
 GET https://<your-app>/api/email/status
 → {"email_enabled":true,"transport":"smtp","smtp_host":"smtp-relay.brevo.com",
-   "smtp_port":587,"smtp_user":"...","mail_from":"mnaflan295@gmail.com",...}
+   "smtp_port":587,"smtp_user":"...","mail_from":"support@lankalens.online",...}
 ```
 
 If `email_enabled` is `false` on Railway, the env vars did not arrive (check the

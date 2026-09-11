@@ -3004,6 +3004,32 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   color: #625AFA;
 }
 
+/* Order on WhatsApp Button */
+.btn-whatsapp {
+  color: #ffffff;
+  background-color: #25D366;
+  border-color: #20BD5A;
+  font-weight: 500;
+}
+.btn-whatsapp:hover,
+.btn-whatsapp:focus {
+  color: #ffffff;
+  background-color: #1EBE5B;
+  border-color: #1AA851;
+  box-shadow: none;
+}
+.btn-whatsapp:active {
+  color: #ffffff;
+  background-color: #1AA851;
+  border-color: #17984A;
+}
+.btn-whatsapp .ti-brand-whatsapp {
+  font-size: 1.1em;
+  line-height: 1;
+  vertical-align: -0.15em;
+  margin-right: 0.35rem;
+}
+
 .p-wishlist-share a {
   display: inline-block;
   color: #ea4c62;

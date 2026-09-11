@@ -720,7 +720,7 @@
       const form = $('form');
       if (!form) return;
       form.removeAttribute('action');
-      // Prefill from ?subject= & ?message= (used by Rental Services "Book Now" and Camera Trade enquiries)
+      // Prefill from ?subject= & ?message= (used by Camera Trade enquiries)
       const params = new URLSearchParams(location.search);
       const prefillInputs = $$('input', form);
       const prefillMessage = $('textarea', form);

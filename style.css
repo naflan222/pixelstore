@@ -5696,3 +5696,39 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 
 /* Account balances are not part of the storefront experience. */
 .available-balance { display: none; }
+
+/* ---------- Rental Services & Camera Trade pages ---------- */
+.product-card .sale-price .rental-price-note {
+  color: #747794;
+  margin-left: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.maintenance-icon {
+  display: inline-block;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: #625AFA;
+  margin-bottom: 0.75rem;
+}
+[theme-color=dark] .maintenance-icon {
+  color: #8b85ff;
+}
+.rental-step-card {
+  text-align: center;
+}
+.rental-step-card i {
+  font-size: 1.75rem;
+  color: #625AFA;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.rental-step-card h6 {
+  font-size: 0.85rem;
+}
+.rental-step-card p {
+  font-size: 0.75rem;
+  color: #747794;
+  margin-bottom: 0;
+}

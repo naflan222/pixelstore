@@ -5731,6 +5731,33 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   font-weight: 500;
   text-decoration: none;
 }
+/* The "Book" button on rental camera cards is the main call to action, so undo
+   the small circular ".product-card .btn" (+) styling used on shop cards. */
+.product-card .btn-rental-book {
+  position: static;
+  width: 100%;
+  height: auto;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  display: -webkit-inline-flex;
+  display: -ms-inline-flexbox;
+  display: inline-flex;
+}
+.product-card .btn-rental-book i {
+  font-size: 1.0625rem;
+  line-height: 1;
+  vertical-align: -0.125em;
+}
+[view-mode=rtl] .product-card .btn-rental-book {
+  right: auto;
+  left: auto;
+}
 .maintenance-icon {
   display: inline-block;
   font-size: 3.5rem;

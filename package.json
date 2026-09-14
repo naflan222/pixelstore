@@ -5,7 +5,11 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "db:init:postgres": "node scripts/init-postgres-schema.js",
+    "migrate:sqlite-to-postgres": "node scripts/migrate-sqlite-to-pg.js",
+    "verify:migration": "node scripts/verify-migration.js"
   },
   "keywords": [],
   "author": "",

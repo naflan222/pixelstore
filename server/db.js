@@ -1,14 +1,23 @@
 // SQLite database layer for Pixels store
 // Uses Node.js built-in SQLite (node:sqlite) — NO native compilation, NO Visual Studio needed.
+//
+// This file implements the "sqlite" engine of the database abstraction (see
+// server/database.js). All application code talks to it through the async
+// interface { get, all, run, insert, transaction } — never DatabaseSync
+// directly — so the same call sites run unchanged against PostgreSQL.
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
+const { SEED_PRODUCTS, DEMO_USER, DEFAULT_STORE_SETTINGS } = require('./seed-data');
 
-const dataDir = path.join(__dirname, '..', 'data');
+// SQLITE_DB_PATH overrides the database file location (used by the automated
+// test suite for isolation). Production behaviour is unchanged when unset.
+const dbFilePath = process.env.SQLITE_DB_PATH || path.join(__dirname, '..', 'data', 'pixels.db');
+const dataDir = path.dirname(dbFilePath);
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new DatabaseSync(path.join(dataDir, 'pixels.db'));
+const db = new DatabaseSync(dbFilePath);
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
@@ -453,15 +462,11 @@ db.prepare(`INSERT OR IGNORE INTO store_settings
   (id, contact, payment_methods, shipping_fee, delivery_options, notification_preferences)
   VALUES (1, ?, ?, ?, ?, ?)`)
   .run(
-    JSON.stringify({ email: '', phone: '', address: '' }),
-    JSON.stringify(['cash', 'credit-card', 'bank', 'paypal']),
-    250,
-    JSON.stringify([
-      { method: 'standard', label: 'Regular delivery', fee: 250, enabled: true },
-      { method: 'express', label: 'Express delivery', fee: 500, enabled: true },
-      { method: 'pickup', label: 'Pickup', fee: 0, enabled: true },
-    ]),
-    JSON.stringify({ new_orders: true, low_stock: true, vendor_applications: true })
+    JSON.stringify(DEFAULT_STORE_SETTINGS.contact),
+    JSON.stringify(DEFAULT_STORE_SETTINGS.payment_methods),
+    DEFAULT_STORE_SETTINGS.shipping_fee,
+    JSON.stringify(DEFAULT_STORE_SETTINGS.delivery_options),
+    JSON.stringify(DEFAULT_STORE_SETTINGS.notification_preferences)
   );
 
 // Ensure the demo user has admin role (for databases created before admin panel)
@@ -471,44 +476,24 @@ if (demoUser) {
 }
 
 // ---------- Seed products ----------
-const products = [
-  { slug: 'single-product', name: '50 in 1 Accessories Kit GoPro', price: 8000, old_price: 13000, image: 'img/product/18.png', badge: 'Sale', featured: 1, flash_sale: 1, description: 'Complete 50-in-1 accessory bundle for GoPro Hero cameras — mounts, straps, grips, cases and more.' },
-  { slug: '12in1kit', name: 'GoPro 12 in 1 Kit', price: 4800, old_price: 5990, image: 'img/product/12.png', badge: 'Sale', featured: 1, description: 'Essential 12-in-1 GoPro accessory kit with mounts and straps for everyday shooting.' },
-  { slug: '19kit', name: '19 in 1 Kit GoPro', price: 4990, old_price: 5900, image: 'img/product/14.png', badge: 'Sale', featured: 1, flash_sale: 1, description: '19-piece GoPro accessory kit covering helmet, chest, bike and hand mounts.' },
-  { slug: '27mstick', name: '2.7M Selfie Stick GoPro', price: 7400, old_price: 10500, image: 'img/product/5.png', badge: 'New', featured: 1, description: 'Extra-long 2.7 metre extendable selfie stick for dramatic wide-angle GoPro shots.' },
-  { slug: '3mstick', name: '3M Selfie Stick', price: 8000, old_price: 14000, image: 'img/product/3mstick.png', badge: 'Sale', description: 'Ultra-long 3 metre carbon selfie stick for GoPro and action cameras.' },
-  { slug: '3slotcharger', name: '3 Slot Battery Charger', price: 5000, old_price: 7000, image: 'img/product/3slot.png', badge: 'Sale', featured: 1, description: 'Charge three GoPro batteries simultaneously with smart LED indicators.' },
-  { slug: '3waystick', name: '3 Way Selfie Stick (Adjustable)', price: 4500, old_price: 5900, image: 'img/product/6.png', badge: 'New', description: '3-way grip, arm and tripod combo — the most versatile GoPro mount.' },
-  { slug: 'cover', name: 'GoPro Silicone Case 13/12/11/10/9/8/7/6/5', price: 1990, old_price: 2500, image: 'img/product/15.png', badge: 'Sale', description: 'Soft silicone protective sleeve with lanyard for GoPro Hero 5–13.' },
-  { slug: 'domeport', name: 'Dome Port', price: 14000, old_price: 22000, image: 'img/product/domeport.png', badge: 'Sale', featured: 1, description: '6-inch dome port for stunning split over/under water shots.' },
-  { slug: 'fhstick', name: 'Floating Handle Stick GoPro', price: 1200, old_price: 1500, image: 'img/product/9.png', badge: '-18%', description: 'Bright floating hand grip keeps your GoPro afloat during water sports.' },
-  { slug: 'gbattery', name: 'Telesin Battery GoPro Hero 13/12/11/10/9', price: 7500, old_price: 9500, image: 'img/product/20.png', badge: 'Sale', featured: 1, description: 'High-capacity Telesin replacement battery compatible with Hero 9–13.' },
-  { slug: 'goggles', name: 'Goggles With Mount', price: 4700, old_price: 5400, image: 'img/product/21.png', badge: 'New', description: 'Diving goggles with built-in GoPro mount for hands-free underwater filming.' },
-  { slug: 'gptemp', name: 'GoPro Tempered Glass', price: 1800, old_price: 2400, image: 'img/product/gptemp.png', badge: 'Sale', description: '9H tempered glass screen and lens protector kit for GoPro.' },
-  { slug: 'helmetstrap', name: 'Helmet Chin Strap Mount', price: 2990, old_price: 3300, image: 'img/product/11.png', badge: 'Sale', flash_sale: 1, description: 'Secure chin-strap helmet mount for POV moto and cycling footage.' },
-  { slug: 'lensfilter', name: 'GoPro Lens Filter (UnderWater)', price: 6000, old_price: 8500, image: 'img/product/4.png', badge: 'On Sale', description: 'Red/magenta dive filters that restore natural colour underwater.' },
-  { slug: 'wpdcase', name: 'Water Proof Diving Case', price: 4300, old_price: 6500, image: 'img/product/8.png', badge: '-11%', description: '45 m waterproof dive housing for GoPro Hero cameras.' },
-  { slug: 'x4case1', name: 'Insta 360 X4 Silicone Case', price: 1900, old_price: 2800, image: 'img/product/19.png', badge: 'New', description: 'Shock-absorbing silicone case for the Insta360 X4.' },
-  { slug: 'btrychrger13', name: 'Battery charger for Hero 13', price: 8200, old_price: 9400, image: 'img/product/22.png', badge: 'New', description: 'Hero 13 3Slot Battery Charger' },
-  { slug: 'antifog', name: 'GoPro Hero Anti-Fog Inserts 12 Pack', price: 300, old_price: 360, image: 'img/product/23.png', badge: 'New', description: 'GoPro Hero Anti-Fogs' },
-  { slug: 'hero13', name: 'GoPro Hero 13 Black', price: 92000, old_price: 98000, image: 'img/product/hero13.png', badge: 'New', description: 'GoPro Hero 13 Black' },
-  { slug: 'osmocap', name: 'DJI Action 5Pro/4/3 Lens Cover', price: 1490, old_price: 1800, image: 'img/product/osmocap.png', badge: 'New', description: 'Soft Silicone Action Camera Lens Protective Case Cover for Dji Action 5Pro/4/3 ActionCam' },
-  { slug: 'osmobag', name: 'All-purpose Set Storage Bag Dji Action', price: 5490, old_price: 6300, image: 'img/product/osmobag.png', badge: 'New', description: 'All-purpose Set Storage Bag Dji Action' },
-];
+// Demo seeding is gated: SQLite keeps its historical convenience behaviour
+// (seed an empty database) unless SEED_DEMO_DATA=false. PostgreSQL never
+// seeds implicitly — see server/db-pg.js (SEED_DEMO_DATA=true required).
+const SEEDING_ALLOWED = process.env.SEED_DEMO_DATA !== 'false';
 
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;
-if (count === 0) {
+if (count === 0 && SEEDING_ALLOWED) {
   const insert = db.prepare(`INSERT INTO products (slug, name, description, price, old_price, image, badge, featured, flash_sale)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   db.exec('BEGIN');
   try {
-    for (const p of products) {
+    for (const p of SEED_PRODUCTS) {
       const row = { featured: 0, flash_sale: 0, ...p };
       insert.run(row.slug, row.name, row.description, row.price, row.old_price, row.image, row.badge, row.featured, row.flash_sale);
     }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
-  console.log(`Seeded ${products.length} products`);
+  console.log(`Seeded ${SEED_PRODUCTS.length} demo products`);
 }
 
 // New databases seed products after migrations, so mirror those legacy paths immediately.
@@ -529,28 +514,99 @@ db.exec(`UPDATE products SET category_id = (
   SELECT id FROM categories WHERE categories.name = products.category
 ) WHERE category_id IS NULL AND TRIM(category) != ''`);
 
-// Demo user (demo@pixels.com / demo1234) — admin role so the shop works out of the box
+// Demo owner account so a fresh development shop works out of the box.
+// (SQLite dev convenience only. Credentials are NEVER logged.)
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
-if (userCount === 0) {
+if (userCount === 0 && SEEDING_ALLOWED) {
   const hash = bcrypt.hashSync('demo1234', 10);
   db.prepare(`INSERT INTO users (username, email, password_hash, full_name, phone, address, balance, role)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run('demo', 'demo@pixels.com', hash, 'Demo User', '+92 300 0000000', '28/C Green Road', 99, 'admin');
-  console.log('Seeded admin user (demo@pixels.com / demo1234)');
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(DEMO_USER.username, DEMO_USER.email, hash, DEMO_USER.full_name,
+      DEMO_USER.phone, DEMO_USER.address, DEMO_USER.balance, 'admin');
+  // The migrate() upgrade above only covers pre-existing rows, so promote now.
+  db.prepare("UPDATE users SET role = 'owner' WHERE email = ?").run(DEMO_USER.email);
+  console.log('Seeded demo owner account (development convenience only — credentials are never printed)');
 }
 
-// Simple transaction helper (mimics better-sqlite3's db.transaction)
-db.transaction = function (fn) {
-  return function (...args) {
+// ---------- Async engine interface (shared with PostgreSQL) ----------
+//
+// node:sqlite is synchronous. Every operation below is serialised through a
+// single promise queue so the async route code keeps exactly the original
+// single-writer semantics: statements from concurrent requests can never
+// interleave inside an open transaction, and SQLITE_BUSY is impossible.
+// Transactions pass a non-queuing handle (`tx`) whose methods run inline,
+// because the surrounding transaction unit already owns the queue.
+let sqliteQueue = Promise.resolve();
+function enqueue(fn) {
+  const result = sqliteQueue.then(fn);
+  sqliteQueue = result.then(
+    () => undefined,
+    () => undefined // a failed unit must not stall later ones
+  );
+  return result;
+}
+
+function rawGet(sql, params) {
+  return db.prepare(sql).get(...params);
+}
+
+function rawAll(sql, params) {
+  return db.prepare(sql).all(...params);
+}
+
+function rawRun(sql, params) {
+  const info = db.prepare(sql).run(...params);
+  return { changes: Number(info.changes), lastInsertRowid: Number(info.lastInsertRowid) };
+}
+
+function makeTx() {
+  return {
+    get: async (sql, ...params) => rawGet(sql, params),
+    all: async (sql, ...params) => rawAll(sql, params),
+    run: async (sql, ...params) => ({ changes: rawRun(sql, params).changes }),
+    insert: async (sql, ...params) => {
+      if (!/^\s*insert\b/i.test(sql)) throw new Error('db.insert() must only be used for INSERT statements');
+      const info = rawRun(sql, params);
+      return { id: info.lastInsertRowid, changes: info.changes };
+    },
+  };
+}
+
+const tx = makeTx();
+
+const sqliteEngine = {
+  engine: 'sqlite',
+
+  get: (sql, ...params) => enqueue(() => rawGet(sql, params)),
+  all: (sql, ...params) => enqueue(() => rawAll(sql, params)),
+  run: (sql, ...params) => enqueue(() => ({ changes: rawRun(sql, params).changes })),
+  insert: (sql, ...params) => enqueue(() => tx.insert(sql, ...params)),
+
+  transaction: (fn) => enqueue(async () => {
     db.exec('BEGIN');
     try {
-      const result = fn(...args);
+      const result = await fn(tx);
       db.exec('COMMIT');
       return result;
-    } catch (e) {
-      db.exec('ROLLBACK');
-      throw e;
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch (_) { /* already rolled back */ }
+      throw error;
     }
-  };
+  }),
+
+  // SQLite transactions are fully serialised by the queue above, so no row
+  // locking clause is needed (and SQLite would reject FOR UPDATE anyway).
+  forUpdate: () => '',
+
+  // Schema/DDL already ran synchronously at require time; kept for symmetry
+  // with the PostgreSQL engine so boot code can `await db.init()` blindly.
+  init: async () => undefined,
+
+  close: async () => { db.close(); },
+
+  // Escape hatch for tooling/debugging only. Application routes must use the
+  // interface above, never this handle.
+  raw: db,
 };
 
-module.exports = db;
+module.exports = sqliteEngine;

@@ -69,28 +69,15 @@ function senderIdentity() {
   };
 }
 
-// Customer replies should land in a real inbox (engagement with replies is a
-// positive spam-filter signal), defaulting to the sending account itself.
+// SMTP login addresses can be relay credentials, not customer support inboxes.
+// Set MAIL_REPLY_TO to a monitored mailbox; otherwise use the From address.
 function replyToIdentity() {
-  const email = process.env.MAIL_REPLY_TO || process.env.SMTP_USER || '';
+  const email = process.env.MAIL_REPLY_TO || senderIdentity().email;
   return email ? { name: senderIdentity().name, email } : null;
 }
 
-let warnedFromMismatch = false;
-// Sending SMTP mail "from" a domain other than the authenticated account is the
-// #1 code-level reason mail lands in spam (providers flag it as spoofing).
-// The Brevo API transport is exempt — Brevo verifies senders on its side.
-function checkSmtpFromDomain() {
-  const from = senderIdentity().email;
-  const user = process.env.SMTP_USER || '';
-  const dom = (a) => String(a || '').split('@').pop().trim().toLowerCase();
-  if (!warnedFromMismatch && user && dom(from) && dom(from) !== dom(user)) {
-    warnedFromMismatch = true;
-    console.warn(`[MAIL] From address "${from}" does not match the SMTP user "${user}". `
-      + 'Most providers rewrite or reject this and it often lands in spam. Use MAIL_FROM = SMTP_USER, '
-      + 'or authenticate the From domain with SPF + DKIM + DMARC (see EMAIL-DELIVERABILITY.md).');
-  }
-}
+// SMTP credential domains do not determine SPF/DKIM alignment. Check the
+// received Authentication-Results header instead (see EMAIL-DELIVERABILITY.md).
 
 // Public (no secrets) summary of the mail configuration — used by the
 // startup log and GET /api/email/status so operators can verify on the
@@ -125,15 +112,15 @@ function describeError(e) {
 function otpHtml(code) {
   return `
       <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:24px;border:1px solid #eee;border-radius:12px;background:#fff">
-        <h2 style="color:#625AFA;margin:0 0 12px">Pixels Store</h2>
+        <h2 style="color:#625AFA;margin:0 0 12px">${escapeHtml(senderIdentity().name)}</h2>
         <p>Password reset requested for your account. Enter this code to continue:</p>
-        <div style="font-size:32px;letter-spacing:8px;font-weight:bold;background:#f4f3ff;padding:16px;text-align:center;border-radius:8px;color:#625AFA">${code}</div>
+        <div style="font-size:32px;letter-spacing:8px;font-weight:bold;background:#f4f3ff;padding:16px;text-align:center;border-radius:8px;color:#625AFA">${escapeHtml(code)}</div>
         <p style="color:#888;font-size:13px;margin-top:16px">The code expires in 15 minutes and can only be used once. If you didn't request this, you can safely ignore this email.</p>
       </div>`;
 }
 
 function otpText(code) {
-  return `Your password reset code is: ${code}\n\nIt expires in 15 minutes. If you didn't request this, ignore this email.`;
+  return `${senderIdentity().name}\n\nYour password reset code is: ${code}\n\nIt expires in 15 minutes and can only be used once. If you didn't request this, you can safely ignore this email.`;
 }
 
 // ---- Brevo HTTP API transport ----
@@ -151,9 +138,9 @@ async function sendViaBrevoApi(toEmail, code) {
     body: JSON.stringify({
       sender: { name: sender.name, email: sender.email },
       to: [{ email: toEmail }],
-      subject: 'Your Pixels password reset code',
+      subject: `Your ${sender.name} password reset code`,
       htmlContent: otpHtml(code),
-      content: otpText(code),
+      textContent: otpText(code),
       ...(reply ? { replyTo: reply } : {}),
     }),
   });
@@ -161,7 +148,7 @@ async function sendViaBrevoApi(toEmail, code) {
   if (!resp.ok) {
     throw new Error(`Brevo API error ${resp.status}: ${data.message || data.type || JSON.stringify(data)}`);
   }
-  const messageId = data.messageIds && data.messageIds[0];
+  const messageId = data.messageId || (data.messageIds && data.messageIds[0]);
   console.log(`[EMAIL] OTP sent via Brevo API to ${toEmail} (messageId: ${messageId || 'n/a'})`);
   return data;
 }
@@ -170,16 +157,15 @@ async function sendViaBrevoApi(toEmail, code) {
 async function sendViaSmtp(toEmail, code) {
   const t = getTransporter();
   if (!t) throw new Error('SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS).');
-  checkSmtpFromDomain();
   const sender = senderIdentity();
   const reply = replyToIdentity();
   const info = await t.sendMail({
-    from: `"${sender.name}" <${sender.email}>`,
+    from: { name: sender.name, address: sender.email },
     to: toEmail,
-    subject: 'Your Pixels password reset code',
+    subject: `Your ${sender.name} password reset code`,
     text: otpText(code),
     html: otpHtml(code),
-    headers: reply ? { 'Reply-To': reply.email } : undefined,
+    replyTo: reply ? { name: reply.name, address: reply.email } : undefined,
   });
   console.log(`[EMAIL] OTP sent via SMTP to ${toEmail} (messageId: ${info.messageId})`);
   return info;
@@ -360,16 +346,15 @@ async function sendOrderViaBrevoApi(toEmail, message) {
 async function sendOrderViaSmtp(toEmail, message) {
   const t = getTransporter();
   if (!t) throw new Error('SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS).');
-  checkSmtpFromDomain();
   const sender = senderIdentity();
   const reply = replyToIdentity();
   const info = await t.sendMail({
-    from: `"${sender.name}" <${sender.email}>`,
+    from: { name: sender.name, address: sender.email },
     to: toEmail,
     subject: message.subject,
     text: message.text,
     html: message.html,
-    headers: reply ? { 'Reply-To': reply.email } : undefined,
+    replyTo: reply ? { name: reply.name, address: reply.email } : undefined,
     attachments: message.attachment ? [{
       filename: message.attachment.name,
       content: Buffer.from(message.attachment.base64, 'base64'),

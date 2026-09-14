@@ -24,6 +24,25 @@
 // Optional, for every email the store sends:
 //   MAIL_FROM_NAME = PixelHouse          (From display name)
 //   MAIL_REPLY_TO = support@yourdomain   (where customer replies land)
+//   BREVO_PIXEL_TRACKING_CONSENT = off   (see "Brevo tracking / unsubscribe" below)
+//
+// Brevo tracking / unsubscribe — what is (and is not) controlled from here:
+//   Brevo appends List-Unsubscribe + List-Unsubscribe-Post and an open-tracking
+//   pixel (r.<your-domain>/tr/op/...) to every message it relays, transactional
+//   ones included. There is no API or SMTP parameter that removes them, so this
+//   file cannot switch them off.
+//     - List-Unsubscribe: mandatory for all Brevo mail. Only Brevo Support can
+//       replace it with a List-Help header (Enterprise plan, recipient-triggered
+//       transactional mail with no promotional content).
+//     - Open/click tracking: the one documented, supported lever is per-contact
+//       pixel tracking consent. Enable Brevo → Settings → Contacts →
+//       Per-contact pixel tracking consent first, then set
+//       BREVO_PIXEL_TRACKING_CONSENT=off here: every transactional API recipient
+//       is sent as "declined", so Brevo does not track opens or clicks for
+//       OTP/invoice email. Left unset, the field is not sent at all (safe
+//       default: the setting must exist in the Brevo account, otherwise the API
+//       rejects the unknown key). The SMTP transport has no equivalent — only
+//       the HTTP API can carry this instruction.
 //
 // Dev only: FORCE_DEV_CODES=1 always returns the code in the API response and
 // logs it, even when a transport is configured (for UI testing without mail).
@@ -79,11 +98,36 @@ function replyToIdentity() {
 // SMTP credential domains do not determine SPF/DKIM alignment. Check the
 // received Authentication-Results header instead (see EMAIL-DELIVERABILITY.md).
 
+/* --------------- Brevo transactional send hygiene (tracking) --------------- */
+
+// BREVO_PIXEL_TRACKING_CONSENT: 'off' | 'on' | unset (see the header comment).
+// Returns true/false to carry a per-recipient consent value, or null to leave
+// the field out entirely so the Brevo account default applies.
+function pixelTrackingConsent() {
+  const raw = String(process.env.BREVO_PIXEL_TRACKING_CONSENT || '').trim().toLowerCase();
+  if (['off', 'false', '0', 'no', 'declined', 'decline'].includes(raw)) return false;
+  if (['on', 'true', '1', 'yes', 'granted'].includes(raw)) return true;
+  return null;
+}
+
+// Brevo's v3 API takes per-recipient pixel/click tracking consent on each entry
+// of `to`/`cc`/`bcc`. Only sent when BREVO_PIXEL_TRACKING_CONSENT is configured.
+function apiRecipients(toEmail) {
+  const consent = pixelTrackingConsent();
+  return [{ email: toEmail, ...(consent === null ? {} : { contactPixelTrackingConsent: consent }) }];
+}
+
+// Tags make these sends easy to find in Brevo → Transactional → Logs (and in
+// webhooks), so transactional OTP/invoice traffic stays separable from any
+// campaign traffic in the same Brevo account.
+const TRANSACTIONAL_TAGS = { otp: 'password-reset-otp', order: 'order-confirmation' };
+
 // Public (no secrets) summary of the mail configuration — used by the
 // startup log and GET /api/email/status so operators can verify on the
 // deployed service that the env vars actually arrived.
 function describeConfig() {
   const port = Number(process.env.SMTP_PORT || 465);
+  const consent = pixelTrackingConsent();
   return {
     email_enabled: emailEnabled(),
     transport: brevoApiConfigured() ? 'brevo_api' : smtpConfigured() ? 'smtp' : null,
@@ -91,6 +135,10 @@ function describeConfig() {
     smtp_port: smtpConfigured() ? port : null,
     smtp_user: process.env.SMTP_USER || null,
     mail_from: process.env.MAIL_FROM || null,
+    // Brevo injects List-Unsubscribe + an open-tracking pixel into every relayed
+    // message; 'declined' means we ask Brevo (per-contact consent) not to track
+    // these transactional sends, 'default' means the Brevo account setting applies.
+    brevo_pixel_tracking_consent: consent === null ? 'default' : consent ? 'granted' : 'declined',
     force_dev_codes: process.env.FORCE_DEV_CODES === '1',
   };
 }
@@ -137,10 +185,11 @@ async function sendViaBrevoApi(toEmail, code) {
     },
     body: JSON.stringify({
       sender: { name: sender.name, email: sender.email },
-      to: [{ email: toEmail }],
+      to: apiRecipients(toEmail),
       subject: `Your ${sender.name} password reset code`,
       htmlContent: otpHtml(code),
       textContent: otpText(code),
+      tags: [TRANSACTIONAL_TAGS.otp],
       ...(reply ? { replyTo: reply } : {}),
     }),
   });
@@ -318,10 +367,11 @@ async function sendOrderViaBrevoApi(toEmail, message) {
   const reply = replyToIdentity();
   const body = {
     sender: { name: sender.name, email: sender.email },
-    to: [{ email: toEmail }],
+    to: apiRecipients(toEmail),
     subject: message.subject,
     htmlContent: message.html,
     textContent: message.text,
+    tags: [TRANSACTIONAL_TAGS.order],
     ...(reply ? { replyTo: reply } : {}),
     ...(message.attachment ? { attachment: [{ name: message.attachment.name, content: message.attachment.base64 }] } : {}),
   };

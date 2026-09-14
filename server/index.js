@@ -138,6 +138,10 @@ app.listen(PORT, () => {
       : `SMTP ${mail.smtp_host}:${mail.smtp_port} as ${mail.smtp_user}`;
     console.log(`[MAIL] enabled — transport: ${where}, from: ${mail.mail_from || '(SMTP user)'}` +
       (mail.force_dev_codes ? ', FORCE_DEV_CODES=1 (dev mode — codes returned in API, no mail sent)' : ''));
+    if (mail.brevo_pixel_tracking_consent === 'declined')
+      console.log(mail.transport === 'brevo_api'
+        ? '[MAIL] Brevo open/click tracking declined for transactional sends (BREVO_PIXEL_TRACKING_CONSENT=off). Brevo still adds its List-Unsubscribe header — that is Brevo-side and cannot be removed from this app.'
+        : '[MAIL] BREVO_PIXEL_TRACKING_CONSENT=off has no effect on the SMTP transport — only the Brevo HTTP API carries per-recipient tracking consent. Set BREVO_API_KEY to use it, or ask Brevo Support to disable tracking for transactional mail on the account.');
   } else {
     console.log('[MAIL] NOT configured — reset codes will be printed to this log (dev mode). Set SMTP_* or BREVO_API_KEY env vars.');
   }

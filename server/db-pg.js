@@ -28,6 +28,21 @@ if (!process.env.DATABASE_URL && process.env.PG_MEM_TEST !== '1') {
 
 const SCHEMA_SQL = fs.readFileSync(path.join(__dirname, 'schema-postgres.sql'), 'utf8');
 
+// TEST-DOUBLE DDL FILTER (pg-mem only — real PostgreSQL always receives the
+// full schema-postgres.sql untouched, via init() below and via
+// scripts/init-postgres-schema.js).
+// pg-mem's planner answers queries from PARTIAL indexes even when the query
+// does not imply the index predicate (verified repro on pg-mem 3.0.14: after
+// UPDATEing a row out of `WHERE is_primary = 1`, `WHERE product_id = $1`
+// stops matching it). Real PostgreSQL never does this. The double therefore
+// skips partial-index DDL; every table, constraint, and non-partial index is
+// still created, and the guarded invariants stay covered by procedural app
+// logic plus suite assertions. Exported for the migration test, which builds
+// its own pg-mem destination from the same schema file.
+function stripUnsupportedMemDdl(ddl) {
+  return ddl.replace(/CREATE\s+UNIQUE\s+INDEX[^;]*?\bWHERE\b[^;]*?;/gi, '');
+}
+
 let pool;
 let pgTypes;
 if (process.env.PG_MEM_TEST === '1') {
@@ -42,7 +57,34 @@ if (process.env.PG_MEM_TEST === '1') {
     name: 'trim', args: [DataType.text], returns: DataType.text,
     implementation: (value) => (value === null || value === undefined ? value : String(value).trim()),
   });
+  mem.public.registerFunction({
+    name: 'random', returns: DataType.float,
+    implementation: () => Math.random(),
+  });
+  mem.public.registerFunction({
+    name: 'nullif', args: [DataType.text, DataType.text], returns: DataType.text,
+    implementation: (a, b) => (a === b ? null : a),
+  });
   pool = new (mem.adapters.createPg().Pool)();
+  // pg-mem evaluates `column - $n` as `$n - column` (verified repro on 3.0.14:
+  // `UPDATE t SET stock = stock - $1` with stock=100 and $1=1 yields -99).
+  // Real PostgreSQL evaluates it correctly, so production SQL stays idiomatic
+  // and only this double rewrites the ONE affected statement shape — by exact
+  // substring, so any future SQL change fails loudly in the suite instead of
+  // being silently rewritten. CAST form is semantics-identical on real PG.
+  const MEM_MINUS_ORIGINAL = 'stock = stock - $1';
+  const MEM_MINUS_PATCHED = 'stock = stock - CAST($1 AS INT)';
+  const patchMemMinus = (text) => (
+    typeof text === 'string' ? text.split(MEM_MINUS_ORIGINAL).join(MEM_MINUS_PATCHED) : text
+  );
+  const wrapMemExecutor = (executor) => {
+    const originalQuery = executor.query.bind(executor);
+    executor.query = (text, params) => originalQuery(patchMemMinus(text), params);
+    return executor;
+  };
+  wrapMemExecutor(pool);
+  const memConnect = pool.connect.bind(pool);
+  pool.connect = async () => wrapMemExecutor(await memConnect());
 } else {
   // eslint-disable-next-line global-require
   const pg = require('pg');
@@ -53,6 +95,11 @@ if (process.env.PG_MEM_TEST === '1') {
   pgTypes.setTypeParser(pgTypes.builtins.TIMESTAMPTZ, (value) => value);
   pgTypes.setTypeParser(pgTypes.builtins.TIMESTAMP, (value) => value);
   pgTypes.setTypeParser(pgTypes.builtins.DATE, (value) => value);
+  // COUNT(*)/SUM(int) come back as int8, AVG() as numeric — node-postgres
+  // returns both as strings by default. This store's magnitudes never approach
+  // 2^53, so parse them to numbers to keep SQLite-identical value shapes.
+  pgTypes.setTypeParser(pgTypes.builtins.INT8, (value) => parseInt(value, 10));
+  pgTypes.setTypeParser(1700, (value) => (value === null ? null : parseFloat(value)));
   pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     // All stored instants are UTC; interpret naive timestamp strings as UTC so
@@ -101,7 +148,7 @@ const shared = clientHandle(pool);
 async function ensureStoreSettings(executor) {
   await executor.query(
     `INSERT INTO store_settings (id, contact, payment_methods, shipping_fee, delivery_options, notification_preferences)
-     VALUES (1, $1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+     VALUES (1, $1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
     [
       JSON.stringify(DEFAULT_STORE_SETTINGS.contact),
       JSON.stringify(DEFAULT_STORE_SETTINGS.payment_methods),
@@ -223,7 +270,7 @@ const pgEngine = {
 
   init: async () => {
     if (initialised) return;
-    await pool.query(SCHEMA_SQL);
+    await pool.query(process.env.PG_MEM_TEST === '1' ? stripUnsupportedMemDdl(SCHEMA_SQL) : SCHEMA_SQL);
     await ensureStoreSettings(pool);
     if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData(pool);
     initialised = true;
@@ -239,3 +286,6 @@ const pgEngine = {
 };
 
 module.exports = pgEngine;
+// Test-support export (used by tests/migration.test.js): the pg-mem DDL
+// filter above. Not part of the engine interface application code uses.
+module.exports.stripUnsupportedMemDdl = stripUnsupportedMemDdl;

@@ -189,14 +189,14 @@ function requirePdfKit() {
 
 // Store details live in the same table the admin Settings tab edits, so an owner
 // changing the store name or contact info updates every future invoice.
-function readShopSettings() {
+async function readShopSettings() {
   const fallback = {
     name: BRAND.name, tagline: BRAND.tagline, email: '', phone: '', address: '', website: '', currency: 'PKR',
   };
   let db;
-  try { db = require('./db'); } catch (_) { return fallback; } // eslint-disable-line global-require
+  try { db = require('./database'); } catch (_) { return fallback; } // eslint-disable-line global-require
   try {
-    const row = db.prepare('SELECT * FROM store_settings WHERE id = 1').get();
+    const row = await db.get('SELECT * FROM store_settings WHERE id = 1');
     if (!row) return fallback;
     const contact = parseJson(row.contact, {});
     return {
@@ -213,20 +213,20 @@ function readShopSettings() {
   }
 }
 
-function readPaymentRecord(orderId) {
+async function readPaymentRecord(orderId) {
   let db;
-  try { db = require('./db'); } catch (_) { return null; } // eslint-disable-line global-require
+  try { db = require('./database'); } catch (_) { return null; } // eslint-disable-line global-require
   try {
-    return db.prepare(`SELECT payment_method, payment_status, transaction_id, paid_at, amount_paid
-      FROM payments WHERE order_id = ?`).get(orderId) || null;
+    return await db.get(`SELECT payment_method, payment_status, transaction_id, paid_at, amount_paid
+      FROM payments WHERE order_id = ?`, orderId) || null;
   } catch (_) {
     return null;
   }
 }
 
-function buildInvoiceModel(order, items, options = {}) {
-  const shop = options.shop || readShopSettings();
-  const payment = options.payment === undefined ? readPaymentRecord(order.id) : options.payment;
+async function buildInvoiceModel(order, items, options = {}) {
+  const shop = options.shop || await readShopSettings();
+  const payment = options.payment === undefined ? await readPaymentRecord(order.id) : options.payment;
   const lines = (items || []).map((item, index) => {
     const unitPrice = number(item.price);
     const quantity = number(item.quantity);
@@ -809,7 +809,7 @@ function sendInvoice(res, order, items, options = {}) {
   };
 
   const task = (async () => {
-    const model = buildInvoiceModel(order, items, settings);
+    const model = await buildInvoiceModel(order, items, settings);
     const baseName = `PixelHouse-Invoice-${model.fileKey}`;
     const usePdf = settings.format !== 'html';
 

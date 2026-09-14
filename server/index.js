@@ -22,9 +22,10 @@ const cookieParser = require('cookie-parser');
 
 const { attachUser } = require('./auth');
 const { describeConfig: describeMailConfig } = require('./mailer');
+const { maintenanceMode } = require('./maintenance');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
-const db = require('./db');
+const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,16 +33,39 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '7mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// ---- Health check (always available, even during maintenance) ----
+// Reports only non-sensitive facts: engine name and reachability. Never
+// includes DATABASE_URL, credentials, or any record contents.
+app.get('/api/health', async (req, res) => {
+  let reachable = false;
+  try {
+    await db.get('SELECT 1 AS ok');
+    reachable = true;
+  } catch (_) {
+    reachable = false;
+  }
+  res.status(reachable ? 200 : 503).json({
+    ok: reachable,
+    engine: db.engine,
+    db_reachable: reachable,
+    maintenance: process.env.MAINTENANCE_MODE === 'true',
+  });
+});
+
 app.use(attachUser);
+// Cutover guard: blocks state-changing API calls while enabled. Registered
+// after /api/health so health checks keep working during maintenance.
+app.use('/api', maintenanceMode);
 
 // ---- Chat endpoint ----
 // Works in TWO modes:
 //  1) Built-in smart shop assistant (always available, answers from the real product DB)
 //  2) Gemini AI (used automatically when GEMINI_API_KEY is set)
 
-function shopAssistant(message) {
+async function shopAssistant(message) {
   const msg = String(message).toLowerCase();
-  const products = db.prepare('SELECT name, price, old_price, slug, stock, badge FROM products').all();
+  const products = await db.all('SELECT name, price, old_price, slug, stock, badge FROM products');
   const fmt = (n) => 'Rs. ' + Number(n).toLocaleString('en-US');
 
   // Product search: match any word of the question against product names
@@ -106,7 +130,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Mode 1: built-in assistant (always works)
-    res.json({ reply: shopAssistant(message) });
+    res.json({ reply: await shopAssistant(message) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -129,8 +153,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Pixels server running at http://localhost:${PORT}`);
+async function start(port = PORT) {
+  await db.init();
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(port, () => resolve(listener));
+  });
+  const actualPort = server.address() && server.address().port;
+  console.log(`Pixels server running at http://localhost:${actualPort} (db: ${db.engine})`);
   const mail = describeMailConfig();
   if (mail.email_enabled) {
     const where = mail.transport === 'brevo_api'
@@ -145,4 +174,14 @@ app.listen(PORT, () => {
   } else {
     console.log('[MAIL] NOT configured — reset codes will be printed to this log (dev mode). Set SMTP_* or BREVO_API_KEY env vars.');
   }
-});
+  return { server, port: actualPort };
+}
+
+if (require.main === module) {
+  start().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, start };

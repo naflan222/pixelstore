@@ -2,7 +2,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const db = require('./db');
+const db = require('./database');
 const { createSession, destroySession, requireAuth } = require('./auth');
 const { emailEnabled, describeConfig, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
@@ -13,27 +13,27 @@ const router = express.Router();
 const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 };
 
 // Merge a guest's cart/wishlist into their account when they register or log in
-function mergeGuestData(req, userId) {
+async function mergeGuestData(req, userId) {
   if (!req.guestId) return;
-  const guestCart = db.prepare('SELECT product_id, quantity FROM carts WHERE guest_id = ?').all(req.guestId);
+  const guestCart = await db.all('SELECT product_id, quantity FROM carts WHERE guest_id = ?', req.guestId);
   for (const item of guestCart) {
-    const existing = db.prepare('SELECT id FROM carts WHERE user_id = ? AND product_id = ?').get(userId, item.product_id);
-    if (existing) db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(item.quantity, existing.id);
-    else db.prepare('INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)').run(userId, item.product_id, item.quantity);
+    const existing = await db.get('SELECT id FROM carts WHERE user_id = ? AND product_id = ?', userId, item.product_id);
+    if (existing) await db.run('UPDATE carts SET quantity = quantity + ? WHERE id = ?', item.quantity, existing.id);
+    else await db.run('INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)', userId, item.product_id, item.quantity);
   }
-  db.prepare('DELETE FROM carts WHERE guest_id = ?').run(req.guestId);
-  const guestWish = db.prepare('SELECT product_id FROM wishlists WHERE guest_id = ?').all(req.guestId);
+  await db.run('DELETE FROM carts WHERE guest_id = ?', req.guestId);
+  const guestWish = await db.all('SELECT product_id FROM wishlists WHERE guest_id = ?', req.guestId);
   for (const item of guestWish) {
-    const existing = db.prepare('SELECT id FROM wishlists WHERE user_id = ? AND product_id = ?').get(userId, item.product_id);
-    if (!existing) db.prepare('INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)').run(userId, item.product_id);
+    const existing = await db.get('SELECT id FROM wishlists WHERE user_id = ? AND product_id = ?', userId, item.product_id);
+    if (!existing) await db.run('INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)', userId, item.product_id);
   }
-  db.prepare('DELETE FROM wishlists WHERE guest_id = ?').run(req.guestId);
-  db.prepare('UPDATE orders SET user_id = ?, guest_id = NULL WHERE guest_id = ?').run(userId, req.guestId);
+  await db.run('DELETE FROM wishlists WHERE guest_id = ?', req.guestId);
+  await db.run('UPDATE orders SET user_id = ?, guest_id = NULL WHERE guest_id = ?', userId, req.guestId);
 }
 
-function notify(userId, title, body, type = 'info') {
-  db.prepare('INSERT INTO notifications (user_id, title, body, type) VALUES (?, ?, ?, ?)')
-    .run(userId, title, body, type);
+async function notify(userId, title, body, type = 'info', tx = db) {
+  await tx.run('INSERT INTO notifications (user_id, title, body, type) VALUES (?, ?, ?, ?)',
+    userId, title, body, type);
 }
 
 /**
@@ -44,10 +44,10 @@ function notify(userId, title, body, type = 'info') {
  */
 function emailOrderConfirmation(orderId) {
   const task = (async () => {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    const order = await db.get('SELECT * FROM orders WHERE id = ?', orderId);
     if (!order || !order.email) return;
-    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(orderId);
-    const model = buildInvoiceModel(order, items);
+    const items = await db.all('SELECT * FROM order_items WHERE order_id = ? ORDER BY id', orderId);
+    const model = await buildInvoiceModel(order, items);
     let pdfBuffer = null;
     try {
       pdfBuffer = await renderPdf(model);
@@ -66,17 +66,17 @@ function emailOrderConfirmation(orderId) {
 const SHIPPING_FEES = { standard: 500, pickup: 0 };
 const COUPON_CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
 
-function cartItems(req) {
+async function cartItems(req, tx = db) {
   const w = cartWhere(req);
-  return db.prepare(`SELECT c.quantity, p.id, p.name, p.price, p.stock
-    FROM carts c JOIN products p ON p.id = c.product_id WHERE ${w.sql}`).all(w.param);
+  return tx.all(`SELECT c.quantity, p.id, p.name, p.price, p.stock
+    FROM carts c JOIN products p ON p.id = c.product_id WHERE ${w.sql}`, w.param);
 }
 
-function couponForCode(value) {
+async function couponForCode(value, tx = db) {
   const code = String(value || '').trim().toUpperCase();
   if (!COUPON_CODE.test(code)) return { code, coupon: null, error: 'Enter a valid coupon code.' };
-  const coupon = db.prepare(`SELECT * FROM coupons WHERE code = ? AND is_active = 1
-    AND (expires_at IS NULL OR expires_at = '' OR expires_at > datetime('now'))`).get(code);
+  const coupon = await tx.get(`SELECT * FROM coupons WHERE lower(code) = lower(?) AND is_active = 1
+    AND (expires_at IS NULL OR expires_at > ?)`, code, db.utcNow());
   if (!coupon) return { code, coupon: null, error: 'This coupon is invalid, inactive, or expired.' };
   if (coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit)
     return { code, coupon: null, error: 'This coupon has reached its usage limit.' };
@@ -104,58 +104,58 @@ router.get('/email/status', (req, res) => {
 
 /* ---------------- AUTH ---------------- */
 
-router.post('/auth/register', (req, res) => {
+router.post('/auth/register', async (req, res) => {
   const { username, email, password } = req.body || {};
   if (!username || !email || !password)
     return res.status(400).json({ error: 'Username, email and password are required.' });
   if (String(password).length < 6)
     return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
-  const exists = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?')
-    .get(username, email.toLowerCase());
+  const exists = await db.get('SELECT id FROM users WHERE username = ? OR email = ?',
+    username, email.toLowerCase());
   if (exists) return res.status(409).json({ error: 'Username or email already registered.' });
 
   const hash = bcrypt.hashSync(password, 10);
-  const info = db.prepare('INSERT INTO users (username, email, password_hash, full_name) VALUES (?, ?, ?, ?)')
-    .run(username, email.toLowerCase(), hash, username);
+  const info = await db.insert('INSERT INTO users (username, email, password_hash, full_name) VALUES (?, ?, ?, ?)',
+    username, email.toLowerCase(), hash, username);
 
-  notify(info.lastInsertRowid, 'Welcome to PixelHouse!', 'Your account was created successfully.', 'welcome');
-  createAdminNotification({ type: 'customer', title: 'New customer', body: 'A customer account was created.', entityType: 'user', entityId: info.lastInsertRowid });
-  mergeGuestData(req, info.lastInsertRowid);
+  await notify(info.id, 'Welcome to PixelHouse!', 'Your account was created successfully.', 'welcome');
+  await createAdminNotification({ type: 'customer', title: 'New customer', body: 'A customer account was created.', entityType: 'user', entityId: info.id });
+  await mergeGuestData(req, info.id);
   // Don't auto-login: user should see the success message and log in manually
   res.json({ ok: true, redirect: 'login.html' });
 });
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password)
     return res.status(400).json({ error: 'Username and password are required.' });
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?')
-    .get(username, username.toLowerCase());
+  const user = await db.get('SELECT * FROM users WHERE username = ? OR email = ?',
+    username, username.toLowerCase());
   if (!user || !bcrypt.compareSync(password, user.password_hash))
     return res.status(401).json({ error: 'Invalid username or password.' });
   if (!user.is_active) return res.status(403).json({ error: 'This account has been disabled.' });
 
-  mergeGuestData(req, user.id);
-  const token = createSession(user.id);
+  await mergeGuestData(req, user.id);
+  const token = await createSession(user.id);
   res.cookie('pixels_session', token, COOKIE_OPTS);
   res.json({ ok: true, redirect: 'home.html' });
 });
 
-router.post('/auth/logout', (req, res) => {
-  destroySession(req.cookies && req.cookies.pixels_session);
+router.post('/auth/logout', async (req, res) => {
+  await destroySession(req.cookies && req.cookies.pixels_session);
   res.clearCookie('pixels_session');
   res.json({ ok: true, redirect: 'home.html' });
 });
 
-router.get('/auth/me', (req, res) => {
+router.get('/auth/me', async (req, res) => {
   const cw = req.user
     ? { sql: 'user_id = ?', param: req.user.id }
     : { sql: 'guest_id = ?', param: req.guestId };
-  const cartCount = db.prepare(`SELECT COALESCE(SUM(quantity),0) AS c FROM carts WHERE ${cw.sql}`).get(cw.param).c;
+  const cartCount = (await db.get(`SELECT COALESCE(SUM(quantity),0) AS c FROM carts WHERE ${cw.sql}`, cw.param)).c;
   if (!req.user) return res.status(401).json({ error: 'Not authenticated', cart_count: cartCount });
-  const notifCount = db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0').get(req.user.id).c;
+  const notifCount = (await db.get('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0', req.user.id)).c;
   res.json({ user: req.user, unread_notifications: notifCount, cart_count: cartCount });
 });
 
@@ -163,6 +163,8 @@ router.get('/auth/me', (req, res) => {
 const FORGOT_MAX_REQUESTS = 3;
 // Max verification attempts per code before it is locked out.
 const RESET_MAX_ATTEMPTS = 5;
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+const ONE_DAY_MS = 24 * 3600 * 1000;
 
 router.post('/auth/forgot-password', async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
@@ -170,21 +172,21 @@ router.post('/auth/forgot-password', async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid email address.' });
 
   // Housekeeping: drop codes that expired more than a day ago.
-  db.prepare(`DELETE FROM password_resets WHERE expires_at < datetime('now', '-1 day')`).run();
+  await db.run('DELETE FROM password_resets WHERE expires_at < ?', db.utcNow(-ONE_DAY_MS));
 
-  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  const user = await db.get('SELECT id FROM users WHERE email = ?', email);
   // Always succeed to avoid leaking which emails exist
   if (user) {
-    const recent = db.prepare(`SELECT COUNT(*) AS c FROM password_resets
-      WHERE email = ? AND created_at > datetime('now', '-15 minutes')`).get(email).c;
+    const recent = (await db.get(`SELECT COUNT(*) AS c FROM password_resets
+      WHERE email = ? AND created_at > ?`, email, db.utcNow(-FIFTEEN_MINUTES_MS))).c;
     if (recent >= FORGOT_MAX_REQUESTS)
       return res.status(429).json({ error: 'Too many reset requests. Please wait 15 minutes and try again.' });
 
     // A new code supersedes any previous unused ones for this email.
-    db.prepare('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0').run(email);
+    await db.run('UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0', email);
     const code = String(crypto.randomInt(100000, 999999));
-    db.prepare(`INSERT INTO password_resets (email, code, expires_at) VALUES (?, ?, datetime('now', '+15 minutes'))`)
-      .run(email, code);
+    await db.run('INSERT INTO password_resets (email, code, expires_at) VALUES (?, ?, ?)',
+      email, code, db.utcNow(FIFTEEN_MINUTES_MS));
     if (emailEnabled() && process.env.FORCE_DEV_CODES !== '1') {
       try {
         await sendOtpEmail(email, code);
@@ -202,21 +204,21 @@ router.post('/auth/forgot-password', async (req, res) => {
 
 // Verify a reset code WITHOUT consuming it — lets the OTP page give
 // instant feedback before the user types a new password.
-router.post('/auth/verify-code', (req, res) => {
+router.post('/auth/verify-code', async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const code = String((req.body || {}).code || '').trim();
   if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
-  const row = db.prepare(`SELECT id, attempts FROM password_resets
-    WHERE email = ? AND code = ? AND used = 0 AND expires_at > datetime('now')
-    ORDER BY id DESC LIMIT 1`).get(email, code);
+  const row = await db.get(`SELECT id, attempts FROM password_resets
+    WHERE email = ? AND code = ? AND used = 0 AND expires_at > ?
+    ORDER BY id DESC LIMIT 1`, email, code, db.utcNow());
   if (!row) return res.status(400).json({ error: 'Invalid or expired reset code. Please check the code in your email.' });
   if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
     return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
-  db.prepare('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?').run(row.id);
+  await db.run('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?', row.id);
   res.json({ ok: true });
 });
 
-router.post('/auth/reset-password', (req, res) => {
+router.post('/auth/reset-password', async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const code = String((req.body || {}).code || '').trim();
   const password = String((req.body || {}).password || '');
@@ -225,91 +227,93 @@ router.post('/auth/reset-password', (req, res) => {
   if (password.length < 6)
     return res.status(400).json({ error: 'New password must be at least 6 characters.' });
 
-  const row = db.prepare(`SELECT id, attempts FROM password_resets
-    WHERE email = ? AND code = ? AND used = 0 AND expires_at > datetime('now')
-    ORDER BY id DESC LIMIT 1`).get(email, code);
+  const row = await db.get(`SELECT id, attempts FROM password_resets
+    WHERE email = ? AND code = ? AND used = 0 AND expires_at > ?
+    ORDER BY id DESC LIMIT 1`, email, code, db.utcNow());
   if (!row) return res.status(400).json({ error: 'Invalid or expired reset code.' });
   if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
     return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
 
-  db.prepare('UPDATE password_resets SET used = 1, attempts = attempts + 1 WHERE id = ?').run(row.id);
-  db.prepare('UPDATE users SET password_hash = ? WHERE email = ?')
-    .run(bcrypt.hashSync(password, 10), email);
+  await db.run('UPDATE password_resets SET used = 1, attempts = attempts + 1 WHERE id = ?', row.id);
+  await db.run('UPDATE users SET password_hash = ? WHERE email = ?',
+    bcrypt.hashSync(password, 10), email);
 
   // Force a fresh login everywhere with the new password.
-  const uid = db.prepare('SELECT id FROM users WHERE email = ?').get(email).id;
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(uid);
+  const uid = (await db.get('SELECT id FROM users WHERE email = ?', email)).id;
+  await db.run('DELETE FROM sessions WHERE user_id = ?', uid);
 
-  notify(uid, 'Password changed', 'Your password was reset. If this was not you, contact support immediately.', 'security');
+  await notify(uid, 'Password changed', 'Your password was reset. If this was not you, contact support immediately.', 'security');
   res.json({ ok: true, redirect: 'forget-password-success.html' });
 });
 
-router.post('/auth/change-password', requireAuth, (req, res) => {
+router.post('/auth/change-password', requireAuth, async (req, res) => {
   const { current_password, new_password } = req.body || {};
   if (!current_password || !new_password)
     return res.status(400).json({ error: 'Current and new password are required.' });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
   if (!bcrypt.compareSync(current_password, user.password_hash))
     return res.status(401).json({ error: 'Current password is incorrect.' });
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
-    .run(bcrypt.hashSync(new_password, 10), req.user.id);
+  await db.run('UPDATE users SET password_hash = ? WHERE id = ?',
+    bcrypt.hashSync(new_password, 10), req.user.id);
   res.json({ ok: true });
 });
 
 /* ---------------- PROFILE ---------------- */
 
-router.put('/profile', requireAuth, (req, res) => {
+router.put('/profile', requireAuth, async (req, res) => {
   const { username, phone, email, address } = req.body || {};
   const emailVal = email ? email.toLowerCase() : req.user.email;
-  const clash = db.prepare('SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?')
-    .get(username || req.user.username, emailVal, req.user.id);
+  const clash = await db.get('SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?',
+    username || req.user.username, emailVal, req.user.id);
   if (clash) return res.status(409).json({ error: 'Username or email already in use.' });
-  db.prepare('UPDATE users SET username = ?, phone = ?, email = ?, address = ? WHERE id = ?')
-    .run(username || req.user.username, phone || '', emailVal, address || '', req.user.id);
+  await db.run('UPDATE users SET username = ?, phone = ?, email = ?, address = ? WHERE id = ?',
+    username || req.user.username, phone || '', emailVal, address || '', req.user.id);
   res.json({ ok: true });
 });
 
 /* ---------------- PRODUCTS ---------------- */
 
-router.get('/products', (req, res) => {
+router.get('/products', async (req, res) => {
   const { category, featured, flash_sale, q } = req.query;
   let sql = 'SELECT * FROM products WHERE 1=1';
   const params = [];
   if (category) { sql += ' AND category = ?'; params.push(category); }
   if (featured === '1') sql += ' AND featured = 1';
   if (flash_sale === '1') sql += ' AND flash_sale = 1';
-  if (q) { sql += ' AND name LIKE ?'; params.push(`%${q}%`); }
+  // lower() both sides: case-insensitive on SQLite AND PostgreSQL alike.
+  if (q) { sql += ' AND lower(name) LIKE lower(?)'; params.push(`%${q}%`); }
   sql += ' ORDER BY id';
-  res.json({ products: db.prepare(sql).all(...params) });
+  res.json({ products: await db.all(sql, ...params) });
 });
 
-router.get('/products/:slug', (req, res) => {
-  const product = db.prepare('SELECT * FROM products WHERE slug = ?').get(req.params.slug);
+router.get('/products/:slug', async (req, res) => {
+  const product = await db.get('SELECT * FROM products WHERE slug = ?', req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
-  const related = db.prepare('SELECT * FROM products WHERE slug != ? ORDER BY RANDOM() LIMIT 4').all(req.params.slug);
-  const reviews = db.prepare(`
+  const randomFn = db.engine === 'postgres' ? 'random()' : 'RANDOM()';
+  const related = await db.all(`SELECT * FROM products WHERE slug != ? ORDER BY ${randomFn} LIMIT 4`, req.params.slug);
+  const reviews = await db.all(`
     SELECT r.rating, r.comment, r.created_at, u.username
     FROM reviews r JOIN users u ON u.id = r.user_id
-    WHERE r.product_id = ? AND r.is_visible = 1 ORDER BY r.id DESC`).all(product.id);
+    WHERE r.product_id = ? AND r.is_visible = 1 ORDER BY r.id DESC`, product.id);
   res.json({ product, related, reviews });
 });
 
 /* ---------------- PROMOTIONS / COUPONS ---------------- */
 
-router.get('/promotional-banners', (req, res) => {
-  const banners = db.prepare(`SELECT id, image, title, description, button_text, button_url, display_order, starts_at, ends_at
+router.get('/promotional-banners', async (req, res) => {
+  const banners = await db.all(`SELECT id, image, title, description, button_text, button_url, display_order, starts_at, ends_at
     FROM promotional_banners WHERE is_active = 1
-    AND (starts_at IS NULL OR starts_at = '' OR starts_at <= datetime('now'))
-    AND (ends_at IS NULL OR ends_at = '' OR ends_at > datetime('now'))
-    ORDER BY display_order ASC, id ASC`).all();
+    AND (starts_at IS NULL OR starts_at <= ?)
+    AND (ends_at IS NULL OR ends_at > ?)
+    ORDER BY display_order ASC, id ASC`, db.utcNow(), db.utcNow());
   res.json({ banners });
 });
 
-router.post('/coupons/validate', (req, res) => {
-  const items = cartItems(req);
+router.post('/coupons/validate', async (req, res) => {
+  const items = await cartItems(req);
   if (!items.length) return res.status(400).json({ error: 'Your cart is empty.' });
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const { code, coupon, error } = couponForCode(req.body && req.body.code);
+  const { code, coupon, error } = await couponForCode(req.body && req.body.code);
   if (error) return res.status(400).json({ error });
   const result = couponDiscount(coupon, subtotal);
   if (result.error) return res.status(400).json({ error: result.error });
@@ -325,66 +329,66 @@ function cartWhere(req) {
     : { sql: 'guest_id = ?', param: req.guestId };
 }
 
-router.get('/cart', (req, res) => {
+router.get('/cart', async (req, res) => {
   const w = cartWhere(req);
-  const items = db.prepare(`
+  const items = await db.all(`
     SELECT c.id AS cart_id, c.quantity, p.id, p.slug, p.name, p.price, p.old_price, p.image
     FROM carts c JOIN products p ON p.id = c.product_id
-    WHERE ${w.sql}`).all(w.param);
+    WHERE ${w.sql}`, w.param);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   res.json({ items, subtotal });
 });
 
-router.post('/cart', (req, res) => {
+router.post('/cart', async (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};
-  const product = db.prepare('SELECT id, stock FROM products WHERE id = ?').get(product_id);
+  const product = await db.get('SELECT id, stock FROM products WHERE id = ?', product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
   const w = cartWhere(req);
-  const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product_id);
+  const existing = await db.get(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`, w.param, product_id);
   if (existing) {
-    db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(qty, existing.id);
+    await db.run('UPDATE carts SET quantity = quantity + ? WHERE id = ?', qty, existing.id);
   } else {
-    db.prepare('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)')
-      .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product_id, qty);
+    await db.run('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)',
+      req.user ? req.user.id : null, req.user ? null : req.guestId, product_id, qty);
   }
   res.json({ ok: true });
 });
 
-function ownsCartItem(req, id) {
+async function ownsCartItem(req, id) {
   const w = cartWhere(req);
-  return db.prepare(`SELECT id FROM carts WHERE id = ? AND ${w.sql}`).get(id, w.param);
+  return db.get(`SELECT id FROM carts WHERE id = ? AND ${w.sql}`, id, w.param);
 }
 
-router.put('/cart/:id', (req, res) => {
-  if (!ownsCartItem(req, req.params.id)) return res.status(404).json({ error: 'Cart item not found' });
+router.put('/cart/:id', async (req, res) => {
+  if (!(await ownsCartItem(req, req.params.id))) return res.status(404).json({ error: 'Cart item not found' });
   const qty = Math.max(1, parseInt(req.body && req.body.quantity) || 1);
-  db.prepare('UPDATE carts SET quantity = ? WHERE id = ?').run(qty, req.params.id);
+  await db.run('UPDATE carts SET quantity = ? WHERE id = ?', qty, req.params.id);
   res.json({ ok: true });
 });
 
-router.delete('/cart/:id', (req, res) => {
-  if (!ownsCartItem(req, req.params.id)) return res.status(404).json({ error: 'Cart item not found' });
-  db.prepare('DELETE FROM carts WHERE id = ?').run(req.params.id);
+router.delete('/cart/:id', async (req, res) => {
+  if (!(await ownsCartItem(req, req.params.id))) return res.status(404).json({ error: 'Cart item not found' });
+  await db.run('DELETE FROM carts WHERE id = ?', req.params.id);
   res.json({ ok: true });
 });
 
 // Add to cart by product slug (used by static "+" buttons on home/listing pages)
-router.post('/cart/by-slug', (req, res) => {
+router.post('/cart/by-slug', async (req, res) => {
   const { slug, quantity = 1 } = req.body || {};
   if (!slug) return res.status(400).json({ error: 'Product slug is required.' });
-  const product = db.prepare('SELECT id, stock FROM products WHERE slug = ?').get(slug);
+  const product = await db.get('SELECT id, stock FROM products WHERE slug = ?', slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
   const w = cartWhere(req);
-  const existing = db.prepare(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`).get(w.param, product.id);
+  const existing = await db.get(`SELECT id, quantity FROM carts WHERE ${w.sql} AND product_id = ?`, w.param, product.id);
   if (existing) {
-    db.prepare('UPDATE carts SET quantity = quantity + ? WHERE id = ?').run(qty, existing.id);
+    await db.run('UPDATE carts SET quantity = quantity + ? WHERE id = ?', qty, existing.id);
   } else {
-    db.prepare('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)')
-      .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product.id, qty);
+    await db.run('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)',
+      req.user ? req.user.id : null, req.user ? null : req.guestId, product.id, qty);
   }
   res.json({ ok: true });
 });
@@ -397,39 +401,39 @@ function wishWhere(req) {
     : { sql: 'guest_id = ?', param: req.guestId };
 }
 
-router.get('/wishlist', (req, res) => {
+router.get('/wishlist', async (req, res) => {
   const w = wishWhere(req);
-  const items = db.prepare(`
+  const items = await db.all(`
     SELECT w.id AS wishlist_id, p.id, p.slug, p.name, p.price, p.old_price, p.image, p.badge
     FROM wishlists w JOIN products p ON p.id = w.product_id
-    WHERE ${w.sql}`).all(w.param);
+    WHERE ${w.sql}`, w.param);
   res.json({ items });
 });
 
-router.post('/wishlist', (req, res) => {
+router.post('/wishlist', async (req, res) => {
   const { product_id } = req.body || {};
-  const product = db.prepare('SELECT id FROM products WHERE id = ?').get(product_id);
+  const product = await db.get('SELECT id FROM products WHERE id = ?', product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   const w = wishWhere(req);
-  const existing = db.prepare(`SELECT id FROM wishlists WHERE ${w.sql} AND product_id = ?`).get(w.param, product_id);
+  const existing = await db.get(`SELECT id FROM wishlists WHERE ${w.sql} AND product_id = ?`, w.param, product_id);
   if (existing) {
-    db.prepare('DELETE FROM wishlists WHERE id = ?').run(existing.id);
+    await db.run('DELETE FROM wishlists WHERE id = ?', existing.id);
     return res.json({ ok: true, added: false });
   }
-  db.prepare('INSERT INTO wishlists (user_id, guest_id, product_id) VALUES (?, ?, ?)')
-    .run(req.user ? req.user.id : null, req.user ? null : req.guestId, product_id);
+  await db.run('INSERT INTO wishlists (user_id, guest_id, product_id) VALUES (?, ?, ?)',
+    req.user ? req.user.id : null, req.user ? null : req.guestId, product_id);
   res.json({ ok: true, added: true });
 });
 
-router.delete('/wishlist/:id', (req, res) => {
+router.delete('/wishlist/:id', async (req, res) => {
   const w = wishWhere(req);
-  db.prepare(`DELETE FROM wishlists WHERE id = ? AND ${w.sql}`).run(req.params.id, w.param);
+  await db.run(`DELETE FROM wishlists WHERE id = ? AND ${w.sql}`, req.params.id, w.param);
   res.json({ ok: true });
 });
 
 /* ---------------- ORDERS / CHECKOUT ---------------- */
 
-router.post('/orders', (req, res) => {
+router.post('/orders', async (req, res) => {
   const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash', coupon_code } = req.body || {};
   if (!full_name || !email || !phone || !address)
     return res.status(400).json({ error: 'Full name, email, phone and address are required.' });
@@ -442,61 +446,74 @@ router.post('/orders', (req, res) => {
     return res.status(400).json({ error: 'Invalid payment method.' });
 
   const w = cartWhere(req);
-  const items = cartItems(req);
+  const items = await cartItems(req);
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty.' });
-
-  for (const i of items) {
-    if (i.stock < i.quantity)
-      return res.status(400).json({ error: `Not enough stock for ${i.name}.` });
-  }
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const shippingFee = SHIPPING_FEES[shipping_method];
 
-  const placeOrder = db.transaction(() => {
-    // Resolve and consume the coupon in the same transaction as stock and order creation.
-    let coupon = null;
-    let discountAmount = 0;
-    let code = '';
-    if (coupon_code !== undefined && String(coupon_code).trim()) {
-      const resolved = couponForCode(coupon_code);
-      if (resolved.error) throw new Error(resolved.error);
-      const discount = couponDiscount(resolved.coupon, subtotal);
-      if (discount.error) throw new Error(discount.error);
-      coupon = resolved.coupon;
-      discountAmount = discount.amount;
-      code = resolved.code;
-      const used = db.prepare(`UPDATE coupons SET usage_count = usage_count + 1, updated_at = datetime('now')
-        WHERE id = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_count < usage_limit)`).run(coupon.id);
-      if (used.changes !== 1) throw new Error('This coupon has reached its usage limit.');
-    }
-    const total = subtotal - discountAmount + shippingFee;
-    const info = db.prepare(`INSERT INTO orders
-      (user_id, guest_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, discount_amount, coupon_code, total)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(req.user ? req.user.id : null, req.user ? null : req.guestId,
-           String(full_name).trim(), String(email).trim().toLowerCase(), String(phone).trim(), String(address).trim(), shipping_method, payment_method,
-           subtotal, shippingFee, discountAmount, code, total);
-    const orderId = info.lastInsertRowid;
-    db.prepare(`INSERT INTO payments (order_id, payment_method, payment_status, amount_paid)
-      VALUES (?, ?, 'pending', 0)`).run(orderId, payment_method);
-    const insertItem = db.prepare('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)');
-    const decStock = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
-    for (const i of items) {
-      insertItem.run(orderId, i.id, i.name, i.price, i.quantity);
-      decStock.run(i.quantity, i.id);
-    }
-    db.prepare(`DELETE FROM carts WHERE ${w.sql}`).run(w.param);
-    if (req.user) notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${payment_method}.`, 'order');
-    createAdminNotification({ type: 'order', title: `New order #${orderId}`, body: 'A new order has been placed.', entityType: 'order', entityId: orderId });
-    return { orderId, total, discountAmount };
-  });
-
   try {
-    const order = placeOrder();
+    const order = await db.transaction(async (tx) => {
+      // CONCURRENCY: lock the product rows first (FOR UPDATE on PostgreSQL;
+      // SQLite transactions are fully serialised by the engine queue), then
+      // validate stock against the LOCKED rows — two simultaneous checkouts
+      // can no longer both pass validation for the last unit.
+      const placeholders = items.map(() => '?').join(',');
+      const locked = await tx.all(
+        `SELECT id, stock FROM products WHERE id IN (${placeholders})${db.forUpdate()}`,
+        ...items.map((i) => i.id)
+      );
+      const stockById = new Map(locked.map((p) => [Number(p.id), Number(p.stock)]));
+      for (const i of items) {
+        if ((stockById.get(Number(i.id)) ?? 0) < i.quantity)
+          throw new Error(`Not enough stock for ${i.name}.`);
+      }
+
+      // Resolve and consume the coupon in the same transaction as stock and order creation.
+      let coupon = null;
+      let discountAmount = 0;
+      let code = '';
+      if (coupon_code !== undefined && String(coupon_code).trim()) {
+        const resolved = await couponForCode(coupon_code, tx);
+        if (resolved.error) throw new Error(resolved.error);
+        const discount = couponDiscount(resolved.coupon, subtotal);
+        if (discount.error) throw new Error(discount.error);
+        coupon = resolved.coupon;
+        discountAmount = discount.amount;
+        code = resolved.code;
+        const used = await tx.run(`UPDATE coupons SET usage_count = usage_count + 1, updated_at = ?
+          WHERE id = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+          db.utcNow(), coupon.id);
+        if (used.changes !== 1) throw new Error('This coupon has reached its usage limit.');
+      }
+      const total = subtotal - discountAmount + shippingFee;
+      const info = await tx.insert(`INSERT INTO orders
+        (user_id, guest_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, discount_amount, coupon_code, total)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        req.user ? req.user.id : null, req.user ? null : req.guestId,
+        String(full_name).trim(), String(email).trim().toLowerCase(), String(phone).trim(), String(address).trim(), shipping_method, payment_method,
+        subtotal, shippingFee, discountAmount, code, total);
+      const orderId = info.id;
+      await tx.run(`INSERT INTO payments (order_id, payment_method, payment_status, amount_paid)
+        VALUES (?, ?, 'pending', 0)`, orderId, payment_method);
+      for (const i of items) {
+        await tx.run('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)',
+          orderId, i.id, i.name, i.price, i.quantity);
+        // Atomic conditional decrement: the final correctness net — even if a
+        // row changed under us, stock can never go negative from checkout.
+        const decremented = await tx.run(
+          'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?', i.quantity, i.id, i.quantity);
+        if (decremented.changes !== 1) throw new Error(`Not enough stock for ${i.name}.`);
+      }
+      await tx.run(`DELETE FROM carts WHERE ${w.sql}`, w.param);
+      if (req.user) await notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${payment_method}.`, 'order', tx);
+      await createAdminNotification({ type: 'order', title: `New order #${orderId}`, body: 'A new order has been placed.', entityType: 'order', entityId: orderId }, tx);
+      return { orderId, total, discountAmount };
+    });
+
     // Hand the customer the invoice number and download link up front, so the
     // confirmation page can reference the exact document it auto-downloads.
-    const placed = db.prepare('SELECT created_at FROM orders WHERE id = ?').get(order.orderId);
+    const placed = await db.get('SELECT created_at FROM orders WHERE id = ?', order.orderId);
     const invoice = invoiceNumberFor(order.orderId, placed?.created_at);
     res.json({
       ok: true,
@@ -515,71 +532,74 @@ router.post('/orders', (req, res) => {
   }
 });
 
-router.get('/orders', requireAuth, (req, res) => {
-  const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC').all(req.user.id);
-  const itemStmt = db.prepare('SELECT * FROM order_items WHERE order_id = ?');
-  res.json({ orders: orders.map(o => ({ ...o, items: itemStmt.all(o.id) })) });
+router.get('/orders', requireAuth, async (req, res) => {
+  const orders = await db.all('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', req.user.id);
+  const withItems = [];
+  for (const o of orders) {
+    withItems.push({ ...o, items: await db.all('SELECT * FROM order_items WHERE order_id = ?', o.id) });
+  }
+  res.json({ orders: withItems });
 });
 
-router.get('/orders/:id', requireAuth, (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+router.get('/orders/:id', requireAuth, async (req, res) => {
+  const order = await db.get('SELECT * FROM orders WHERE id = ? AND user_id = ?', req.params.id, req.user.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+  const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', order.id);
   res.json({ order, items });
 });
 
-router.get('/orders/:id/invoice', (req, res) => {
+router.get('/orders/:id/invoice', async (req, res) => {
   const orderId = Number.parseInt(req.params.id, 10);
   if (!Number.isSafeInteger(orderId) || orderId < 1)
     return res.status(400).json({ error: 'Invalid order ID.' });
 
   const order = req.user
-    ? db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(orderId, req.user.id)
-    : db.prepare('SELECT * FROM orders WHERE id = ? AND guest_id = ?').get(orderId, req.guestId);
+    ? await db.get('SELECT * FROM orders WHERE id = ? AND user_id = ?', orderId, req.user.id)
+    : await db.get('SELECT * FROM orders WHERE id = ? AND guest_id = ?', orderId, req.guestId);
   if (!order) return res.status(404).json({ error: 'Invoice not found.' });
 
   // The product join only feeds the printed item code, so the invoice still works
   // for orders whose product has since been removed from the catalog.
-  const items = db.prepare(`SELECT oi.name, oi.price, oi.quantity, p.sku
+  const items = await db.all(`SELECT oi.name, oi.price, oi.quantity, p.sku
     FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
-    WHERE oi.order_id = ? ORDER BY oi.id`).all(order.id);
+    WHERE oi.order_id = ? ORDER BY oi.id`, order.id);
   sendInvoice(res, order, items);
 });
 
 /* ---------------- VENDOR / CONTACT / NOTIFICATIONS / REVIEWS ---------------- */
 
-router.post('/vendor/apply', requireAuth, (req, res) => {
+router.post('/vendor/apply', requireAuth, async (req, res) => {
   const { account_type, store_name, location, mobile } = req.body || {};
   if (!account_type || !store_name || !location || !mobile)
     return res.status(400).json({ error: 'Account type, store name, location and mobile are required.' });
-  const application = db.prepare('INSERT INTO vendor_applications (user_id, account_type, store_name, location, mobile) VALUES (?, ?, ?, ?, ?)')
-    .run(req.user.id, account_type, store_name, location, mobile);
-  notify(req.user.id, 'Vendor application received', `Your application for "${store_name}" is under review.`, 'vendor');
-  createAdminNotification({ type: 'vendor', title: 'New vendor application', body: 'A vendor application needs review.', entityType: 'vendor_application', entityId: application.lastInsertRowid });
+  const application = await db.insert('INSERT INTO vendor_applications (user_id, account_type, store_name, location, mobile) VALUES (?, ?, ?, ?, ?)',
+    req.user.id, account_type, store_name, location, mobile);
+  await notify(req.user.id, 'Vendor application received', `Your application for "${store_name}" is under review.`, 'vendor');
+  await createAdminNotification({ type: 'vendor', title: 'New vendor application', body: 'A vendor application needs review.', entityType: 'vendor_application', entityId: application.id });
   res.json({ ok: true });
 });
 
-router.post('/contact', (req, res) => {
+router.post('/contact', async (req, res) => {
   const { name, email, subject = '', message } = req.body || {};
   if (!name || !email || !message)
     return res.status(400).json({ error: 'Name, email and message are required.' });
-  const contact = db.prepare('INSERT INTO contact_messages (user_id, name, email, subject, message) VALUES (?, ?, ?, ?, ?)')
-    .run(req.user ? req.user.id : null, name, email, subject, message);
-  createAdminNotification({ type: 'contact', title: 'New contact message', body: 'A customer has sent a contact message.', entityType: 'contact_message', entityId: contact.lastInsertRowid });
+  const contact = await db.insert('INSERT INTO contact_messages (user_id, name, email, subject, message) VALUES (?, ?, ?, ?, ?)',
+    req.user ? req.user.id : null, name, email, subject, message);
+  await createAdminNotification({ type: 'contact', title: 'New contact message', body: 'A customer has sent a contact message.', entityType: 'contact_message', entityId: contact.id });
   res.json({ ok: true });
 });
 
-router.get('/notifications', requireAuth, (req, res) => {
-  const items = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 50').all(req.user.id);
+router.get('/notifications', requireAuth, async (req, res) => {
+  const items = await db.all('SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 50', req.user.id);
   res.json({ notifications: items });
 });
 
-router.post('/notifications/read', requireAuth, (req, res) => {
-  db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.user.id);
+router.post('/notifications/read', requireAuth, async (req, res) => {
+  await db.run('UPDATE notifications SET read = 1 WHERE user_id = ?', req.user.id);
   res.json({ ok: true });
 });
 
-router.post('/products/:slug/reviews', requireAuth, (req, res) => {
+router.post('/products/:slug/reviews', requireAuth, async (req, res) => {
   const { rating, comment = '' } = req.body || {};
   const ratingNum = Number(rating);
   const reviewComment = String(comment).trim();
@@ -587,14 +607,14 @@ router.post('/products/:slug/reviews', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
   if (reviewComment.length > 200)
     return res.status(400).json({ error: 'Reviews must be 200 characters or fewer.' });
-  const product = db.prepare('SELECT id FROM products WHERE slug = ?').get(req.params.slug);
+  const product = await db.get('SELECT id FROM products WHERE slug = ?', req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
-  const review = db.prepare('INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)')
-    .run(req.user.id, product.id, ratingNum, reviewComment);
-  const agg = db.prepare('SELECT AVG(rating) AS avg, COUNT(*) AS c FROM reviews WHERE product_id = ? AND is_visible = 1').get(product.id);
-  db.prepare('UPDATE products SET rating = ?, rating_count = ? WHERE id = ?')
-    .run(Math.round(agg.avg * 10) / 10, agg.c, product.id);
-  createAdminNotification({ type: 'review', title: 'New product review', body: 'A customer submitted a product review.', entityType: 'review', entityId: review.lastInsertRowid });
+  const review = await db.insert('INSERT INTO reviews (user_id, product_id, rating, comment) VALUES (?, ?, ?, ?)',
+    req.user.id, product.id, ratingNum, reviewComment);
+  const agg = await db.get('SELECT AVG(rating) AS avg, COUNT(*) AS c FROM reviews WHERE product_id = ? AND is_visible = 1', product.id);
+  await db.run('UPDATE products SET rating = ?, rating_count = ? WHERE id = ?',
+    Math.round(agg.avg * 10) / 10, agg.c, product.id);
+  await createAdminNotification({ type: 'review', title: 'New product review', body: 'A customer submitted a product review.', entityType: 'review', entityId: review.id });
   res.json({ ok: true });
 });
 

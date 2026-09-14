@@ -1,33 +1,39 @@
 // Session authentication helpers
 const crypto = require('crypto');
-const db = require('./db');
+const db = require('./database');
 
 const SESSION_DAYS = 30;
 
-function createSession(userId) {
+async function createSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare(`INSERT INTO sessions (token, user_id, expires_at)
-    VALUES (?, ?, datetime('now', '+${SESSION_DAYS} days'))`).run(token, userId);
+  await db.run(
+    'INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+    token, userId, db.utcNow(SESSION_DAYS * 24 * 3600 * 1000)
+  );
   return token;
 }
 
-function getUserByToken(token) {
+async function getUserByToken(token) {
   if (!token) return null;
-  const row = db.prepare(`
+  const row = await db.get(`
     SELECT u.id, u.username, u.email, u.full_name, u.phone, u.address, u.avatar, u.balance, u.role, u.is_active
     FROM sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token = ? AND u.is_active = 1 AND s.expires_at > datetime('now')`).get(token);
+    WHERE s.token = ? AND u.is_active = 1 AND s.expires_at > ?`, token, db.utcNow());
   return row || null;
 }
 
-function destroySession(token) {
-  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+async function destroySession(token) {
+  if (token) await db.run('DELETE FROM sessions WHERE token = ?', token);
 }
 
 // Express middleware: attaches req.user when a valid session cookie exists.
 // Also assigns a guest id cookie so visitors can shop WITHOUT an account.
-function attachUser(req, res, next) {
-  req.user = getUserByToken(req.cookies && req.cookies.pixels_session);
+async function attachUser(req, res, next) {
+  try {
+    req.user = await getUserByToken(req.cookies && req.cookies.pixels_session);
+  } catch (error) {
+    return next(error);
+  }
   let guestId = req.cookies && req.cookies.pixels_guest;
   if (!guestId || !/^[a-f0-9]{32}$/.test(guestId)) {
     guestId = crypto.randomBytes(16).toString('hex');

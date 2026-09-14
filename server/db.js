@@ -453,6 +453,13 @@ CREATE TABLE IF NOT EXISTS read_messages (
     insertImage.run(product.id, product.image, mimeType, path.basename(product.image));
   }
 
+  // Normalise legacy "empty string means unset" date sentinels to NULL so both
+  // engines share one query shape (expires_at/starts_at/ends_at IS NULL …).
+  // One-time, idempotent, and behaviour-preserving: '' always meant "no date".
+  for (const [table, column] of [['coupons', 'expires_at'], ['promotional_banners', 'starts_at'], ['promotional_banners', 'ends_at']]) {
+    try { db.prepare(`UPDATE ${table} SET ${column} = NULL WHERE ${column} = ''`).run(); } catch (_) { /* pre-table DBs */ }
+  }
+
   db.exec('PRAGMA legacy_alter_table = OFF');
   db.exec('PRAGMA foreign_keys = ON');
 })();

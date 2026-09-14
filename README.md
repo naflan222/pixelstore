@@ -137,6 +137,10 @@ BREVO_API_KEY = <your v3 API key>
 MAIL_FROM = support@lankalens.online # sender address, verified in Brevo
 MAIL_FROM_NAME = PixelHouse          # optional From display name
 MAIL_REPLY_TO = support@lankalens.online # optional; where customer replies land
+BREVO_PIXEL_TRACKING_CONSENT = off   # optional: ask Brevo not to track opens/clicks
+                                     # on transactional mail (HTTP API only, and the
+                                     # Brevo per-contact consent setting must be on
+                                     # first — see EMAIL-DELIVERABILITY.md §4)
 ```
 
 **Option B — Brevo SMTP** (used when no API key is set):
@@ -186,7 +190,8 @@ and a public endpoint (no secrets) shows the live state:
 ```
 GET https://<your-app>/api/email/status
 → {"email_enabled":true,"transport":"smtp","smtp_host":"smtp-relay.brevo.com",
-   "smtp_port":587,"smtp_user":"...","mail_from":"support@lankalens.online",...}
+   "smtp_port":587,"smtp_user":"...","mail_from":"support@lankalens.online",
+   "brevo_pixel_tracking_consent":"default",...}
 ```
 
 If `email_enabled` is `false` on Railway, the env vars did not arrive (check the
@@ -196,12 +201,19 @@ password, socket = connectivity — in which case use `BREVO_API_KEY` instead).
 
 ### Emails going to spam?
 
-See **[EMAIL-DELIVERABILITY.md](EMAIL-DELIVERABILITY.md)** for the full fix — the
-short version: authenticate your sender domain in Brevo (SPF/DKIM/DMARC records),
-keep `MAIL_FROM` the same address everywhere, and verify with a 10/10 score on
-[mail-tester.com](https://www.mail-tester.com). The code already sends
+See **[EMAIL-DELIVERABILITY.md](EMAIL-DELIVERABILITY.md)** for the full audit and
+fix — the short version: authenticate your sender domain in Brevo (SPF/DKIM/DMARC
+records), keep `MAIL_FROM` the same address everywhere, and verify with a 10/10
+score on [mail-tester.com](https://www.mail-tester.com). The code already sends
 well-formed mail (multipart text+HTML, branded From, Reply-To, calm subjects)
 and prints a console warning if the From address looks like spoofing.
+
+`List-Unsubscribe`, the open-tracking pixel and `Feedback-ID` are added by **Brevo**
+to every relayed message, transactional ones included — no code change can remove
+them. What the code *can* do is ask Brevo not to track opens/clicks per recipient
+(`BREVO_PIXEL_TRACKING_CONSENT=off`, HTTP API transport only) and tag the sends; see
+**[EMAIL-DELIVERABILITY.md](EMAIL-DELIVERABILITY.md) §3–§4** for the exact Brevo
+settings and the support ticket wording.
 
 ## Branded PDF Invoices
 

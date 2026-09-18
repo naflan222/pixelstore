@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+# Private, account, checkout, and API areas should not be crawled.
+Disallow: /admin/
+Disallow: /api/
+Disallow: /cart.html
+Disallow: /checkout
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /profile.html
+Disallow: /edit-profile.html
+Disallow: /my-order.html
+Disallow: /notifications.html
+Disallow: /notification-details.html
+Disallow: /message.html
+Disallow: /otp
+Disallow: /change-password.html
+Disallow: /forget-password
+Disallow: /payment-success.html
+
+Sitemap: https://pixelhouse.lk/sitemap.xml

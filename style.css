@@ -1131,6 +1131,16 @@ textarea:invalid {
   max-width: calc(100% - 3.125rem);
   width: calc(100% - 3.125rem);
 }
+/* When no alternative search-options button is present, let the search bar fill
+   the same container width as the rest of the mobile storefront. */
+.search-form > form:only-child {
+  -webkit-box-flex: 0;
+      -ms-flex: 0 0 100%;
+          flex: 0 0 100%;
+  max-width: 100%;
+  width: 100%;
+}
+
 .search-form form .form-control {
   width: 100%;
   background-color: #ffffff;

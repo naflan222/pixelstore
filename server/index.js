@@ -26,6 +26,7 @@ const { maintenanceMode } = require('./maintenance');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./database');
+const { createHtmlHandler, createSitemapHandler } = require('./seo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -142,11 +143,17 @@ app.use('/api', apiRoutes);
 // ---- Admin API ----
 app.use('/api/admin', adminRoutes);
 
-// The template showcase is not part of the public storefront.
-app.get('/', (req, res) => res.redirect('/home.html'));
+// ---- Search-friendly storefront pages ----
+// HTML is enriched at response time with metadata and structured data. The
+// source markup and CSS are left unchanged, so this cannot alter the design.
+const publicRoot = path.join(__dirname, '..');
+const seoHtmlHandler = createHtmlHandler({ rootDir: publicRoot });
+app.get('/', seoHtmlHandler);
+app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, seoHtmlHandler);
+app.get('/sitemap.xml', createSitemapHandler({ rootDir: publicRoot }));
 
 // ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(publicRoot));
 
 app.use((err, req, res, next) => {
   console.error(err);

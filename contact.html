@@ -78,7 +78,7 @@
     <div class="page-content-wrapper">
       <!-- Google Maps-->
       <div class="google-maps-wrap">
-        <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d37902.096510377676!2d101.6393079588335!3d3.103387873464772!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31cc49c701efeae7%3A0xf4d98e5b2f1c287d!2sKuala%20Lumpur%2C%20Federal%20Territory%20of%20Kuala%20Lumpur%2C%20Malaysia!5e0!3m2!1sen!2sbd!4v1591684973931!5m2!1sen!2sbd" allowfullscreen="" aria-hidden="false" tabindex="0"></iframe>
+        <iframe src="https://www.google.com/maps?q=Dikwella%2C%20Sri%20Lanka&amp;output=embed" title="Pixel House service area in Dikwella, Sri Lanka" loading="lazy" allowfullscreen="" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
       <div class="container">
         <div class="card">
@@ -89,18 +89,18 @@
             </div>
             <!-- Contact Form-->
             <div class="contact-form mt-3">
-              <form action="#" method="">
-                <input class="form-control border mb-3" id="username" type="text" placeholder="Your Name">
-                <input class="form-control border mb-3" id="email" type="email" placeholder="Enter email">
+              <form id="contactForm">
+                <input class="form-control border mb-3" id="contactName" type="text" placeholder="Your Name" required>
+                <input class="form-control border mb-3" id="contactEmail" type="email" placeholder="Enter email">
                 <select class="mb-3 w-100 border" id="topicSelect" name="topic">
-                  <option value="">Buying &amp; Support</option>
-                  <option value="">Authors Help</option>
-                  <option value="">Buyer Help</option>
-                  <option value="">License</option>
+                  <option value="Buying &amp; Support">Buying &amp; Support</option>
+                  <option value="Order Help">Order Help</option>
+                  <option value="Rental Help">Rental Help</option>
+                  <option value="Returns &amp; Warranty">Returns &amp; Warranty</option>
                 </select>
-                <input class="form-control border mb-3" id="username" type="text" placeholder="Include a relevant URL">
-                <textarea class="form-control border mb-3" id="message" name="" cols="30" rows="10" placeholder="Write something..."></textarea>
-                <button class="btn btn-primary btn-lg w-100">Send Now</button>
+                <input class="form-control border mb-3" id="relevantUrl" type="url" placeholder="Include a relevant URL (optional)">
+                <textarea class="form-control border mb-3" id="contactMessage" cols="30" rows="6" placeholder="Write something..." required></textarea>
+                <button class="btn btn-primary btn-lg w-100" type="submit"><i class="ti ti-brand-whatsapp me-1"></i>Send via WhatsApp</button>
               </form>
             </div>
           </div>
@@ -136,5 +136,26 @@
     <script src="js/active.js"></script>
     <script src="js/pwa.js"></script>
       <script src="js/api-client.js"></script>
+    <script>
+      document.getElementById('contactForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var name = document.getElementById('contactName').value.trim();
+        var email = document.getElementById('contactEmail').value.trim();
+        var topic = document.getElementById('topicSelect').value;
+        var relevantUrl = document.getElementById('relevantUrl').value.trim();
+        var message = document.getElementById('contactMessage').value.trim();
+        var lines = [
+          'Hello Pixel House,',
+          '',
+          'Name: ' + name,
+          'Topic: ' + topic,
+          email ? 'Email: ' + email : '',
+          relevantUrl ? 'Related link: ' + relevantUrl : '',
+          '',
+          message
+        ].filter(Boolean);
+        window.location.href = 'https://wa.me/94777466675?text=' + encodeURIComponent(lines.join('\n'));
+      });
+    </script>
   </body>
 </html>

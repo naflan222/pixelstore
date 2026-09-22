@@ -2387,6 +2387,52 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   background-size: cover;
   border-radius: 0.5rem;
 }
+.category-premium-banner {
+  position: relative;
+  overflow: hidden;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+.category-banner-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 52%;
+  padding: 1rem 1.25rem;
+  color: #ffffff;
+  text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
+}
+.category-banner-eyebrow,
+.category-banner-title {
+  display: block;
+}
+.category-banner-eyebrow {
+  margin-bottom: 0.25rem;
+  color: #aebdff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.category-banner-title {
+  color: #ffffff;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+@media only screen and (max-width:359px) {
+  .category-banner-copy {
+    max-width: 55%;
+    padding: 0.75rem 1rem;
+  }
+  .category-banner-title {
+    font-size: 1rem;
+  }
+}
 
 /* Flash Sale CSS */
 .flash-sale-card {

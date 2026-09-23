@@ -144,6 +144,19 @@ const IMAGE_ALT = {
   'img/product/21.png': 'Action-camera goggles with mount',
   'img/product/20.png': 'Telesin replacement battery for GoPro cameras',
   'img/product/19.png': 'Protective case for Insta360 X4',
+  'img/product/3mstick.png': 'Three metre carbon-fibre action-camera selfie stick',
+  'img/product/3slot.png': 'Three-slot GoPro battery charger',
+  'img/product/domeport.png': 'Dome port for action cameras',
+  'img/product/gptemp.png': 'GoPro tempered-glass protector kit',
+  'img/product/hero13.png': 'GoPro Hero 13 Black action camera',
+  'img/product/osmocap.png': 'DJI Osmo Action lens cover',
+  'img/product/osmobag.png': 'DJI Osmo Action storage bag',
+  'img/product/22.png': 'Battery charger for GoPro Hero 13',
+  'img/product/23.png': 'GoPro anti-fog inserts',
+  'img/product/rent-gopro9.webp': 'GoPro Hero 9 rental camera',
+  'img/product/rent-gopro10.webp': 'GoPro Hero 10 rental camera',
+  'img/product/rent-gopro11.webp': 'GoPro Hero 11 rental camera',
+  'img/product/rent-gopro12.webp': 'GoPro Hero 12 rental camera',
 };
 
 function escapeHtml(value) {
@@ -284,10 +297,13 @@ function improveImages(html) {
     }
 
     const isPriorityImage = seen <= 3 || (src && /logo-small|icon-\d+x\d+/.test(src));
+    if (isPriorityImage && !/\bloading=/i.test(updated)) {
+      updated = updated.replace(/>$/, ' loading="eager">');
+    }
     if (!isPriorityImage && !/\bloading=/i.test(updated)) {
       updated = updated.replace(/>$/, ' loading="lazy">');
     }
-    if (!isPriorityImage && !/\bdecoding=/i.test(updated)) {
+    if (!/\bdecoding=/i.test(updated)) {
       updated = updated.replace(/>$/, ' decoding="async">');
     }
     return updated;

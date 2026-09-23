@@ -156,6 +156,11 @@ async function defineSuite(t, ctx) {
     const response = await fetch(ctx.base + '/featured-products.html', { redirect: 'manual' });
     assert.equal(response.status, 301);
     assert.equal(response.headers.get('location'), '/products.html');
+    for (const paymentPage of ['checkout-credit-card.html', 'checkout-paypal.html']) {
+      const paymentResponse = await fetch(`${ctx.base}/${paymentPage}`, { redirect: 'manual' });
+      assert.equal(paymentResponse.status, 301);
+      assert.equal(paymentResponse.headers.get('location'), '/checkout-payment.html');
+    }
   });
 
   await t.test('change password', async () => {
@@ -469,6 +474,20 @@ async function defineSuite(t, ctx) {
       full_name: 'A', email: 'a@x.com', phone: '1', address: 'a', payment_method: 'gold',
     });
     assert.equal(r.status, 400);
+    r = await alice.post('/api/orders', {
+      full_name: 'A', email: 'a@x.com', phone: '1', address: 'a', payment_method: 'credit-card',
+    });
+    assert.equal(r.status, 400);
+    r = await alice.post('/api/orders', {
+      full_name: 'A', email: 'a@x.com', phone: '1', address: 'a', payment_method: 'paypal',
+    });
+    assert.equal(r.status, 400);
+    await ctx.db.run("UPDATE store_settings SET payment_methods = '[\"cash\"]' WHERE id = 1");
+    r = await alice.post('/api/orders', {
+      full_name: 'A', email: 'a@x.com', phone: '1', address: 'a', payment_method: 'bank',
+    });
+    assert.equal(r.status, 400);
+    await ctx.db.run("UPDATE store_settings SET payment_methods = '[\"cash\",\"bank\"]' WHERE id = 1");
     // Single-use coupon: bob consumes it, alice's checkout then fails cleanly.
     r = await owner.post('/api/admin/coupons', { code: 'ONCE1', discount_type: 'fixed', discount_value: 10, usage_limit: 1 });
     assert.equal(r.status, 201);
@@ -623,7 +642,7 @@ async function defineSuite(t, ctx) {
     const payload = {
       store_name: 'PixelHouse', currency: 'USD', store_email: 'shop@example.com',
       store_phone: '123', store_open: true, cash_enabled: true, bank_enabled: false,
-      paypal_enabled: true, shipping_fee: 300, standard_delivery_enabled: true,
+      shipping_fee: 300, standard_delivery_enabled: true,
       express_delivery_enabled: false, order_notifications: true,
       low_stock_notifications: false, vendor_notifications: true,
     };

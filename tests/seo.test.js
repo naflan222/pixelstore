@@ -31,6 +31,8 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
   assert.match(result, /href="style\.css"/);
+  assert.match(result, /loading="lazy"/);
+  assert.match(result, /decoding="async"/);
 });
 
 test('product page receives Product and Offer schema without fake ratings', () => {
@@ -48,8 +50,17 @@ test('product page receives Product and Offer schema without fake ratings', () =
   assert.match(result, /"priceCurrency":"LKR"/);
   assert.match(result, /"price":"4300"/);
   assert.doesNotMatch(result, /aggregateRating/);
+  assert.doesNotMatch(source, /Very good product\.|4 ratings|100% Good Reviews/);
   assert.doesNotMatch(result, /Very good product\.|4 ratings|Flash sale end in/);
   assert.match(result, /No verified reviews yet/);
+});
+
+test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
+  const source = read('service-worker.js');
+
+  assert.match(source, /pixelhouse-static-v2/);
+  assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
+  assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
 });
 
 test('private transactional pages are explicitly excluded from indexing', () => {

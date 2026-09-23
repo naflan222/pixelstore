@@ -460,7 +460,6 @@ tr:last-child td{border-bottom:none}
               <div class="form-grid">
                 <div class="form-group"><label class="form-switch" for="settingCashEnabled"><input id="settingCashEnabled" name="cash_enabled" type="checkbox"> Cash on delivery</label></div>
                 <div class="form-group"><label class="form-switch" for="settingBankEnabled"><input id="settingBankEnabled" name="bank_enabled" type="checkbox"> Bank transfer</label></div>
-                <div class="form-group"><label class="form-switch" for="settingPaypalEnabled"><input id="settingPaypalEnabled" name="paypal_enabled" type="checkbox"> PayPal</label></div>
               </div>
             </section>
 
@@ -1342,7 +1341,7 @@ async function deleteBanner(id) { if (!confirm('Delete this promotional banner?'
 /* ---------- SETTINGS ---------- */
 const settingsFields = {
   store_name: 'settingStoreName', currency: 'settingCurrency', store_email: 'settingStoreEmail', store_phone: 'settingStorePhone', store_open: 'settingStoreOpen',
-  cash_enabled: 'settingCashEnabled', bank_enabled: 'settingBankEnabled', paypal_enabled: 'settingPaypalEnabled', shipping_fee: 'settingShippingFee',
+  cash_enabled: 'settingCashEnabled', bank_enabled: 'settingBankEnabled', shipping_fee: 'settingShippingFee',
   standard_delivery_enabled: 'settingStandardDelivery', express_delivery_enabled: 'settingExpressDelivery', order_notifications: 'settingOrderNotifications',
   low_stock_notifications: 'settingLowStockNotifications', vendor_notifications: 'settingVendorNotifications'
 };

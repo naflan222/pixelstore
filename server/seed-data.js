@@ -47,7 +47,7 @@ const DEMO_USER = {
 
 const DEFAULT_STORE_SETTINGS = {
   contact: { email: '', phone: '', address: '' },
-  payment_methods: ['cash', 'credit-card', 'bank', 'paypal'],
+  payment_methods: ['cash', 'bank'],
   shipping_fee: 250,
   delivery_options: [
     { method: 'standard', label: 'Regular delivery', fee: 250, enabled: true },

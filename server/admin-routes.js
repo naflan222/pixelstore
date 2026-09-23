@@ -125,7 +125,7 @@ function parseSettingsJson(value, fallback) {
 
 function storeSettingsPayload(body) {
   const source = body || {};
-  const expectedFields = new Set(['store_name', 'currency', 'store_email', 'store_phone', 'store_open', 'cash_enabled', 'bank_enabled', 'paypal_enabled', 'shipping_fee', 'standard_delivery_enabled', 'express_delivery_enabled', 'order_notifications', 'low_stock_notifications', 'vendor_notifications']);
+  const expectedFields = new Set(['store_name', 'currency', 'store_email', 'store_phone', 'store_open', 'cash_enabled', 'bank_enabled', 'shipping_fee', 'standard_delivery_enabled', 'express_delivery_enabled', 'order_notifications', 'low_stock_notifications', 'vendor_notifications']);
   if (!source || typeof source !== 'object' || Array.isArray(source) || Object.keys(source).some(key => !expectedFields.has(key)))
     return { error: 'Provide only recognized store settings.' };
   if ([...expectedFields].some(key => !Object.prototype.hasOwnProperty.call(source, key)))
@@ -140,7 +140,7 @@ function storeSettingsPayload(body) {
   const currency = String(source.currency || '').trim().toUpperCase();
   const storeOpen = source.store_open;
   const shippingFee = finiteMoney(source.shipping_fee, { min: 0, required: true });
-  const booleans = ['store_open', 'cash_enabled', 'bank_enabled', 'paypal_enabled', 'standard_delivery_enabled', 'express_delivery_enabled', 'order_notifications', 'low_stock_notifications', 'vendor_notifications'];
+  const booleans = ['store_open', 'cash_enabled', 'bank_enabled', 'standard_delivery_enabled', 'express_delivery_enabled', 'order_notifications', 'low_stock_notifications', 'vendor_notifications'];
 
   if (!storeName || storeName.length > 160 || (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)) ||
       phone.length > 50 || !/^[A-Z]{3}$/.test(currency) || shippingFee === null || shippingFee > 1000000 ||
@@ -152,7 +152,7 @@ function storeSettingsPayload(body) {
     contact: { email, phone, address: '' },
     currency,
     storeStatus: storeOpen ? 'open' : 'closed',
-    paymentMethods: ['cash', 'bank', 'paypal'].filter(method => source[`${method === 'cash' ? 'cash' : method}_enabled`]),
+    paymentMethods: ['cash', 'bank'].filter(method => source[`${method}_enabled`]),
     shippingFee,
     deliveryOptions: [
       { method: 'standard', label: 'Standard delivery', fee: shippingFee, enabled: source.standard_delivery_enabled },
@@ -176,7 +176,6 @@ function storeSettingsResponse(row) {
     currency: row.currency,
     cash_enabled: paymentMethods.includes('cash'),
     bank_enabled: paymentMethods.includes('bank'),
-    paypal_enabled: paymentMethods.includes('paypal'),
     shipping_fee: row.shipping_fee,
     standard_delivery_enabled: enabledDelivery('standard'),
     express_delivery_enabled: enabledDelivery('express'),

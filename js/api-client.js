@@ -89,7 +89,7 @@
         '<div class="card product-card" style="position:relative">' +
           '<div class="card-body">' +
             badge + stockBadge +
-            '<a class="product-thumbnail d-block" href="' + slug + '.html"><img class="mb-2" src="' + image + '" alt="' + name + '"></a>' +
+            '<a class="product-thumbnail d-block" href="' + slug + '.html"><img class="mb-2" src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
             '<a class="product-title" href="' + slug + '.html">' + name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
             rating +
@@ -623,9 +623,7 @@
 
     // --- Final payment pages: place the real order on button click ---
     'checkout-cash.html': placeOrderPage('cash'),
-    'checkout-credit-card.html': placeOrderPage('credit-card'),
     'checkout-bank.html': placeOrderPage('bank'),
-    'checkout-paypal.html': placeOrderPage('paypal'),
 
     // --- Success page: the order's branded PDF invoice downloads itself ---
     'payment-success.html': function () {
@@ -971,7 +969,7 @@
     const renderReviews = async () => {
       const { product, reviews } = await get('/products/' + slug);
       list.innerHTML = reviews.map((review) => (
-        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt="Customer reviewer"></div>' +
+        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt="Customer reviewer" loading="lazy" decoding="async"></div>' +
         '<div class="rating-comment"><div class="rating">' + '<i class="ti ti-star-filled"></i>'.repeat(review.rating) +
         '</div><p class="comment mb-0">' + escapeHtml(review.comment) + '</p><span class="name-date">' +
         escapeHtml(review.username) + ' · ' + escapeHtml(review.created_at) + '</span></div></li>'

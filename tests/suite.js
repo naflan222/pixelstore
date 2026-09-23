@@ -17,7 +17,7 @@ async function defineSuite(t, ctx) {
   const guest = ctx.makeSession();
 
   await t.test('health reports engine without secrets', async () => {
-    const { status, data } = await guest.get('/api/health');
+    const { status, data, headers } = await guest.get('/api/health');
     assert.equal(status, 200);
     assert.equal(data.ok, true);
     assert.equal(data.engine, ctx.engine);
@@ -25,6 +25,9 @@ async function defineSuite(t, ctx) {
     assert.equal(data.maintenance, false);
     assert.ok(!JSON.stringify(data).includes('postgres://'));
     assert.ok(!JSON.stringify(data).includes('DATABASE_URL'));
+    assert.equal(headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.equal(headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
   });
 
   await t.test('seeded catalog present', async () => {
@@ -135,6 +138,24 @@ async function defineSuite(t, ctx) {
     await guest.post('/api/auth/forgot-password', { email: 'bob@example.com' });
     r = await guest.post('/api/auth/forgot-password', { email: 'bob@example.com' });
     assert.equal(r.status, 429);
+  });
+
+  await t.test('password reset locks after repeated incorrect codes', async () => {
+    let r = await guest.post('/api/auth/forgot-password', { email: 'alice2@example.com' });
+    assert.equal(r.status, 200);
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      r = await guest.post('/api/auth/verify-code', { email: 'alice2@example.com', code: '000000' });
+    }
+    assert.equal(r.status, 429);
+    const reset = await ctx.db.get('SELECT attempts, used FROM password_resets WHERE email = ? ORDER BY id DESC LIMIT 1', 'alice2@example.com');
+    assert.equal(Number(reset.attempts), 5);
+    assert.equal(Number(reset.used), 1);
+  });
+
+  await t.test('legacy demo storefront pages redirect to real products', async () => {
+    const response = await fetch(ctx.base + '/featured-products.html', { redirect: 'manual' });
+    assert.equal(response.status, 301);
+    assert.equal(response.headers.get('location'), '/products.html');
   });
 
   await t.test('change password', async () => {

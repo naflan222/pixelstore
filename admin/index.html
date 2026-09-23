@@ -1212,7 +1212,7 @@ async function loadVendors() {
         <td>${esc(v.account_type)}</td>
         <td style="font-size:12px">${esc(v.location)}</td>
         <td style="font-size:12px">${esc(v.mobile)}</td>
-        <td style="font-size:12px">${esc(v.username || 'N/A')} ${v.email ? '(' + v.email + ')' : ''}</td>
+        <td style="font-size:12px">${esc(v.username || 'N/A')} ${v.email ? '(' + esc(v.email) + ')' : ''}</td>
         <td><span class="badge badge-${v.status}">${v.status}</span></td>
         <td style="white-space:nowrap">
           <button class="btn btn-green btn-sm" onclick="updateVendorStatus(${v.id},'approved')"><i class="ti ti-check"></i></button>

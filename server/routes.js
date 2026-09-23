@@ -7,10 +7,23 @@ const { createSession, destroySession, requireAuth } = require('./auth');
 const { emailEnabled, describeConfig, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
 const { sendInvoice, invoiceNumberFor, buildInvoiceModel, renderPdf } = require('./invoice');
+const { rateLimit } = require('./security');
 
 const router = express.Router();
 
-const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 };
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 30 * 24 * 3600 * 1000,
+  };
+}
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
+const resetLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15 });
+const contactLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10 });
 
 // Merge a guest's cart/wishlist into their account when they register or log in
 async function mergeGuestData(req, userId) {
@@ -99,17 +112,18 @@ function couponDiscount(coupon, subtotal) {
 // Public, secret-free mail config summary — lets you verify on the deployed
 // service that the SMTP/API env vars arrived: GET /api/email/status
 router.get('/email/status', (req, res) => {
-  res.json({ ok: true, ...describeConfig() });
+  const config = describeConfig();
+  res.json({ ok: true, email_enabled: config.email_enabled, transport: config.transport });
 });
 
 /* ---------------- AUTH ---------------- */
 
-router.post('/auth/register', async (req, res) => {
+router.post('/auth/register', authLimiter, async (req, res) => {
   const { username, email, password } = req.body || {};
   if (!username || !email || !password)
     return res.status(400).json({ error: 'Username, email and password are required.' });
-  if (String(password).length < 6)
-    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (String(password).length < 8)
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
   const exists = await db.get('SELECT id FROM users WHERE username = ? OR email = ?',
     username, email.toLowerCase());
@@ -126,7 +140,7 @@ router.post('/auth/register', async (req, res) => {
   res.json({ ok: true, redirect: 'login.html' });
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password)
     return res.status(400).json({ error: 'Username and password are required.' });
@@ -139,13 +153,18 @@ router.post('/auth/login', async (req, res) => {
 
   await mergeGuestData(req, user.id);
   const token = await createSession(user.id);
-  res.cookie('pixels_session', token, COOKIE_OPTS);
+  res.cookie('pixels_session', token, sessionCookieOptions());
   res.json({ ok: true, redirect: 'home.html' });
 });
 
 router.post('/auth/logout', async (req, res) => {
   await destroySession(req.cookies && req.cookies.pixels_session);
-  res.clearCookie('pixels_session');
+  res.clearCookie('pixels_session', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  });
   res.json({ ok: true, redirect: 'home.html' });
 });
 
@@ -166,7 +185,7 @@ const RESET_MAX_ATTEMPTS = 5;
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_DAY_MS = 24 * 3600 * 1000;
 
-router.post('/auth/forgot-password', async (req, res) => {
+router.post('/auth/forgot-password', resetLimiter, async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ error: 'Please enter a valid email address.' });
@@ -202,35 +221,54 @@ router.post('/auth/forgot-password', async (req, res) => {
   res.json({ ok: true, message: 'If that email exists, a reset code has been sent.' });
 });
 
+async function latestActiveReset(email) {
+  return db.get(`SELECT id, code, attempts FROM password_resets
+    WHERE email = ? AND used = 0 AND expires_at > ?
+    ORDER BY id DESC LIMIT 1`, email, db.utcNow());
+}
+
+function resetCodeMatches(expected, supplied) {
+  const expectedBuffer = Buffer.from(String(expected || ''));
+  const suppliedBuffer = Buffer.from(String(supplied || ''));
+  return expectedBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
+}
+
+async function rejectBadResetCode(row, res, message) {
+  if (!row) return res.status(400).json({ error: message });
+  const attempts = Number(row.attempts || 0) + 1;
+  await db.run('UPDATE password_resets SET attempts = ?, used = ? WHERE id = ?',
+    attempts, attempts >= RESET_MAX_ATTEMPTS ? 1 : 0, row.id);
+  if (attempts >= RESET_MAX_ATTEMPTS)
+    return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
+  return res.status(400).json({ error: message });
+}
+
 // Verify a reset code WITHOUT consuming it — lets the OTP page give
 // instant feedback before the user types a new password.
-router.post('/auth/verify-code', async (req, res) => {
+router.post('/auth/verify-code', resetLimiter, async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const code = String((req.body || {}).code || '').trim();
   if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
-  const row = await db.get(`SELECT id, attempts FROM password_resets
-    WHERE email = ? AND code = ? AND used = 0 AND expires_at > ?
-    ORDER BY id DESC LIMIT 1`, email, code, db.utcNow());
-  if (!row) return res.status(400).json({ error: 'Invalid or expired reset code. Please check the code in your email.' });
+  const row = await latestActiveReset(email);
+  if (!row || !resetCodeMatches(row.code, code))
+    return rejectBadResetCode(row, res, 'Invalid or expired reset code. Please check the code in your email.');
   if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
     return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
-  await db.run('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?', row.id);
   res.json({ ok: true });
 });
 
-router.post('/auth/reset-password', async (req, res) => {
+router.post('/auth/reset-password', resetLimiter, async (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const code = String((req.body || {}).code || '').trim();
   const password = String((req.body || {}).password || '');
   if (!email || !code || !password)
     return res.status(400).json({ error: 'Email, code and new password are required.' });
-  if (password.length < 6)
-    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  if (password.length < 8)
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
 
-  const row = await db.get(`SELECT id, attempts FROM password_resets
-    WHERE email = ? AND code = ? AND used = 0 AND expires_at > ?
-    ORDER BY id DESC LIMIT 1`, email, code, db.utcNow());
-  if (!row) return res.status(400).json({ error: 'Invalid or expired reset code.' });
+  const row = await latestActiveReset(email);
+  if (!row || !resetCodeMatches(row.code, code))
+    return rejectBadResetCode(row, res, 'Invalid or expired reset code.');
   if (Number(row.attempts || 0) >= RESET_MAX_ATTEMPTS)
     return res.status(429).json({ error: 'Too many attempts with this code. Please request a new one.' });
 
@@ -250,6 +288,8 @@ router.post('/auth/change-password', requireAuth, async (req, res) => {
   const { current_password, new_password } = req.body || {};
   if (!current_password || !new_password)
     return res.status(400).json({ error: 'Current and new password are required.' });
+  if (String(new_password).length < 8)
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
   const user = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
   if (!bcrypt.compareSync(current_password, user.password_hash))
     return res.status(401).json({ error: 'Current password is incorrect.' });
@@ -579,10 +619,14 @@ router.post('/vendor/apply', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/contact', async (req, res) => {
+router.post('/contact', contactLimiter, async (req, res) => {
   const { name, email, subject = '', message } = req.body || {};
   if (!name || !email || !message)
     return res.status(400).json({ error: 'Name, email and message are required.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim()))
+    return res.status(400).json({ error: 'Enter a valid email address.' });
+  if (String(name).length > 100 || String(email).length > 254 || String(subject).length > 160 || String(message).length > 2000)
+    return res.status(400).json({ error: 'Contact message is too long.' });
   const contact = await db.insert('INSERT INTO contact_messages (user_id, name, email, subject, message) VALUES (?, ?, ?, ?, ?)',
     req.user ? req.user.id : null, name, email, subject, message);
   await createAdminNotification({ type: 'contact', title: 'New contact message', body: 'A customer has sent a contact message.', entityType: 'contact_message', entityId: contact.id });

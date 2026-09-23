@@ -70,10 +70,17 @@
   }
 
   function productCardHTML(p) {
-    const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + p.badge + '</span>' : '';
+    const name = escapeHtml(p.name);
+    const slug = escapeHtml(p.slug);
+    const image = escapeHtml(p.image);
+    const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + escapeHtml(p.badge) + '</span>' : '';
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
     const outOfStock = p.stock != null && p.stock <= 0;
     const stockBadge = outOfStock ? '<span class="badge rounded-pill badge-danger" style="position:absolute;top:8px;left:8px;">Out of Stock</span>' : '';
+    const rating = Number(p.rating_count) > 0
+      ? '<div class="product-rating"><i class="ti ti-star-filled"></i>' + Number(p.rating).toFixed(1) +
+        ' <span class="ms-1">(' + Number(p.rating_count) + ')</span></div>'
+      : '<div class="product-rating text-muted">No reviews yet</div>';
     const addBtn = outOfStock
       ? '<a class="btn btn-secondary btn-sm disabled" href="#" style="opacity:.5;pointer-events:none;cursor:not-allowed"><i class="ti ti-x"></i></a>'
       : '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>';
@@ -82,10 +89,10 @@
         '<div class="card product-card" style="position:relative">' +
           '<div class="card-body">' +
             badge + stockBadge +
-            '<a class="product-thumbnail d-block" href="' + p.slug + '.html"><img class="mb-2" src="' + p.image + '" alt=""></a>' +
-            '<a class="product-title" href="' + p.slug + '.html">' + p.name + '</a>' +
+            '<a class="product-thumbnail d-block" href="' + slug + '.html"><img class="mb-2" src="' + image + '" alt="' + name + '"></a>' +
+            '<a class="product-title" href="' + slug + '.html">' + name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
-            '<div class="product-rating"><i class="ti ti-star-filled"></i>' + p.rating + '</div>' +
+            rating +
             addBtn +
           '</div>' +
         '</div>' +
@@ -412,7 +419,7 @@
         if (isReset) {
           const newPwd = fields[1].value;
           const confirmPwd = fields[2] ? fields[2].value : newPwd;
-          if (newPwd.length < 6) { alertBox(form, 'New password must be at least 6 characters.'); return; }
+          if (newPwd.length < 8) { alertBox(form, 'New password must be at least 8 characters.'); return; }
           if (newPwd !== confirmPwd) { alertBox(form, 'New passwords do not match.'); return; }
           try {
             const r = await post('/auth/reset-password', { email, code, password: newPwd });
@@ -431,6 +438,7 @@
           const current = fields[0].value;
           const newPwd = fields[1] ? fields[1].value : current;
           const confirmPwd = fields[2] ? fields[2].value : newPwd;
+          if (newPwd.length < 8) { alertBox(form, 'New password must be at least 8 characters.'); return; }
           if (newPwd !== confirmPwd) { alertBox(form, 'New passwords do not match.'); return; }
           try {
             await post('/auth/change-password', {
@@ -492,8 +500,8 @@
           tbody.innerHTML = items.map((i) => (
             '<tr>' +
               '<th scope="row"><a class="remove-product" href="#" data-remove="' + i.cart_id + '"><i class="ti ti-x"></i></a></th>' +
-              '<td><img class="rounded" src="' + i.image + '" alt=""></td>' +
-              '<td><a class="product-title" href="' + i.slug + '.html">' + i.name +
+              '<td><img class="rounded" src="' + escapeHtml(i.image) + '" alt="' + escapeHtml(i.name) + '"></td>' +
+              '<td><a class="product-title" href="' + escapeHtml(i.slug) + '.html">' + escapeHtml(i.name) +
                 '<span class="mt-1">' + money(i.price) + ' × ' + i.quantity + '</span></a></td>' +
               '<td><div class="quantity"><input class="qty-text" type="number" min="1" max="99" value="' + i.quantity +
                 '" data-qty="' + i.cart_id + '"></div></td>' +
@@ -543,13 +551,13 @@
       if (billingCard) {
         billingCard.innerHTML =
           '<div class="mb-3"><div class="title mb-2"><i class="ti ti-user"></i><span>Full Name</span></div>' +
-            '<input class="form-control" id="billName" type="text" placeholder="Your full name" value="' + billing.name + '"></div>' +
+            '<input class="form-control" id="billName" type="text" placeholder="Your full name" value="' + escapeHtml(billing.name) + '"></div>' +
           '<div class="mb-3"><div class="title mb-2"><i class="ti ti-mail"></i><span>Email Address</span></div>' +
-            '<input class="form-control" id="billEmail" type="email" placeholder="you@example.com" value="' + billing.email + '"></div>' +
+            '<input class="form-control" id="billEmail" type="email" placeholder="you@example.com" value="' + escapeHtml(billing.email) + '"></div>' +
           '<div class="mb-3"><div class="title mb-2"><i class="ti ti-phone"></i><span>Phone Number</span></div>' +
-            '<input class="form-control" id="billPhone" type="text" placeholder="07X XXX XXXX" value="' + billing.phone + '"></div>' +
+            '<input class="form-control" id="billPhone" type="text" placeholder="07X XXX XXXX" value="' + escapeHtml(billing.phone) + '"></div>' +
           '<div class="mb-3"><div class="title mb-2"><i class="ti ti-location"></i><span>Shipping Address</span></div>' +
-            '<input class="form-control" id="billAddress" type="text" placeholder="Street, City" value="' + billing.address + '"></div>' +
+            '<input class="form-control" id="billAddress" type="text" placeholder="Street, City" value="' + escapeHtml(billing.address) + '"></div>' +
           '<div class="api-alert alert alert-danger py-2 px-3 mb-2" id="billError" style="display:none;font-size:13px"></div>';
       }
 
@@ -668,9 +676,9 @@
         wrap.innerHTML = orders.map((o) => (
           '<div class="card mb-3"><div class="card-body">' +
             '<div class="d-flex justify-content-between"><h6>Order #' + o.id + '</h6>' +
-            '<span class="badge badge-' + (o.status === 'pending' ? 'warning' : 'success') + '">' + o.status + '</span></div>' +
-            '<p class="mb-1 text-muted" style="font-size:12px">' + o.created_at + ' · ' + o.payment_method + '</p>' +
-            o.items.map((i) => '<div class="d-flex justify-content-between" style="font-size:13px"><span>' + i.name + ' × ' + i.quantity + '</span><span>' + money(i.price * i.quantity) + '</span></div>').join('') +
+            '<span class="badge badge-' + (o.status === 'pending' ? 'warning' : 'success') + '">' + escapeHtml(o.status) + '</span></div>' +
+            '<p class="mb-1 text-muted" style="font-size:12px">' + escapeHtml(o.created_at) + ' · ' + escapeHtml(o.payment_method) + '</p>' +
+            o.items.map((i) => '<div class="d-flex justify-content-between" style="font-size:13px"><span>' + escapeHtml(i.name) + ' × ' + Number(i.quantity) + '</span><span>' + money(i.price * i.quantity) + '</span></div>').join('') +
             '<hr><div class="d-flex justify-content-between"><strong>Total</strong><strong>' + money(o.total) + '</strong></div>' +
             '<div class="text-right mt-2"><a class="btn btn-sm btn-outline-primary" href="/api/orders/' + o.id + '/invoice" download title="Download the PDF invoice for order #' + o.id + '"><i class="ti ti-file-download"></i> Invoice (PDF)</a></div>' +
           '</div></div>'
@@ -686,9 +694,9 @@
         if (!notifications.length) return;
         wrap.innerHTML = notifications.map((n) => (
           '<div class="card mb-2"><div class="card-body py-2">' +
-            '<h6 class="mb-1">' + n.title + '</h6>' +
-            '<p class="mb-1" style="font-size:13px">' + n.body + '</p>' +
-            '<small class="text-muted">' + n.created_at + '</small>' +
+            '<h6 class="mb-1">' + escapeHtml(n.title) + '</h6>' +
+            '<p class="mb-1" style="font-size:13px">' + escapeHtml(n.body) + '</p>' +
+            '<small class="text-muted">' + escapeHtml(n.created_at) + '</small>' +
           '</div></div>'
         )).join('');
         await post('/notifications/read');
@@ -825,7 +833,7 @@
       const categories = [...new Set(products.map((product) => product.category).filter(Boolean))].sort();
       categoryWrap.innerHTML = [
         '<button class="btn btn-sm ' + (!category ? 'btn-primary' : 'btn-outline-primary') + '" type="button" data-category="">All</button>',
-        ...categories.map((name) => '<button class="btn btn-sm ' + (category === name ? 'btn-primary' : 'btn-outline-primary') + '" type="button" data-category="' + name + '">' + name + '</button>'),
+        ...categories.map((name) => '<button class="btn btn-sm ' + (category === name ? 'btn-primary' : 'btn-outline-primary') + '" type="button" data-category="' + escapeHtml(name) + '">' + escapeHtml(name) + '</button>'),
       ].join('');
     }
 
@@ -908,6 +916,11 @@
           stockInfo.style.cssText = 'color:#ef4444;font-size:13px;font-weight:600;margin-bottom:8px';
           stockInfo.innerHTML = '<i class="ti ti-alert-circle"></i> Out of Stock — Available soon';
           cartForm.querySelector('.order-plus-minus').insertAdjacentElement('afterend', stockInfo);
+          const whatsApp = $('.btn-whatsapp');
+          if (whatsApp) {
+            whatsApp.innerHTML = '<i class="ti ti-brand-whatsapp"></i> Ask when back in stock';
+            whatsApp.setAttribute('aria-label', 'Ask PixelHouse when this product is back in stock');
+          }
         } else if (prod.stock != null && prod.stock < 10) {
           const stockInfo = document.createElement('p');
           stockInfo.style.cssText = 'color:#f59e0b;font-size:12px;font-weight:600;margin-bottom:8px';
@@ -956,13 +969,29 @@
     if (!slug || !form || !list) return;
 
     const renderReviews = async () => {
-      const { reviews } = await get('/products/' + slug);
+      const { product, reviews } = await get('/products/' + slug);
       list.innerHTML = reviews.map((review) => (
-        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt=""></div>' +
+        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt="Customer reviewer"></div>' +
         '<div class="rating-comment"><div class="rating">' + '<i class="ti ti-star-filled"></i>'.repeat(review.rating) +
         '</div><p class="comment mb-0">' + escapeHtml(review.comment) + '</p><span class="name-date">' +
         escapeHtml(review.username) + ' · ' + escapeHtml(review.created_at) + '</span></div></li>'
-      )).join('') || '<li class="single-user-review">No reviews yet.</li>';
+      )).join('') || '<li class="single-user-review">No verified reviews yet.</li>';
+
+      const summary = $('#productRatingSummary') || $('.product-ratings');
+      if (summary) {
+        const count = reviews.length;
+        if (count) {
+          const average = Number(product.rating || (reviews.reduce((sum, review) => sum + Number(review.rating), 0) / count));
+          summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
+            '<div class="ratings">' + '<i class="ti ti-star-filled"></i>'.repeat(Math.round(average)) +
+            '<span class="ps-1">' + count + ' verified review' + (count === 1 ? '' : 's') + '</span></div>' +
+            '<div class="total-result-of-ratings"><span>' + average.toFixed(1) + '</span><span>Verified</span></div></div>';
+        } else {
+          summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
+            '<div class="ratings"><span>No verified reviews yet</span></div>' +
+            '<div class="total-result-of-ratings"><span>New</span></div></div>';
+        }
+      }
     };
 
     try { await renderReviews(); } catch (_) {}
@@ -1043,9 +1072,9 @@
           box.innerHTML = '<div class="ss-empty">No products found. Try "stick", "case", "kit"...</div>';
         } else {
           box.innerHTML = matches.map((p) =>
-            `<a href="${p.slug}.html" data-slug="${p.slug}">` +
-              `<img src="${p.image}" alt="">` +
-              `<span class="ss-name">${p.name}</span>` +
+            `<a href="${escapeHtml(p.slug)}.html" data-slug="${escapeHtml(p.slug)}">` +
+              `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">` +
+              `<span class="ss-name">${escapeHtml(p.name)}</span>` +
               `<span class="ss-price">${money(p.price)}</span>` +
             '</a>'
           ).join('');

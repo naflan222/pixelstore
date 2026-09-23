@@ -27,9 +27,14 @@ const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./database');
 const { createHtmlHandler, createSitemapHandler } = require('./seo');
+const { rateLimit, securityHeaders } = require('./security');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(securityHeaders);
 
 app.use(express.json({ limit: '7mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -94,9 +99,9 @@ async function shopAssistant(message) {
   if (/buy|order|how can i get|purchase/.test(msg))
     return 'Ordering is easy — no account needed! Just tap a product, hit the "+" button to add it to your cart, then open the Cart tab and tap "Checkout Now". Fill in your name, phone and address, choose delivery and payment — done! 🛒';
   if (/shipping|deliver|courier|dispatch/.test(msg))
-    return 'We offer three delivery options at checkout: Fast Shipping (1 day, Rs. 500), Regular (3–7 days, Rs. 250), and Courier (5–8 days, free). You can pick your preferred one on the checkout page.';
+    return 'At checkout you can choose standard delivery (Rs. 500) or free pickup from PixelHouse. Contact us before ordering if you need a special delivery arrangement.';
   if (/payment|pay|card|paypal|cash/.test(msg))
-    return 'We accept Cash on Delivery, Credit/Debit Card, Bank Transfer and PayPal. You can choose your payment method at checkout.';
+    return 'We currently accept Cash on Delivery and Bank Transfer. Card and PayPal options are not available yet.';
   if (/order|track|status|purchase/.test(msg))
     return 'You can see all your orders on the "My Orders" page (my-order.html) after logging in. Each order shows its items, total and status.';
   if (/return|refund|exchange|warranty/.test(msg))
@@ -109,10 +114,11 @@ async function shopAssistant(message) {
   return 'I can help with product prices, availability, current deals, shipping options and payment methods. Try asking "price of dome port" or "any deals?" 😊';
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', rateLimit({ windowMs: 60 * 1000, max: 20 }), async (req, res) => {
   try {
     const { message } = req.body || {};
     if (!message) return res.status(400).json({ error: 'Message is required.' });
+    if (String(message).length > 500) return res.status(400).json({ error: 'Message must be 500 characters or fewer.' });
 
     // Mode 2: Gemini when an API key is configured
     if (process.env.GEMINI_API_KEY) {
@@ -133,7 +139,8 @@ app.post('/api/chat', async (req, res) => {
     // Mode 1: built-in assistant (always works)
     res.json({ reply: await shopAssistant(message) });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[CHAT ERROR]', error.message);
+    res.status(500).json({ error: 'Chat is temporarily unavailable. Please try again.' });
   }
 });
 
@@ -148,6 +155,18 @@ app.use('/api/admin', adminRoutes);
 // source markup and CSS are left unchanged, so this cannot alter the design.
 const publicRoot = path.join(__dirname, '..');
 const seoHtmlHandler = createHtmlHandler({ rootDir: publicRoot });
+const legacyStorefrontRedirects = new Map([
+  ['/featured-products.html', '/products.html'],
+  ['/flash-sale.html', '/products.html'],
+  ['/shop-grid.html', '/products.html'],
+  ['/shop-list.html', '/products.html'],
+  ['/blog-grid.html', '/'],
+  ['/blog-details.html', '/'],
+  ['/vendor-shop.html', '/products.html'],
+]);
+app.get([...legacyStorefrontRedirects.keys()], (req, res) => {
+  res.redirect(301, legacyStorefrontRedirects.get(req.path));
+});
 app.get('/', seoHtmlHandler);
 app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, seoHtmlHandler);
 app.get('/sitemap.xml', createSitemapHandler({ rootDir: publicRoot }));

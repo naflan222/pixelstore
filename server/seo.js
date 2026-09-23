@@ -17,16 +17,6 @@ const PAGE_META = {
     description: 'Browse action cameras, mounts, batteries, protective cases, selfie sticks and camera accessories available from Pixel House Sri Lanka.',
     heading: 'All Camera and Action Camera Products',
   },
-  'featured-products.html': {
-    title: 'Featured Camera Accessories | Pixel House Sri Lanka',
-    description: 'Explore featured GoPro, DJI Osmo and Insta360 cameras and accessories selected by Pixel House Sri Lanka.',
-    heading: 'Featured Camera Accessories',
-  },
-  'flash-sale.html': {
-    title: 'Popular Camera Accessories | Pixel House Sri Lanka',
-    description: 'Browse popular action-camera accessories and current product prices at Pixel House Sri Lanka.',
-    heading: 'Popular Camera Accessories',
-  },
   'catagory.html': {
     title: 'GoPro Accessories in Sri Lanka | Pixel House',
     description: 'Shop GoPro mounts, cases, batteries, chargers, selfie sticks and underwater accessories from Pixel House Sri Lanka.',
@@ -113,7 +103,7 @@ const PRODUCT_PAGES = [
 ];
 
 const INDEXABLE_PAGES = [
-  'home.html', 'products.html', 'featured-products.html', 'flash-sale.html',
+  'home.html', 'products.html',
   'catagory.html', 'gpproducts2.html', 'actioncamera.html', 'insta360-camera.html',
   'dji-osmo-camera.html', '360accesories.html', 'osmocat.html',
   'rental-services.html', 'camera-trade.html', 'about-us.html', 'contact.html',
@@ -125,8 +115,14 @@ const INDEXABLE_SET = new Set(INDEXABLE_PAGES);
 
 const IMAGE_ALT = {
   'img/core-img/logo-small.png': 'Pixel House',
-  'img/core-img/camera-trade.png': 'Camera gear and accessories',
-  'img/core-img/rental-services.png': 'GoPro camera rental services',
+  'img/core-img/camera-trade.webp': 'Camera gear and accessories',
+  'img/core-img/rental-services.webp': 'GoPro camera rental services',
+  'img/core-img/woman-clothes.png': 'Action cameras',
+  'img/core-img/grocery.png': 'Insta360 cameras',
+  'img/core-img/shampoo.png': 'DJI Osmo cameras',
+  'img/core-img/rowboat.png': 'GoPro accessories',
+  'img/core-img/tv-table.png': 'Insta360 accessories',
+  'img/core-img/beach.png': 'DJI Osmo accessories',
   'img/product/1.png': '50 in 1 GoPro accessories kit',
   'img/product/2.png': '3 metre action-camera selfie stick',
   'img/product/3.png': 'Action-camera dome port',
@@ -332,6 +328,32 @@ function enhanceHtml(html, filename) {
   ].join('\n');
 
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
+
+  // Old template pages contained invented review counts and comments. Product
+  // pages now start in an honest empty state and the client fills this area
+  // only with reviews returned by the database.
+  if (meta.product) {
+    output = output.replace(
+      /<!-- Ratings-->[\s\S]*?<!-- Flash Sale Panel-->/i,
+      `<!-- Ratings-->
+          <div class="product-ratings" id="productRatingSummary">
+            <div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">
+              <div class="ratings"><span>No verified reviews yet</span></div>
+              <div class="total-result-of-ratings"><span>New</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Flash Sale Panel-->`
+    );
+    output = output.replace(
+      /(<div class="rating-review-content">\s*<ul[^>]*>)[\s\S]*?(<\/ul>)/i,
+      '$1<li class="single-user-review">No verified reviews yet.</li>$2'
+    );
+    output = output.replace(
+      /<div class="sales-end">[\s\S]*?<\/div>\s*<!-- Sales Volume-->/i,
+      '<div class="sales-end"><p class="mb-1 font-weight-bold"><i class="ti ti-package me-1"></i>Live availability</p></div><!-- Sales Volume-->'
+    );
+  }
 
   if (!/<h1\b/i.test(output)) {
     output = output.replace(

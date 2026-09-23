@@ -90,15 +90,20 @@
             <!-- Contact Form-->
             <div class="contact-form mt-3">
               <form id="contactForm">
+                <label class="visually-hidden" for="contactName">Your name</label>
                 <input class="form-control border mb-3" id="contactName" type="text" placeholder="Your Name" required>
+                <label class="visually-hidden" for="contactEmail">Email address</label>
                 <input class="form-control border mb-3" id="contactEmail" type="email" placeholder="Enter email">
+                <label class="visually-hidden" for="topicSelect">Message topic</label>
                 <select class="mb-3 w-100 border" id="topicSelect" name="topic">
                   <option value="Buying &amp; Support">Buying &amp; Support</option>
                   <option value="Order Help">Order Help</option>
                   <option value="Rental Help">Rental Help</option>
                   <option value="Returns &amp; Warranty">Returns &amp; Warranty</option>
                 </select>
+                <label class="visually-hidden" for="relevantUrl">Relevant URL</label>
                 <input class="form-control border mb-3" id="relevantUrl" type="url" placeholder="Include a relevant URL (optional)">
+                <label class="visually-hidden" for="contactMessage">Your message</label>
                 <textarea class="form-control border mb-3" id="contactMessage" cols="30" rows="6" placeholder="Write something..." required></textarea>
                 <button class="btn btn-primary btn-lg w-100" type="submit"><i class="ti ti-brand-whatsapp me-1"></i>Send via WhatsApp</button>
               </form>

@@ -276,18 +276,23 @@ async function defineSuite(t, ctx) {
   await t.test('admin: products CRUD + image library', async () => {
     let r = await owner.post('/api/admin/products', {
       name: 'Test Widget', slug: 'test-widget', price: 2500, old_price: 3000,
-      stock: 40, brand: 'Acme', sku: 'W-1', status: 'active', featured: true,
+      stock: 40, brand: 'Acme', mpn: 'ACME-W-1', gtin: '12345670', sku: 'W-1', status: 'active', featured: true,
     });
     assert.equal(r.status, 201);
     const id = r.data.id;
     r = await owner.post('/api/admin/products', { name: 'Dup', slug: 'test-widget', price: 1 });
     assert.equal(r.status, 409);
+    r = await owner.post('/api/admin/products', { name: 'Bad GTIN', slug: 'bad-gtin', price: 1, gtin: '123' });
+    assert.equal(r.status, 400);
     r = await owner.put(`/api/admin/products/${id}`, {
       name: 'Test Widget v2', slug: 'test-widget', price: 2600, stock: 41, status: 'active',
+      brand: 'Acme', mpn: 'ACME-W-1', gtin: '12345670',
     });
     assert.equal(r.status, 200);
     r = await owner.get('/api/admin/products?search=test-widget');
     assert.equal(r.data.products[0].price, 2600);
+    assert.equal(r.data.products[0].mpn, 'ACME-W-1');
+    assert.equal(r.data.products[0].gtin, '12345670');
     // Images: 1 legacy row, then upload a real one and exercise the library.
     r = await owner.get(`/api/admin/products/${id}/images`);
     assert.equal(r.data.images.length, 1);
@@ -638,7 +643,7 @@ async function defineSuite(t, ctx) {
 
   await t.test('store settings round-trip', async () => {
     let r = await owner.get('/api/admin/settings');
-    assert.equal(r.data.settings.currency, 'PKR');
+    assert.equal(r.data.settings.currency, 'LKR');
     const payload = {
       store_name: 'PixelHouse', currency: 'USD', store_email: 'shop@example.com',
       store_phone: '123', store_open: true, cash_enabled: true, bank_enabled: false,
@@ -654,7 +659,7 @@ async function defineSuite(t, ctx) {
     assert.equal(r.status, 400);
     r = await owner.put('/api/admin/settings', { store_name: 'x' });
     assert.equal(r.status, 400);
-    await owner.put('/api/admin/settings', { ...payload, currency: 'PKR' });
+    await owner.put('/api/admin/settings', { ...payload, currency: 'LKR' });
   });
 
   await t.test('promotional banners', async () => {
@@ -697,7 +702,7 @@ async function defineSuite(t, ctx) {
     r = await owner.post('/api/admin/products/bulk', { ids: [a], action: 'delete' });
     assert.equal(r.status, 400); // confirm required
     // CSV round-trip with an explicit high id (also exercises sequence repair).
-    const csv = 'name,slug,price,stock,image,id\nCSV Widget,csv-widget,1234,7,img/product/1.png,91001\n';
+    const csv = 'name,slug,price,stock,image,id\nCSV Widget,csv-widget,1234,7,img/product/1.webp,91001\n';
     const imp = await owner.request('POST', '/api/admin/products/import', { rawBody: csv, contentType: 'text/csv' });
     assert.equal(imp.status, 201);
     assert.equal(await imp.json().then((d) => d.count), 1);

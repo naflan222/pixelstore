@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS products (
   sku         TEXT,
   status      TEXT NOT NULL DEFAULT 'active',
   brand       TEXT DEFAULT '',
+  mpn         TEXT DEFAULT '',
+  gtin        TEXT DEFAULT '',
   created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -204,7 +206,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   id                       INTEGER PRIMARY KEY CHECK(id = 1),
   store_name               TEXT NOT NULL DEFAULT 'PixelHouse',
   contact                  TEXT NOT NULL DEFAULT '{}',
-  currency                 TEXT NOT NULL DEFAULT 'PKR',
+  currency                 TEXT NOT NULL DEFAULT 'LKR',
   store_status             TEXT NOT NULL DEFAULT 'open',
   payment_methods          TEXT NOT NULL DEFAULT '[]',
   shipping_fee             REAL NOT NULL DEFAULT 0 CHECK(shipping_fee >= 0),
@@ -382,6 +384,8 @@ CREATE TABLE IF NOT EXISTS read_messages (
   addColumn('products', 'sku', 'sku TEXT');
   addColumn('products', 'status', "status TEXT NOT NULL DEFAULT 'active'");
   addColumn('products', 'brand', "brand TEXT DEFAULT ''");
+  addColumn('products', 'mpn', "mpn TEXT DEFAULT ''");
+  addColumn('products', 'gtin', "gtin TEXT DEFAULT ''");
   addColumn('reviews', 'is_visible', 'is_visible INTEGER NOT NULL DEFAULT 1');
   addColumn('users', 'is_active', 'is_active INTEGER NOT NULL DEFAULT 1');
   addColumn('password_resets', 'attempts', 'attempts INTEGER DEFAULT 0');
@@ -420,6 +424,10 @@ CREATE TABLE IF NOT EXISTS read_messages (
     CREATE INDEX IF NOT EXISTS idx_audit_logs_filters ON audit_logs(actor_id, action, entity_type, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_users_admin_active ON users(role, is_active);
   `);
+
+  // Pixel House operates in Sri Lanka. Correct legacy template databases that
+  // were accidentally created with the Pakistani currency code.
+  db.prepare("UPDATE store_settings SET currency = 'LKR' WHERE upper(currency) = 'PKR'").run();
 
   // Preserve payment visibility for existing orders without declaring them paid.
   db.prepare(`INSERT OR IGNORE INTO payments (order_id, payment_method, payment_status, amount_paid)

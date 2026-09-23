@@ -2472,7 +2472,7 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   display: block;
   width: 100%;
   height: 132px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   border-radius: 0.5rem;
   background: #f7f7fb;
@@ -2572,7 +2572,7 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   width: 100%;
   height: 100%;
   margin: 0 !important;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 .top-products-area .product-card .product-thumbnail {
@@ -2589,7 +2589,7 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   width: 100%;
   height: 100%;
   margin: 0 !important;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 .product-card.catalog-product-card .product-title {
@@ -2618,8 +2618,11 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 .dynamic-product-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   object-position: center;
+  padding: 0.75rem;
 }
 .product-card .product-thumbnail .offer-countdown-timer {
   background-color: #ffaf00;
@@ -2746,7 +2749,7 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   height: 100%;
   max-height: none;
   padding: 0;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 .horizontal-product-card .product-thumbnail-side .product-thumbnail .offer-countdown-timer {
@@ -2964,7 +2967,7 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   width: 100%;
   height: 100%;
   max-height: none;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 .featured-product-card .product-description .product-title {

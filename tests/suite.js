@@ -328,6 +328,10 @@ async function defineSuite(t, ctx) {
     r = await owner.post(`/api/admin/products/${id}/images`, { data: PNG_1PX, file_name: 'one.png', is_primary: true });
     assert.equal(r.status, 201);
     const img2 = r.data.id;
+    r = await guest.get('/api/products/test-widget');
+    assert.equal(r.status, 200);
+    assert.equal(r.data.product.images.length, 2);
+    assert.ok(r.data.product.images.includes(PNG_1PX));
     r = await owner.get(`/api/admin/products/${id}/images`);
     assert.equal(r.data.images.length, 2);
     const primary = r.data.images.find((i) => i.is_primary === 1);

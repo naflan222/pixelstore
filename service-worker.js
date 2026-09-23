@@ -1,6 +1,6 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v1';
+const STATIC_CACHE = 'pixelhouse-static-v2';
 const APP_SHELL = [
   '/',
   '/home.html',
@@ -43,7 +43,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (['style', 'script', 'image', 'font'].includes(request.destination)) {
+  // CSS and JavaScript are network-first so a deployment cannot leave users
+  // on an outdated interface. The cache remains an offline fallback.
+  if (['style', 'script'].includes(request.destination)) {
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Images and fonts use stale-while-revalidate for fast repeat visits.
+  if (['image', 'font'].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         const fresh = fetch(request).then((response) => {

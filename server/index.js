@@ -163,6 +163,8 @@ const legacyStorefrontRedirects = new Map([
   ['/blog-grid.html', '/'],
   ['/blog-details.html', '/'],
   ['/vendor-shop.html', '/products.html'],
+  ['/checkout-credit-card.html', '/checkout-payment.html'],
+  ['/checkout-paypal.html', '/checkout-payment.html'],
 ]);
 app.get([...legacyStorefrontRedirects.keys()], (req, res) => {
   res.redirect(301, legacyStorefrontRedirects.get(req.path));

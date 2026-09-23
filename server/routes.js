@@ -77,7 +77,20 @@ function emailOrderConfirmation(orderId) {
 }
 
 const SHIPPING_FEES = { standard: 500, pickup: 0 };
+const IMPLEMENTED_PAYMENT_METHODS = new Set(['cash', 'bank']);
 const COUPON_CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
+
+async function enabledPaymentMethods(tx = db) {
+  const settings = await tx.get('SELECT payment_methods FROM store_settings WHERE id = 1');
+  if (!settings) return new Set();
+  try {
+    const configured = JSON.parse(settings.payment_methods);
+    if (!Array.isArray(configured)) return new Set();
+    return new Set(configured.filter((method) => IMPLEMENTED_PAYMENT_METHODS.has(method)));
+  } catch (_) {
+    return new Set();
+  }
+}
 
 async function cartItems(req, tx = db) {
   const w = cartWhere(req);
@@ -475,6 +488,7 @@ router.delete('/wishlist/:id', async (req, res) => {
 
 router.post('/orders', async (req, res) => {
   const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash', coupon_code } = req.body || {};
+  const paymentMethod = String(payment_method).trim().toLowerCase();
   if (!full_name || !email || !phone || !address)
     return res.status(400).json({ error: 'Full name, email, phone and address are required.' });
   if (!String(full_name).trim() || String(full_name).length > 120 || String(email).length > 254 ||
@@ -482,8 +496,9 @@ router.post('/orders', async (req, res) => {
     return res.status(400).json({ error: 'Phone number and shipping address are required.' });
   if (!Object.prototype.hasOwnProperty.call(SHIPPING_FEES, shipping_method))
     return res.status(400).json({ error: 'Invalid shipping method.' });
-  if (!['cash', 'credit-card', 'bank', 'paypal'].includes(String(payment_method)))
-    return res.status(400).json({ error: 'Invalid payment method.' });
+  const availablePaymentMethods = await enabledPaymentMethods();
+  if (!availablePaymentMethods.has(paymentMethod))
+    return res.status(400).json({ error: 'This payment method is not currently available.' });
 
   const w = cartWhere(req);
   const items = await cartItems(req);
@@ -531,11 +546,11 @@ router.post('/orders', async (req, res) => {
         (user_id, guest_id, full_name, email, phone, address, shipping_method, payment_method, subtotal, shipping_fee, discount_amount, coupon_code, total)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         req.user ? req.user.id : null, req.user ? null : req.guestId,
-        String(full_name).trim(), String(email).trim().toLowerCase(), String(phone).trim(), String(address).trim(), shipping_method, payment_method,
+        String(full_name).trim(), String(email).trim().toLowerCase(), String(phone).trim(), String(address).trim(), shipping_method, paymentMethod,
         subtotal, shippingFee, discountAmount, code, total);
       const orderId = info.id;
       await tx.run(`INSERT INTO payments (order_id, payment_method, payment_status, amount_paid)
-        VALUES (?, ?, 'pending', 0)`, orderId, payment_method);
+        VALUES (?, ?, 'pending', 0)`, orderId, paymentMethod);
       for (const i of items) {
         await tx.run('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)',
           orderId, i.id, i.name, i.price, i.quantity);
@@ -546,7 +561,7 @@ router.post('/orders', async (req, res) => {
         if (decremented.changes !== 1) throw new Error(`Not enough stock for ${i.name}.`);
       }
       await tx.run(`DELETE FROM carts WHERE ${w.sql}`, w.param);
-      if (req.user) await notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${payment_method}.`, 'order', tx);
+      if (req.user) await notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${paymentMethod}.`, 'order', tx);
       await createAdminNotification({ type: 'order', title: `New order #${orderId}`, body: 'A new order has been placed.', entityType: 'order', entityId: orderId }, tx);
       return { orderId, total, discountAmount };
     });

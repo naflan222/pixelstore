@@ -101,7 +101,7 @@ Any Node host works (Railway, Render, VPS, etc.):
 ## Production TODOs (currently dev-mode)
 
 - ~~Password reset emails~~ — done: SMTP-based OTP flow (see "Email OTP Setup" above)
-- Payments: `checkout-credit-card.html` / `checkout-paypal.html` record the method but don't charge — integrate Stripe/PayPal when ready
+- Payments: cash on delivery and bank transfer are available. Card and PayPal remain hidden until a PCI-compliant payment provider is integrated.
 - Keep the owner account protected and assign the least-privileged staff role required: order manager, catalog manager, or support
 - Add rate limiting (e.g. `express-rate-limit`) on auth endpoints
 

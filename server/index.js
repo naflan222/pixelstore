@@ -154,7 +154,10 @@ app.use('/api/admin', adminRoutes);
 // HTML is enriched at response time with metadata and structured data. The
 // source markup and CSS are left unchanged, so this cannot alter the design.
 const publicRoot = path.join(__dirname, '..');
-const seoHtmlHandler = createHtmlHandler({ rootDir: publicRoot });
+const seoHtmlHandler = createHtmlHandler({
+  rootDir: publicRoot,
+  productLookup: (slug) => db.get('SELECT name, description, price, image, stock, status, sku, brand, mpn, gtin FROM products WHERE slug = ?', slug),
+});
 const legacyStorefrontRedirects = new Map([
   ['/featured-products.html', '/products.html'],
   ['/flash-sale.html', '/products.html'],

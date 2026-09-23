@@ -39,8 +39,8 @@ const DEMO_USER = {
   username: 'demo',
   email: 'demo@pixels.com',
   full_name: 'Demo User',
-  phone: '+92 300 0000000',
-  address: '28/C Green Road',
+  phone: '+94 77 000 0000',
+  address: 'Dikwella, Sri Lanka',
   balance: 99,
   role: 'owner',
 };

@@ -422,7 +422,7 @@ textarea:invalid {
   position: absolute;
   width: 100%;
   height: 100%;
-  background-image: url("img/bg-img/dark-bg.jpg");
+  background-image: url("img/bg-img/dark-bg.webp");
   background-position: center center;
   top: 0;
   opacity: 0.3;

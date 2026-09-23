@@ -44,7 +44,7 @@ const PAYMENT_LABELS = { cash: 'Cash on delivery', 'credit-card': 'Credit / debi
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Symbols that read better with a space keep it here, so money() stays a template.
 const CURRENCY_SYMBOLS = {
-  PKR: 'Rs. ', INR: 'Rs. ', USD: 'US$ ', EUR: '€', GBP: '£', AED: 'AED ', SAR: 'SAR ', AUD: 'A$ ', CAD: 'C$ ', TRY: '₺',
+  LKR: 'Rs. ', INR: 'Rs. ', USD: 'US$ ', EUR: '€', GBP: '£', AED: 'AED ', SAR: 'SAR ', AUD: 'A$ ', CAD: 'C$ ', TRY: '₺',
 };
 
 /* ------------------------------- helpers ------------------------------- */
@@ -81,7 +81,7 @@ function number(value) {
 }
 
 function currencyCode(shop) {
-  return String(shop.currency || 'PKR').toUpperCase();
+  return String(shop.currency || 'LKR').toUpperCase();
 }
 
 function money(amount, shop) {
@@ -191,7 +191,7 @@ function requirePdfKit() {
 // changing the store name or contact info updates every future invoice.
 async function readShopSettings() {
   const fallback = {
-    name: BRAND.name, tagline: BRAND.tagline, email: '', phone: '', address: '', website: '', currency: 'PKR',
+    name: BRAND.name, tagline: BRAND.tagline, email: '', phone: '', address: '', website: '', currency: 'LKR',
   };
   let db;
   try { db = require('./database'); } catch (_) { return fallback; } // eslint-disable-line global-require
@@ -206,7 +206,7 @@ async function readShopSettings() {
       phone: String(contact.phone || '').trim(),
       address: String(contact.address || '').trim(),
       website: String(process.env.PUBLIC_URL || process.env.SITE_URL || '').replace(/\/+$/, ''),
-      currency: String(row.currency || 'PKR').trim() || 'PKR',
+      currency: String(row.currency || 'LKR').trim() || 'LKR',
     };
   } catch (_) {
     return fallback;

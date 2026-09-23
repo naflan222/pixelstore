@@ -25,8 +25,16 @@ const productId = (value) => {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
 const validSlug = (value) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(value || ''));
+const validGtin = (value) => {
+  if (!value) return true;
+  if (!/^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(value)) return false;
+  const digits = value.split('').map(Number);
+  const checkDigit = digits.pop();
+  const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === checkDigit;
+};
 const validImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const DEFAULT_PRODUCT_IMAGE = 'img/product/1.png';
+const DEFAULT_PRODUCT_IMAGE = 'img/product/1.webp';
 const SALES_ORDER_FILTER = "status NOT IN ('cancelled', 'refunded')";
 const ADMIN_ROLES = new Set(['owner', 'admin', 'order_manager', 'catalog_manager', 'support']);
 const ownerOnly = requirePermission('owner');
@@ -298,10 +306,12 @@ async function importProductRow(row, rowNumber, seen) {
   const oldPrice = csvMoney(row.old_price, 'old_price', rowNumber, { nullable: true });
   const status = String(row.status || 'active').toLowerCase();
   const image = String(row.image || DEFAULT_PRODUCT_IMAGE).trim();
+  const gtin = String(row.gtin || '').trim();
   if (!name || name.length > 255 || !validSlug(slug) || !Number.isFinite(price)) throw new Error(`Row ${rowNumber}: provide a name, URL-safe slug, and non-negative price.`);
   if (!['active', 'inactive', 'draft'].includes(status)) throw new Error(`Row ${rowNumber}: status must be active, inactive, or draft.`);
   if (sku && sku.length > 100) throw new Error(`Row ${rowNumber}: SKU is too long.`);
   if (image.length > 500 || !/^img\/[A-Za-z0-9._/-]+$/.test(image) || image.includes('..')) throw new Error(`Row ${rowNumber}: image must be a safe img/ path.`);
+  if (!validGtin(gtin)) throw new Error(`Row ${rowNumber}: GTIN must be a valid 8, 12, 13, or 14 digit code.`);
   for (const [label, value] of [['id', id], ['slug', slug], ['sku', sku && sku.toLowerCase()]]) {
     if (value !== null && seen[label].has(value)) throw new Error(`Row ${rowNumber}: duplicate ${label} in this import.`);
     if (value !== null) seen[label].add(value);
@@ -321,6 +331,8 @@ async function importProductRow(row, rowNumber, seen) {
     description: String(row.description || '').trim().slice(0, 10000),
     badge: String(row.badge || '').trim().slice(0, 100) || null,
     brand: String(row.brand || '').trim().slice(0, 100),
+    mpn: String(row.mpn || '').trim().slice(0, 100),
+    gtin,
     stock: csvInteger(row.stock, 'stock', rowNumber),
     reorderThreshold: csvInteger(row.reorder_threshold, 'reorder_threshold', rowNumber, { fallback: 10 }),
     featured: csvBoolean(row.featured, 'featured', rowNumber),
@@ -875,9 +887,9 @@ router.post('/products/bulk', catalogAccess, async (req, res) => {
 
 router.get('/products/export', catalogAccess, async (req, res) => {
   const products = await db.all(`SELECT p.id, p.name, p.slug, p.sku, p.price, p.old_price, COALESCE(c.name, p.category, '') AS category,
-    p.category_id, p.stock, p.reorder_threshold, p.status, p.featured, p.flash_sale, p.badge, p.brand, p.description, p.image
+    p.category_id, p.stock, p.reorder_threshold, p.status, p.featured, p.flash_sale, p.badge, p.brand, p.mpn, p.gtin, p.description, p.image
     FROM products p LEFT JOIN categories c ON c.id = p.category_id ORDER BY p.id`);
-  const headers = ['id', 'name', 'slug', 'sku', 'price', 'old_price', 'category', 'category_id', 'stock', 'reorder_threshold', 'status', 'featured', 'flash_sale', 'badge', 'brand', 'description', 'image'];
+  const headers = ['id', 'name', 'slug', 'sku', 'price', 'old_price', 'category', 'category_id', 'stock', 'reorder_threshold', 'status', 'featured', 'flash_sale', 'badge', 'brand', 'mpn', 'gtin', 'description', 'image'];
   const csv = [headers.join(','), ...products.map(product => headers.map(header => csvEscape(product[header])).join(','))].join('\r\n');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="products.csv"', 'Cache-Control': 'no-store' });
   res.send(`﻿${csv}\r\n`);
@@ -887,7 +899,7 @@ router.post('/products/import', catalogAccess, async (req, res) => {
   try {
     const csv = typeof req.body === 'string' ? req.body : req.body && req.body.csv;
     const rows = parseCsv(csv);
-    const allowedHeaders = new Set(['id', 'name', 'slug', 'sku', 'price', 'old_price', 'category', 'category_id', 'stock', 'reorder_threshold', 'status', 'featured', 'flash_sale', 'badge', 'brand', 'description', 'image']);
+    const allowedHeaders = new Set(['id', 'name', 'slug', 'sku', 'price', 'old_price', 'category', 'category_id', 'stock', 'reorder_threshold', 'status', 'featured', 'flash_sale', 'badge', 'brand', 'mpn', 'gtin', 'description', 'image']);
     const unknownHeaders = Object.keys(rows[0]).filter(header => !allowedHeaders.has(header));
     if (unknownHeaders.length) return res.status(400).json({ error: `Unsupported CSV columns: ${unknownHeaders.join(', ')}.` });
     const seen = { id: new Set(), slug: new Set(), sku: new Set() };
@@ -911,17 +923,17 @@ router.post('/products/import', catalogAccess, async (req, res) => {
       for (const product of products) {
         let id = product.id;
         if (id) {
-          await tx.run(`INSERT INTO products (id, slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, reorder_threshold, sku, status, brand)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          await tx.run(`INSERT INTO products (id, slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, reorder_threshold, sku, status, brand, mpn, gtin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             product.id, product.slug, product.name, product.description, product.price, product.oldPrice, product.image,
             product.category ? product.category.name : 'GoPro Accessories', product.category && product.category.id, product.badge, product.stock,
-            product.featured, product.flashSale, product.reorderThreshold, product.sku, product.status, product.brand);
+            product.featured, product.flashSale, product.reorderThreshold, product.sku, product.status, product.brand, product.mpn, product.gtin);
         } else {
-          const inserted = await tx.insert(`INSERT INTO products (slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, reorder_threshold, sku, status, brand)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          const inserted = await tx.insert(`INSERT INTO products (slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, reorder_threshold, sku, status, brand, mpn, gtin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             product.slug, product.name, product.description, product.price, product.oldPrice, product.image,
             product.category ? product.category.name : 'GoPro Accessories', product.category && product.category.id, product.badge, product.stock,
-            product.featured, product.flashSale, product.reorderThreshold, product.sku, product.status, product.brand);
+            product.featured, product.flashSale, product.reorderThreshold, product.sku, product.status, product.brand, product.mpn, product.gtin);
           id = inserted.id;
         }
         await tx.run('INSERT INTO product_images (product_id, image_data, mime_type, file_name, sort_order, is_primary) VALUES (?, ?, ?, ?, 0, 1)',
@@ -940,22 +952,27 @@ router.post('/products/import', catalogAccess, async (req, res) => {
 });
 
 router.post('/products', catalogAccess, async (req, res) => {
-  const { name, slug, price, old_price, image, description, category_id, badge, stock, featured, flash_sale, sku, status, brand } = req.body || {};
+  const { name, slug, price, old_price, image, description, category_id, badge, stock, featured, flash_sale, sku, status, brand, mpn, gtin } = req.body || {};
   const category = category_id == null || category_id === '' ? null : await getCategory(category_id);
   if (!String(name || '').trim() || !validSlug(slug) || !Number.isFinite(Number(price)) || Number(price) < 0)
     return res.status(400).json({ error: 'Name, URL-safe slug, and a non-negative price are required.' });
   if (category_id != null && category_id !== '' && !category) return res.status(400).json({ error: 'Choose an active category.' });
   if (!['active', 'inactive', 'draft'].includes(String(status || 'active'))) return res.status(400).json({ error: 'Invalid product status.' });
   const cleanSku = String(sku || '').trim() || null;
+  const cleanBrand = String(brand || '').trim();
+  const cleanMpn = String(mpn || '').trim();
+  const cleanGtin = String(gtin || '').trim();
   if (cleanSku && cleanSku.length > 100) return res.status(400).json({ error: 'SKU is too long.' });
+  if (cleanBrand.length > 100 || cleanMpn.length > 100) return res.status(400).json({ error: 'Brand and MPN must be 100 characters or fewer.' });
+  if (!validGtin(cleanGtin)) return res.status(400).json({ error: 'GTIN must be a valid 8, 12, 13, or 14 digit code.' });
   const existing = await db.get('SELECT id FROM products WHERE slug = ? OR (sku IS NOT NULL AND sku = ?)', slug, cleanSku || '');
   if (existing) return res.status(409).json({ error: 'A product with this slug already exists.' });
   const id = await db.transaction(async (tx) => {
-    const result = await tx.insert(`INSERT INTO products (slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, sku, status, brand)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    const result = await tx.insert(`INSERT INTO products (slug, name, description, price, old_price, image, category, category_id, badge, stock, featured, flash_sale, sku, status, brand, mpn, gtin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       String(slug).trim(), String(name).trim(), String(description || '').trim(), Number(price), old_price == null || old_price === '' ? null : Number(old_price),
       String(image || DEFAULT_PRODUCT_IMAGE).trim(), category ? category.name : 'GoPro Accessories', category && category.id, badge || null,
-      Math.max(0, Number.parseInt(stock, 10) || 0), featured ? 1 : 0, flash_sale ? 1 : 0, cleanSku, String(status || 'active'), String(brand || '').trim());
+      Math.max(0, Number.parseInt(stock, 10) || 0), featured ? 1 : 0, flash_sale ? 1 : 0, cleanSku, String(status || 'active'), cleanBrand, cleanMpn, cleanGtin);
     const newId = Number(result.id);
     await tx.run(`INSERT INTO product_images (product_id, image_data, mime_type, file_name, is_primary)
       VALUES (?, ?, ?, ?, 1)`, newId, String(image || DEFAULT_PRODUCT_IMAGE).trim(), 'image/*', 'legacy-image');
@@ -967,7 +984,7 @@ router.post('/products', catalogAccess, async (req, res) => {
 
 router.put('/products/:id', catalogAccess, async (req, res) => {
   const id = productId(req.params.id);
-  const { name, slug, price, old_price, image, description, category_id, badge, stock, featured, flash_sale, rating, reorder_threshold, sku, status, brand } = req.body || {};
+  const { name, slug, price, old_price, image, description, category_id, badge, stock, featured, flash_sale, rating, reorder_threshold, sku, status, brand, mpn, gtin } = req.body || {};
   const current = id && await db.get('SELECT * FROM products WHERE id = ?', id);
   if (!current) return res.status(404).json({ error: 'Product not found.' });
   const category = category_id == null || category_id === '' ? null : await getCategory(category_id);
@@ -976,17 +993,22 @@ router.put('/products/:id', catalogAccess, async (req, res) => {
   if (category_id != null && category_id !== '' && !category) return res.status(400).json({ error: 'Choose an active category.' });
   if (!['active', 'inactive', 'draft'].includes(String(status || 'active'))) return res.status(400).json({ error: 'Invalid product status.' });
   const cleanSku = String(sku || '').trim() || null;
+  const cleanBrand = String(brand || '').trim();
+  const cleanMpn = String(mpn || '').trim();
+  const cleanGtin = String(gtin || '').trim();
   if (cleanSku && cleanSku.length > 100) return res.status(400).json({ error: 'SKU is too long.' });
+  if (cleanBrand.length > 100 || cleanMpn.length > 100) return res.status(400).json({ error: 'Brand and MPN must be 100 characters or fewer.' });
+  if (!validGtin(cleanGtin)) return res.status(400).json({ error: 'GTIN must be a valid 8, 12, 13, or 14 digit code.' });
   const duplicate = await db.get('SELECT id FROM products WHERE (slug = ? OR (sku IS NOT NULL AND sku = ?)) AND id != ?', slug, cleanSku || '', id);
   if (duplicate) return res.status(409).json({ error: 'Another product already uses this slug or SKU.' });
   await db.transaction(async (tx) => {
     await tx.run(`UPDATE products SET
       name = ?, slug = ?, description = ?, price = ?, old_price = ?, image = ?,
-      category = ?, category_id = ?, badge = ?, stock = ?, featured = ?, flash_sale = ?, rating = ?, reorder_threshold = ?, sku = ?, status = ?, brand = ?
+      category = ?, category_id = ?, badge = ?, stock = ?, featured = ?, flash_sale = ?, rating = ?, reorder_threshold = ?, sku = ?, status = ?, brand = ?, mpn = ?, gtin = ?
       WHERE id = ?`,
       String(name).trim(), String(slug).trim(), String(description || '').trim(), Number(price), old_price == null || old_price === '' ? null : Number(old_price),
       String(image || current.image).trim(), category ? category.name : 'GoPro Accessories', category && category.id, badge || null, stock != null ? Math.max(0, Number.parseInt(stock, 10) || 0) : current.stock,
-      featured ? 1 : 0, flash_sale ? 1 : 0, Number(rating) || 0, Math.max(0, Number(reorder_threshold) || 0), cleanSku, String(status || 'active'), String(brand || '').trim(), id);
+      featured ? 1 : 0, flash_sale ? 1 : 0, Number(rating) || 0, Math.max(0, Number(reorder_threshold) || 0), cleanSku, String(status || 'active'), cleanBrand, cleanMpn, cleanGtin, id);
     if (image && image !== current.image) {
       await tx.run('UPDATE product_images SET is_primary = 0 WHERE product_id = ?', id);
       await tx.run(`INSERT INTO product_images (product_id, image_data, mime_type, file_name, sort_order, is_primary)

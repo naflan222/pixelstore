@@ -242,8 +242,8 @@ function shippingLabel(method) {
   return ({ standard: 'Standard delivery', express: 'Express delivery', courier: 'Courier', pickup: 'Store pickup' })[String(method).toLowerCase()] || String(method);
 }
 
-function formatMoney(amount, currency = 'PKR') {
-  const symbol = currency === 'PKR' ? 'Rs. ' : `${currency} `;
+function formatMoney(amount, currency = 'LKR') {
+  const symbol = currency === 'LKR' ? 'Rs. ' : `${currency} `;
   return symbol + Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 

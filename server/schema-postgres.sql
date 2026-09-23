@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS products (
   sku         TEXT,
   status      TEXT NOT NULL DEFAULT 'active',
   brand       TEXT DEFAULT '',
+  mpn         TEXT DEFAULT '',
+  gtin        TEXT DEFAULT '',
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
@@ -203,7 +205,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   id                       INTEGER PRIMARY KEY CHECK(id = 1),
   store_name               TEXT NOT NULL DEFAULT 'PixelHouse',
   contact                  TEXT NOT NULL DEFAULT '{}',
-  currency                 TEXT NOT NULL DEFAULT 'PKR',
+  currency                 TEXT NOT NULL DEFAULT 'LKR',
   store_status             TEXT NOT NULL DEFAULT 'open',
   payment_methods          TEXT NOT NULL DEFAULT '[]',
   shipping_fee             DOUBLE PRECISION NOT NULL DEFAULT 0 CHECK(shipping_fee >= 0),

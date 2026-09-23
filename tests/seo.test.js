@@ -38,7 +38,11 @@ test('homepage receives SEO metadata without removing storefront content', () =>
 test('product page receives Product and Offer schema without fake ratings', () => {
   const source = read('wpdcase.html');
   const product = extractProduct(source);
-  const result = enhanceHtml(source, 'wpdcase.html');
+  const result = enhanceHtml(source, 'wpdcase.html', {
+    name: 'Waterproof Diving Case', description: 'Protective underwater housing.',
+    price: 4300, image: 'img/bg-img/wpdcase1.jpg', stock: 5, status: 'active',
+    sku: 'PH-WPD-1', brand: 'Telesin', mpn: 'WPD-13', gtin: '12345670',
+  });
 
   assert.deepEqual(product, {
     name: 'Waterproof Diving Case',
@@ -49,6 +53,12 @@ test('product page receives Product and Offer schema without fake ratings', () =
   assert.match(result, /"@type":"Product"/);
   assert.match(result, /"priceCurrency":"LKR"/);
   assert.match(result, /"price":"4300"/);
+  assert.match(result, /"availability":"https:\/\/schema\.org\/InStock"/);
+  assert.match(result, /"shippingDetails"/);
+  assert.match(result, /"hasMerchantReturnPolicy"/);
+  assert.match(result, /"brand":\{"@type":"Brand","name":"Telesin"\}/);
+  assert.match(result, /"mpn":"WPD-13"/);
+  assert.match(result, /"gtin":"12345670"/);
   assert.doesNotMatch(result, /aggregateRating/);
   assert.doesNotMatch(source, /Very good product\.|4 ratings|100% Good Reviews/);
   assert.doesNotMatch(result, /Very good product\.|4 ratings|Flash sale end in/);

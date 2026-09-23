@@ -120,11 +120,11 @@ const IMAGE_ALT = {
   'img/core-img/woman-clothes.png': 'Action cameras',
   'img/core-img/grocery.png': 'Insta360 cameras',
   'img/core-img/shampoo.png': 'DJI Osmo cameras',
-  'img/core-img/rowboat.png': 'GoPro accessories',
+  'img/core-img/rowboat.webp': 'GoPro accessories',
   'img/core-img/tv-table.png': 'Insta360 accessories',
-  'img/core-img/beach.png': 'DJI Osmo accessories',
-  'img/product/1.png': '50 in 1 GoPro accessories kit',
-  'img/product/2.png': '3 metre action-camera selfie stick',
+  'img/core-img/beach.webp': 'DJI Osmo accessories',
+  'img/product/1.webp': '50 in 1 GoPro accessories kit',
+  'img/product/2.webp': '3 metre action-camera selfie stick',
   'img/product/3.png': 'Action-camera dome port',
   'img/product/4(2).png': 'Three-slot action-camera battery charger',
   'img/product/5(2).png': 'Three-way action-camera selfie stick',
@@ -225,7 +225,7 @@ function metaFor(filename, html) {
   };
 }
 
-function buildSchema(meta, canonical, filename) {
+function buildSchema(meta, canonical, filename, catalogProduct = null) {
   const graph = [
     {
       '@type': 'ElectronicsStore',
@@ -262,22 +262,58 @@ function buildSchema(meta, canonical, filename) {
   ];
 
   if (meta.product) {
-    graph.push({
+    const offer = {
+      '@type': 'Offer',
+      url: canonical,
+      priceCurrency: 'LKR',
+      price: meta.product.price,
+      itemCondition: 'https://schema.org/NewCondition',
+      shippingDetails: {
+        '@type': 'OfferShippingDetails',
+        shippingDestination: {
+          '@type': 'DefinedRegion',
+          addressCountry: 'LK',
+        },
+        shippingRate: {
+          '@type': 'MonetaryAmount',
+          value: '500',
+          currency: 'LKR',
+        },
+        deliveryTime: {
+          '@type': 'ShippingDeliveryTime',
+          handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
+          transitTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 5, unitCode: 'DAY' },
+        },
+      },
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: 'LK',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: 7,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
+      },
+    };
+    if (catalogProduct) {
+      offer.availability = Number(catalogProduct.stock) > 0 && String(catalogProduct.status || 'active') === 'active'
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock';
+    }
+
+    const productSchema = {
       '@type': 'Product',
       '@id': `${canonical}#product`,
       name: meta.product.name,
       image: [meta.product.image],
       description: meta.description,
       url: canonical,
-      sku: path.basename(filename, '.html').toUpperCase(),
-      offers: {
-        '@type': 'Offer',
-        url: canonical,
-        priceCurrency: 'LKR',
-        price: meta.product.price,
-        itemCondition: 'https://schema.org/NewCondition',
-      },
-    });
+      sku: (catalogProduct && catalogProduct.sku) || path.basename(filename, '.html').toUpperCase(),
+      offers: offer,
+    };
+    if (catalogProduct && catalogProduct.brand) productSchema.brand = { '@type': 'Brand', name: String(catalogProduct.brand) };
+    if (catalogProduct && catalogProduct.mpn) productSchema.mpn = String(catalogProduct.mpn);
+    if (catalogProduct && catalogProduct.gtin) productSchema.gtin = String(catalogProduct.gtin);
+    graph.push(productSchema);
   }
 
   return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
@@ -310,8 +346,18 @@ function improveImages(html) {
   });
 }
 
-function enhanceHtml(html, filename) {
+function enhanceHtml(html, filename, catalogProduct = null) {
   const meta = metaFor(filename, html);
+  if (meta.product && catalogProduct) {
+    meta.product = {
+      name: String(catalogProduct.name || meta.product.name),
+      price: String(catalogProduct.price ?? meta.product.price),
+      image: absoluteUrl(catalogProduct.image || meta.product.image),
+    };
+    if (catalogProduct.description) meta.description = textOnly(catalogProduct.description);
+    meta.heading = meta.product.name;
+    meta.title = `${meta.product.name} in Sri Lanka | Pixel House`;
+  }
   const canonical = canonicalFor(filename);
   const isIndexable = INDEXABLE_SET.has(filename);
   const image = meta.product ? meta.product.image : DEFAULT_IMAGE;
@@ -340,7 +386,7 @@ function enhanceHtml(html, filename) {
     `    <meta name="twitter:title" content="${escapeHtml(meta.title)}">`,
     `    <meta name="twitter:description" content="${escapeHtml(meta.description)}">`,
     `    <meta name="twitter:image" content="${image}">`,
-    `    <script type="application/ld+json" data-seo-managed="true">${buildSchema(meta, canonical, filename)}</script>`,
+    `    <script type="application/ld+json" data-seo-managed="true">${buildSchema(meta, canonical, filename, catalogProduct)}</script>`,
   ].join('\n');
 
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
@@ -381,8 +427,8 @@ function enhanceHtml(html, filename) {
   return improveImages(output);
 }
 
-function createHtmlHandler({ rootDir }) {
-  return function serveSeoHtml(req, res, next) {
+function createHtmlHandler({ rootDir, productLookup = null }) {
+  return async function serveSeoHtml(req, res, next) {
     const filename = req.path === '/' ? 'home.html' : path.basename(req.path);
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(filename)) return next();
 
@@ -391,8 +437,11 @@ function createHtmlHandler({ rootDir }) {
 
     try {
       const html = fs.readFileSync(filePath, 'utf8');
+      const catalogProduct = productLookup && extractProduct(html)
+        ? await productLookup(path.basename(filename, '.html'))
+        : null;
       res.set('Cache-Control', 'public, max-age=0, must-revalidate');
-      res.type('html').send(enhanceHtml(html, filename));
+      res.type('html').send(enhanceHtml(html, filename, catalogProduct));
     } catch (error) {
       next(error);
     }

@@ -146,6 +146,11 @@ function clientHandle(client) {
 const shared = clientHandle(pool);
 
 async function ensureStoreSettings(executor) {
+  // Idempotent production upgrades for databases created before these fields
+  // and Sri Lankan currency defaults were introduced.
+  await executor.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS mpn TEXT DEFAULT ''");
+  await executor.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS gtin TEXT DEFAULT ''");
+  await executor.query("ALTER TABLE store_settings ALTER COLUMN currency SET DEFAULT 'LKR'");
   await executor.query(
     `INSERT INTO store_settings (id, contact, payment_methods, shipping_fee, delivery_options, notification_preferences)
      VALUES (1, $1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
@@ -157,6 +162,7 @@ async function ensureStoreSettings(executor) {
       JSON.stringify(DEFAULT_STORE_SETTINGS.notification_preferences),
     ]
   );
+  await executor.query("UPDATE store_settings SET currency = 'LKR' WHERE upper(currency) = 'PKR'");
   // Preserve payment visibility for orders that predate their payments row.
   await executor.query(
     `INSERT INTO payments (order_id, payment_method, payment_status, amount_paid)

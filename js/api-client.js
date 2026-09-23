@@ -160,10 +160,57 @@
       const category = section.dataset.catalogCategory || '';
       const { products } = await get('/products?category=' + encodeURIComponent(category));
       if (!Array.isArray(products)) return;
-      grid.innerHTML = products.length
-        ? products.map(productCardHTML).join('')
-        : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
-      bindProductButtons(grid);
+      const perPage = 12;
+      const queryPage = Number(new URLSearchParams(location.search).get('page'));
+      let currentPage = Number.isInteger(queryPage) && queryPage > 0
+        ? queryPage
+        : (page === 'gpproducts2.html' ? 2 : 1);
+      let paginationNav = $('nav[aria-label="Page navigation"]', section);
+      if (!paginationNav) {
+        paginationNav = document.createElement('nav');
+        paginationNav.setAttribute('aria-label', 'Page navigation');
+        paginationNav.innerHTML = '<ul class="pagination justify-content-center flex-wrap"></ul>';
+      }
+      if (paginationNav.parentElement === grid) grid.after(paginationNav);
+      if (!paginationNav.isConnected) grid.after(paginationNav);
+      let pagination = $('.pagination', paginationNav);
+      if (!pagination) {
+        pagination = document.createElement('ul');
+        pagination.className = 'pagination justify-content-center flex-wrap';
+        paginationNav.appendChild(pagination);
+      }
+
+      function pageHref(targetPage) {
+        if (category.toLowerCase() === 'gopro accessories') {
+          if (targetPage === 1) return 'catagory.html';
+          if (targetPage === 2) return 'gpproducts2.html';
+          return 'catagory.html?page=' + targetPage;
+        }
+        const params = new URLSearchParams(location.search);
+        if (targetPage === 1) params.delete('page');
+        else params.set('page', String(targetPage));
+        return page + (params.size ? '?' + params.toString() : '');
+      }
+
+      function renderCatalog() {
+        const pageCount = Math.max(1, Math.ceil(products.length / perPage));
+        currentPage = Math.min(currentPage, pageCount);
+        const start = (currentPage - 1) * perPage;
+        const visibleProducts = products.slice(start, start + perPage);
+        grid.innerHTML = visibleProducts.length
+          ? visibleProducts.map(productCardHTML).join('')
+          : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
+        paginationNav.hidden = pageCount < 2;
+        pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
+          const targetPage = index + 1;
+          const active = targetPage === currentPage;
+          return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
+            pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
+        }).join('');
+        bindProductButtons(grid);
+      }
+
+      renderCatalog();
     } catch (_) {
       // Keep the existing page cards as a graceful fallback if the catalog API is unavailable.
     }
@@ -958,9 +1005,29 @@
         if (price) price.innerHTML = money(liveProduct.price) + (liveProduct.old_price ? '<span>' + money(liveProduct.old_price) + '</span>' : '');
         if (description) description.textContent = liveProduct.description || 'Contact PixelHouse for more product details.';
         if (slides) {
-          slides.innerHTML = '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" alt="' + escapeHtml(liveProduct.name) + '"></div>';
-          const productImage = $('.dynamic-product-image', slides);
-          if (productImage) productImage.src = liveProduct.image || '';
+          const carousel = window.jQuery ? window.jQuery(slides) : null;
+          if (carousel && carousel.data('owl.carousel')) carousel.owlCarousel('destroy');
+          const gallery = Array.from(new Set([
+            liveProduct.image,
+            ...(Array.isArray(liveProduct.images) ? liveProduct.images : []),
+          ].filter((image) => typeof image === 'string' && image.trim())));
+          slides.innerHTML = gallery.map((image) =>
+            '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" src="' +
+            escapeHtml(image) + '" alt="' + escapeHtml(liveProduct.name) + '" draggable="false"></div>'
+          ).join('');
+          if (carousel && typeof carousel.owlCarousel === 'function') {
+            carousel.owlCarousel({
+              items: 1,
+              margin: 0,
+              loop: false,
+              autoplay: false,
+              dots: gallery.length > 1,
+              nav: gallery.length > 1,
+              navText: ['<i class="ti ti-chevron-left"></i>', '<i class="ti ti-chevron-right"></i>'],
+              mouseDrag: true,
+              touchDrag: true,
+            });
+          }
         }
         const videoPanel = $('.product-description > .bg-img');
         if (videoPanel) videoPanel.style.display = 'none';

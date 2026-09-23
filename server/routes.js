@@ -352,6 +352,13 @@ router.get('/products', async (req, res) => {
 router.get('/products/:slug', async (req, res) => {
   const product = await db.get("SELECT * FROM products WHERE slug = ? AND status = 'active'", req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
+  const images = await db.all(`SELECT image_data FROM product_images
+    WHERE product_id = ? AND image_data IS NOT NULL AND image_data <> ''
+    ORDER BY is_primary DESC, sort_order, id LIMIT 8`, product.id);
+  product.images = [...new Set([
+    product.image,
+    ...images.map((image) => image.image_data),
+  ].filter((image) => typeof image === 'string' && image.trim()))].slice(0, 8);
   const randomFn = db.engine === 'postgres' ? 'random()' : 'RANDOM()';
   const related = await db.all(`SELECT * FROM products WHERE slug != ? AND status = 'active' ORDER BY ${randomFn} LIMIT 4`, req.params.slug);
   const reviews = await db.all(`

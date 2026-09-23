@@ -2468,6 +2468,15 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 .flash-sale-card img {
   margin-bottom: 0.75rem;
 }
+.flash-sale-card .card-body > a > img {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 0.5rem;
+  background: #f7f7fb;
+}
 .flash-sale-card .product-title {
   -webkit-transition-duration: 500ms;
           transition-duration: 500ms;
@@ -2563,15 +2572,35 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   width: 100%;
   height: 100%;
   margin: 0 !important;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
 }
-.catalog-product-card .product-title {
-  display: block;
-  min-height: 2.8em;
+.top-products-area .product-card .product-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  border-radius: 0.5rem;
+  background: #f7f7fb;
+}
+.top-products-area .product-card .product-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0 !important;
+  object-fit: cover;
+  object-position: center;
+}
+.product-card.catalog-product-card .product-title {
+  display: block;
+  min-height: 3.6em;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: unset;
 }
 .catalog-empty-state {
   padding: 1.5rem 1rem;
@@ -2589,7 +2618,8 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 .dynamic-product-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
 }
 .product-card .product-thumbnail .offer-countdown-timer {
   background-color: #ffaf00;
@@ -2702,6 +2732,22 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   max-height: 110px;
   padding: 0.5rem;
   border-radius: 0.75rem;
+}
+.horizontal-product-card .product-thumbnail-side .product-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 110px;
+  overflow: hidden;
+  background: #f7f7fb;
+}
+.horizontal-product-card .product-thumbnail-side .product-thumbnail img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  object-fit: cover;
+  object-position: center;
 }
 .horizontal-product-card .product-thumbnail-side .product-thumbnail .offer-countdown-timer {
   background-color: #ffaf00;
@@ -2904,6 +2950,22 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 }
 .featured-product-card .product-thumbnail-side .product-thumbnail img {
   max-height: 150px;
+}
+.featured-product-card .product-thumbnail-side .product-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: #f7f7fb;
+}
+.featured-product-card .product-thumbnail-side .product-thumbnail img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
 }
 .featured-product-card .product-description .product-title {
   margin-bottom: 0.25rem;

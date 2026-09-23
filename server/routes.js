@@ -328,24 +328,42 @@ router.put('/profile', requireAuth, async (req, res) => {
 
 router.get('/products', async (req, res) => {
   const { category, category_id, featured, flash_sale, q } = req.query;
-  let sql = `SELECT p.*, c.name AS category_name, c.slug AS category_slug
-    FROM products p LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.status = 'active'`;
+  let where = ` WHERE p.status = 'active'`;
   const params = [];
   if (category_id) {
     const id = Number(category_id);
     if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid category.' });
-    sql += ' AND p.category_id = ?'; params.push(id);
+    where += ' AND p.category_id = ?'; params.push(id);
   } else if (category) {
     const value = String(category).trim();
-    sql += ' AND (lower(c.name) = lower(?) OR lower(c.slug) = lower(?) OR lower(p.category) = lower(?))';
+    where += ' AND (lower(c.name) = lower(?) OR lower(c.slug) = lower(?) OR lower(p.category) = lower(?))';
     params.push(value, value, value);
   }
-  if (featured === '1') sql += ' AND p.featured = 1';
-  if (flash_sale === '1') sql += ' AND p.flash_sale = 1';
+  if (featured === '1') where += ' AND p.featured = 1';
+  if (flash_sale === '1') where += ' AND p.flash_sale = 1';
   // lower() both sides: case-insensitive on SQLite AND PostgreSQL alike.
-  if (q) { sql += ' AND lower(p.name) LIKE lower(?)'; params.push(`%${q}%`); }
-  sql += ' ORDER BY p.id DESC';
+  if (q) { where += ' AND lower(p.name) LIKE lower(?)'; params.push(`%${q}%`); }
+  const from = ' FROM products p LEFT JOIN categories c ON c.id = p.category_id';
+  let sql = `SELECT p.*, c.name AS category_name, c.slug AS category_slug${from}${where} ORDER BY p.id DESC`;
+
+  // Category pages request a small page at a time so image data for the entire
+  // catalog is not transferred before the first products can appear.
+  if ((category || category_id) && (req.query.page != null || req.query.limit != null)) {
+    const requestedPage = Number.parseInt(req.query.page || '1', 10);
+    const limit = Number.parseInt(req.query.limit || '12', 10);
+    if (!Number.isSafeInteger(requestedPage) || requestedPage < 1 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 48) {
+      return res.status(400).json({ error: 'Invalid product pagination.' });
+    }
+    const count = await db.get(`SELECT COUNT(*) AS total${from}${where}`, ...params);
+    const total = Number(count && count.total) || 0;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    sql += ' LIMIT ? OFFSET ?';
+    const products = await db.all(sql, ...params, limit, (page - 1) * limit);
+    return res.json({ products, pagination: { page, limit, total, pages } });
+  }
+
   res.json({ products: await db.all(sql, ...params) });
 });
 

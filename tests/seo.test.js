@@ -109,10 +109,19 @@ test('category pages declare their live catalog category', () => {
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
-  assert.match(source, /pixelhouse-static-v3/);
-  assert.match(source, /\/js\/api-client\.js\?v=20260923\.1/);
+  assert.match(source, /pixelhouse-static-v4/);
+  assert.match(source, /\/js\/api-client\.js\?v=20260923\.2/);
   assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
   assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
+});
+
+test('homepage adventure banner uses the new photo and GoPro category pages omit the filter trigger', () => {
+  assert.match(read('home.html'), /img\/core-img\/camera-adventure\.webp/);
+  for (const filename of ['catagory.html', 'gpproducts2.html']) {
+    const source = read(filename);
+    assert.doesNotMatch(source, /class="filter-option[^"]*"/);
+    assert.match(source, /data-catalog-category="GoPro Accessories"/);
+  }
 });
 
 test('private transactional pages are explicitly excluded from indexing', () => {

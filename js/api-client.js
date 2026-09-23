@@ -156,29 +156,43 @@
     if (!section) return;
     const grid = $('.row.g-2', section);
     if (!grid) return;
+    const category = section.dataset.catalogCategory || '';
+    const perPage = 12;
+    const queryPage = Number(new URLSearchParams(location.search).get('page'));
+    let currentPage = Number.isInteger(queryPage) && queryPage > 0
+      ? queryPage
+      : (page === 'gpproducts2.html' ? 2 : 1);
+    const fallbackHTML = grid.innerHTML;
+    let paginationNav = $('nav[aria-label="Page navigation"]', section);
+    if (!paginationNav) {
+      paginationNav = document.createElement('nav');
+      paginationNav.setAttribute('aria-label', 'Page navigation');
+      paginationNav.innerHTML = '<ul class="pagination justify-content-center flex-wrap"></ul>';
+    }
+    if (paginationNav.parentElement === grid) grid.after(paginationNav);
+    if (!paginationNav.isConnected) grid.after(paginationNav);
+    let pagination = $('.pagination', paginationNav);
+    if (!pagination) {
+      pagination = document.createElement('ul');
+      pagination.className = 'pagination justify-content-center flex-wrap';
+      paginationNav.appendChild(pagination);
+    }
+
+    // Remove template products immediately so stale sample cards do not look
+    // like the live catalog while its first page is loading.
+    grid.innerHTML = '<div class="col-12"><div class="catalog-loading" role="status">Loading products…</div></div>';
     try {
-      const category = section.dataset.catalogCategory || '';
-      const { products } = await get('/products?category=' + encodeURIComponent(category));
-      if (!Array.isArray(products)) return;
-      const perPage = 12;
-      const queryPage = Number(new URLSearchParams(location.search).get('page'));
-      let currentPage = Number.isInteger(queryPage) && queryPage > 0
-        ? queryPage
-        : (page === 'gpproducts2.html' ? 2 : 1);
-      let paginationNav = $('nav[aria-label="Page navigation"]', section);
-      if (!paginationNav) {
-        paginationNav = document.createElement('nav');
-        paginationNav.setAttribute('aria-label', 'Page navigation');
-        paginationNav.innerHTML = '<ul class="pagination justify-content-center flex-wrap"></ul>';
+      const params = new URLSearchParams({
+        category,
+        page: String(currentPage),
+        limit: String(perPage),
+      });
+      const { products, pagination: pageInfo } = await get('/products?' + params.toString());
+      if (!Array.isArray(products)) {
+        grid.innerHTML = fallbackHTML;
+        return;
       }
-      if (paginationNav.parentElement === grid) grid.after(paginationNav);
-      if (!paginationNav.isConnected) grid.after(paginationNav);
-      let pagination = $('.pagination', paginationNav);
-      if (!pagination) {
-        pagination = document.createElement('ul');
-        pagination.className = 'pagination justify-content-center flex-wrap';
-        paginationNav.appendChild(pagination);
-      }
+      currentPage = Number(pageInfo && pageInfo.page) || currentPage;
 
       function pageHref(targetPage) {
         if (category.toLowerCase() === 'gopro accessories') {
@@ -192,27 +206,23 @@
         return page + (params.size ? '?' + params.toString() : '');
       }
 
-      function renderCatalog() {
-        const pageCount = Math.max(1, Math.ceil(products.length / perPage));
-        currentPage = Math.min(currentPage, pageCount);
-        const start = (currentPage - 1) * perPage;
-        const visibleProducts = products.slice(start, start + perPage);
-        grid.innerHTML = visibleProducts.length
-          ? visibleProducts.map(productCardHTML).join('')
-          : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
-        paginationNav.hidden = pageCount < 2;
-        pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
-          const targetPage = index + 1;
-          const active = targetPage === currentPage;
-          return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
-            pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
-        }).join('');
-        bindProductButtons(grid);
-      }
-
-      renderCatalog();
+      const pageCount = Math.max(1, Number(pageInfo && pageInfo.pages) || Math.ceil(products.length / perPage));
+      const visibleProducts = pageInfo ? products : products.slice((currentPage - 1) * perPage, currentPage * perPage);
+      grid.innerHTML = visibleProducts.length
+        ? visibleProducts.map(productCardHTML).join('')
+        : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
+      paginationNav.hidden = pageCount < 2;
+      paginationNav.style.display = pageCount < 2 ? 'none' : '';
+      pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
+        const targetPage = index + 1;
+        const active = targetPage === currentPage;
+        return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
+          pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
+      }).join('');
+      bindProductButtons(grid);
     } catch (_) {
-      // Keep the existing page cards as a graceful fallback if the catalog API is unavailable.
+      // Fall back to the page's existing cards if the catalog API is unavailable.
+      grid.innerHTML = fallbackHTML;
     }
   }
 
@@ -1021,6 +1031,8 @@
               margin: 0,
               loop: false,
               autoplay: false,
+              smartSpeed: 250,
+              slideBy: 1,
               dots: gallery.length > 1,
               nav: gallery.length > 1,
               navText: ['<i class="ti ti-chevron-left"></i>', '<i class="ti ti-chevron-right"></i>'],
@@ -1028,15 +1040,28 @@
               touchDrag: true,
             });
           }
+          const firstImage = $('.dynamic-product-image', slides);
+          if (!firstImage || firstImage.complete) document.documentElement.classList.remove('dynamic-product-loading');
+          else {
+            const showProduct = () => document.documentElement.classList.remove('dynamic-product-loading');
+            firstImage.addEventListener('load', showProduct, { once: true });
+            firstImage.addEventListener('error', showProduct, { once: true });
+          }
         }
+        if (isDynamicProduct && !slides) document.documentElement.classList.remove('dynamic-product-loading');
         const videoPanel = $('.product-description > .bg-img');
         if (videoPanel) videoPanel.style.display = 'none';
         document.title = liveProduct.name + ' | Pixel House Sri Lanka';
       }
     } catch (error) {
-      if (isDynamicProduct && /not found/i.test(error.message || '')) {
-        const description = $('.product-description');
-        if (description) description.innerHTML = '<div class="container py-4"><h2>Product unavailable</h2><p>This product may have been removed or is not currently available.</p><a class="btn btn-primary" href="products.html">Browse products</a></div>';
+      if (isDynamicProduct) {
+        const pageContent = $('.page-content-wrapper');
+        const notFound = /not found/i.test(error.message || '');
+        if (pageContent) pageContent.innerHTML = '<div class="container py-5"><div class="catalog-empty-state"><h5>' +
+          (notFound ? 'Product unavailable' : 'Product could not be loaded') +
+          '</h5><p>' + (notFound ? 'This product may have been removed or is not currently available.' : 'Please check your connection and try again.') +
+          '</p><a class="btn btn-primary" href="products.html">Browse products</a></div></div>';
+        document.documentElement.classList.remove('dynamic-product-loading');
         return;
       }
     }
@@ -1260,11 +1285,13 @@
     var pl = document.getElementById('preloader');
     if (pl) pl.style.display = 'none';
 
+    // Start catalog and product requests immediately instead of waiting for
+    // the session check, so newly added products can render sooner.
+    wireCategoryCatalog().catch(() => {});
+    wireProductDetail().catch(() => {});
     await loadSession();
     if (wiring[page]) await wiring[page]();
-    await wireCategoryCatalog();
     hideRemovedCatalogCards();
-    wireProductDetail();
     wireProductReviews();
     updateFlashSaleStockBars();
     bindProductButtons(document);

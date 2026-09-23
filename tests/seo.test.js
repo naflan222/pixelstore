@@ -65,6 +65,47 @@ test('product page receives Product and Offer schema without fake ratings', () =
   assert.match(result, /No verified reviews yet/);
 });
 
+test('dynamic catalog product pages receive their own canonical and metadata', async () => {
+  const app = express();
+  app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, createHtmlHandler({
+    rootDir: root,
+    productLookup: async (slug) => slug === 'new-tripod'
+      ? { slug, name: 'New Tripod', description: 'A sturdy action-camera tripod.', price: 3200, image: 'img/product/1.webp', stock: 4, status: 'active' }
+      : null,
+  }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/single-product.html?product=new-tripod`);
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>New Tripod in Sri Lanka \| Pixel House<\/title>/);
+    assert.match(html, /rel="canonical" href="https:\/\/pixelhouse\.lk\/single-product\.html\?product=new-tripod"/);
+    assert.match(html, /"name":"New Tripod"/);
+
+    const missing = await fetch(`${base}/single-product.html?product=deleted-item`);
+    assert.equal(missing.status, 404);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('category pages declare their live catalog category', () => {
+  const categories = [
+    ['catagory.html', 'GoPro Accessories'],
+    ['actioncamera.html', 'Action Cameras'],
+    ['insta360-camera.html', 'Insta360 Camera'],
+    ['dji-osmo-camera.html', 'DJI Osmo Camera'],
+    ['360accesories.html', 'Insta360 Accessories'],
+    ['osmocat.html', 'Osmo Accessories'],
+  ];
+  for (const [filename, category] of categories) {
+    assert.match(read(filename), new RegExp(`data-catalog-category="${category}"`));
+  }
+});
+
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
@@ -94,7 +135,7 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
   const htmlHandler = createHtmlHandler({ rootDir: root });
   app.get('/', htmlHandler);
   app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, htmlHandler);
-  app.get('/sitemap.xml', createSitemapHandler({ rootDir: root }));
+  app.get('/sitemap.xml', createSitemapHandler({ rootDir: root, productList: async () => [{ slug: 'new-tripod', created_at: '2026-09-23' }] }));
 
   const server = await new Promise((resolve) => {
     const listener = app.listen(0, () => resolve(listener));
@@ -118,6 +159,7 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
     assert.match(sitemap.headers.get('content-type'), /application\/xml/);
     assert.match(sitemapText, /<loc>https:\/\/pixelhouse\.lk\/<\/loc>/);
     assert.match(sitemapText, /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+    assert.match(sitemapText, /https:\/\/pixelhouse\.lk\/single-product\.html\?product=new-tripod/);
     assert.doesNotMatch(sitemapText, /featured-products\.html|flash-sale\.html/);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

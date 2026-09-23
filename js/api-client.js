@@ -73,6 +73,7 @@
     const name = escapeHtml(p.name);
     const slug = escapeHtml(p.slug);
     const image = escapeHtml(p.image);
+    const productUrl = 'single-product.html?product=' + encodeURIComponent(p.slug);
     const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + escapeHtml(p.badge) + '</span>' : '';
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
     const outOfStock = p.stock != null && p.stock <= 0;
@@ -86,11 +87,11 @@
       : '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>';
     return (
       '<div class="col-6 col-md-4">' +
-        '<div class="card product-card" style="position:relative">' +
+        '<div class="card product-card catalog-product-card" style="position:relative">' +
           '<div class="card-body">' +
             badge + stockBadge +
-            '<a class="product-thumbnail d-block" href="' + slug + '.html"><img class="mb-2" src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
-            '<a class="product-title" href="' + slug + '.html">' + name + '</a>' +
+            '<a class="product-thumbnail d-block" href="' + productUrl + '"><img class="mb-2" src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
+            '<a class="product-title" href="' + productUrl + '">' + name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
             rating +
             addBtn +
@@ -148,6 +149,50 @@
         } catch (err) { alert(err.message); }
       });
     });
+  }
+
+  async function wireCategoryCatalog() {
+    const section = $('[data-catalog-category]');
+    if (!section) return;
+    const grid = $('.row.g-2', section);
+    if (!grid) return;
+    try {
+      const category = section.dataset.catalogCategory || '';
+      const { products } = await get('/products?category=' + encodeURIComponent(category));
+      if (!Array.isArray(products)) return;
+      grid.innerHTML = products.length
+        ? products.map(productCardHTML).join('')
+        : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
+      bindProductButtons(grid);
+    } catch (_) {
+      // Keep the existing page cards as a graceful fallback if the catalog API is unavailable.
+    }
+  }
+
+  async function hideRemovedCatalogCards() {
+    if (page !== 'home.html' && !$('.related-product-wrapper')) return;
+    try {
+      const { products } = await get('/products');
+      const activeSlugs = new Set((products || []).map((product) => String(product.slug)));
+      const cards = page === 'home.html'
+        ? $$('.product-card, .horizontal-product-card, .featured-product-card')
+        : $$('.related-product-wrapper .product-card');
+      cards.forEach((card) => {
+        const link = $('.product-title[href], .product-thumbnail[href]', card);
+        if (!link) return;
+        const href = link.getAttribute('href') || '';
+        let slug = '';
+        try {
+          const target = new URL(href, location.href);
+          slug = target.searchParams.get('product') || target.pathname.split('/').pop().replace(/\.html$/i, '');
+        } catch (_) { return; }
+        if (!slug || slug === 'single-product' || slug === 'products' || activeSlugs.has(slug)) return;
+        const column = card.parentElement && /\bcol(?:-|\s)/.test(card.parentElement.className) ? card.parentElement : null;
+        (column || card).remove();
+      });
+    } catch (_) {
+      // Keep static markup if the public catalog cannot be reached.
+    }
   }
 
   function requireLogin() {
@@ -894,16 +939,47 @@
 
   /* ---------- product detail pages: wire "Add to Cart" ---------- */
   async function wireProductDetail() {
-    const slug = page.replace('.html', '');
+    const queryProduct = new URLSearchParams(location.search).get('product');
+    const slug = queryProduct || page.replace('.html', '');
+    const isDynamicProduct = page === 'single-product.html' && Boolean(queryProduct);
     // Only run on actual product detail pages (not home, index, cart, etc.)
     if (!slug || page === 'index.html' || page === 'home.html') return;
+
+    let liveProduct = null;
+    try {
+      const result = await get('/products/' + encodeURIComponent(slug));
+      liveProduct = result.product;
+      if (isDynamicProduct && liveProduct) {
+        const title = $('.p-title-price h5');
+        const price = $('.p-title-price .sale-price');
+        const description = $('.p-specification .container p');
+        const slides = $('.product-slides');
+        if (title) title.textContent = liveProduct.name;
+        if (price) price.innerHTML = money(liveProduct.price) + (liveProduct.old_price ? '<span>' + money(liveProduct.old_price) + '</span>' : '');
+        if (description) description.textContent = liveProduct.description || 'Contact PixelHouse for more product details.';
+        if (slides) {
+          slides.innerHTML = '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" alt="' + escapeHtml(liveProduct.name) + '"></div>';
+          const productImage = $('.dynamic-product-image', slides);
+          if (productImage) productImage.src = liveProduct.image || '';
+        }
+        const videoPanel = $('.product-description > .bg-img');
+        if (videoPanel) videoPanel.style.display = 'none';
+        document.title = liveProduct.name + ' | Pixel House Sri Lanka';
+      }
+    } catch (error) {
+      if (isDynamicProduct && /not found/i.test(error.message || '')) {
+        const description = $('.product-description');
+        if (description) description.innerHTML = '<div class="container py-4"><h2>Product unavailable</h2><p>This product may have been removed or is not currently available.</p><a class="btn btn-primary" href="products.html">Browse products</a></div>';
+        return;
+      }
+    }
 
     // The main "Add to Cart" button on product detail pages is inside <form class="cart-form">
     const cartForm = $('.cart-form');
     if (cartForm) {
       // Fetch product to show stock status and disable add if out of stock
       try {
-        const { product: prod } = await get('/products/' + slug);
+        const prod = liveProduct || (await get('/products/' + encodeURIComponent(slug))).product;
         const salesVolume = $('.sales-volume');
         if (salesVolume) updateStockProgress(salesVolume, prod);
         if (prod.stock != null && prod.stock <= 0) {
@@ -932,7 +1008,7 @@
         const qtyInput = $('.cart-quantity-input', cartForm);
         const quantity = qtyInput ? Math.max(1, parseInt(qtyInput.value) || 1) : 1;
         try {
-          const { product } = await get('/products/' + slug);
+          const { product } = await get('/products/' + encodeURIComponent(slug));
           await post('/cart', { product_id: product.id, quantity });
           location.href = 'cart.html';
         } catch (err) { alert(err.message); }
@@ -961,7 +1037,7 @@
   }
 
   async function wireProductReviews() {
-    const slug = page.replace('.html', '');
+    const slug = new URLSearchParams(location.search).get('product') || page.replace('.html', '');
     const form = $('.ratings-submit-form form');
     const list = $('.rating-review-content ul');
     if (!slug || !form || !list) return;
@@ -1070,7 +1146,7 @@
           box.innerHTML = '<div class="ss-empty">No products found. Try "stick", "case", "kit"...</div>';
         } else {
           box.innerHTML = matches.map((p) =>
-            `<a href="${escapeHtml(p.slug)}.html" data-slug="${escapeHtml(p.slug)}">` +
+            `<a href="single-product.html?product=${encodeURIComponent(p.slug)}" data-slug="${escapeHtml(p.slug)}">` +
               `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">` +
               `<span class="ss-name">${escapeHtml(p.name)}</span>` +
               `<span class="ss-price">${money(p.price)}</span>` +
@@ -1101,7 +1177,7 @@
         const words = q.split(/\s+/).filter(Boolean);
         const match = list.find((p) => words.every((w) => p.name.toLowerCase().includes(w)))
                    || list.find((p) => words.some((w) => p.name.toLowerCase().includes(w)));
-        if (match) location.href = match.slug + '.html';
+        if (match) location.href = 'single-product.html?product=' + encodeURIComponent(match.slug);
         else { input.value = ''; input.placeholder = 'No product found — try again'; }
       });
 
@@ -1119,6 +1195,8 @@
 
     await loadSession();
     if (wiring[page]) await wiring[page]();
+    await wireCategoryCatalog();
+    hideRemovedCatalogCards();
     wireProductDetail();
     wireProductReviews();
     updateFlashSaleStockBars();

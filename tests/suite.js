@@ -56,6 +56,35 @@ async function defineSuite(t, ctx) {
     assert.ok(featured.data.products.every((p) => p.featured === 1));
   });
 
+  await t.test('public category catalog follows admin status and deletion changes', async () => {
+    await owner.post('/api/auth/login', { username: 'demo', password: 'demo1234' });
+    const category = await owner.post('/api/admin/categories', { name: 'Dynamic Test Category', slug: 'dynamic-test-category' });
+    assert.equal(category.status, 201);
+    const created = await owner.post('/api/admin/products', {
+      name: 'Dynamic Test Product', slug: 'dynamic-test-product', price: 1250,
+      category_id: category.data.id, image: PNG_1PX, status: 'active',
+    });
+    assert.equal(created.status, 201);
+
+    let listing = await guest.get('/api/products?category=dynamic-test-category');
+    assert.equal(listing.status, 200);
+    assert.equal(listing.data.products.length, 1);
+    assert.equal(listing.data.products[0].slug, 'dynamic-test-product');
+    assert.equal(listing.data.products[0].category_name, 'Dynamic Test Category');
+
+    const hidden = await owner.put(`/api/admin/products/${created.data.id}`, {
+      name: 'Dynamic Test Product', slug: 'dynamic-test-product', price: 1250,
+      category_id: category.data.id, status: 'inactive',
+    });
+    assert.equal(hidden.status, 200);
+    listing = await guest.get('/api/products?category=Dynamic Test Category');
+    assert.deepEqual(listing.data.products, []);
+    assert.equal((await guest.get('/api/products/dynamic-test-product')).status, 404);
+
+    await owner.del(`/api/admin/products/${created.data.id}`);
+    await owner.del(`/api/admin/categories/${category.data.id}`);
+  });
+
   await t.test('product detail has related + reviews', async () => {
     const { status, data } = await guest.get('/api/products/domeport');
     assert.equal(status, 200);

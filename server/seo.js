@@ -180,6 +180,7 @@ function textOnly(value) {
 
 function absoluteUrl(value) {
   if (!value) return DEFAULT_IMAGE;
+  if (/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(String(value))) return DEFAULT_IMAGE;
   if (/^https?:\/\//i.test(value)) return value;
   return `${SITE_URL}/${String(value).replace(/^\//, '')}`;
 }
@@ -200,7 +201,8 @@ function extractProduct(html) {
   };
 }
 
-function canonicalFor(filename) {
+function canonicalFor(filename, override = null) {
+  if (override) return override;
   return filename === 'home.html' ? `${SITE_URL}/` : `${SITE_URL}/${filename}`;
 }
 
@@ -307,7 +309,7 @@ function buildSchema(meta, canonical, filename, catalogProduct = null) {
       image: [meta.product.image],
       description: meta.description,
       url: canonical,
-      sku: (catalogProduct && catalogProduct.sku) || path.basename(filename, '.html').toUpperCase(),
+      sku: (catalogProduct && catalogProduct.sku) || (catalogProduct && catalogProduct.slug) || path.basename(filename, '.html').toUpperCase(),
       offers: offer,
     };
     if (catalogProduct && catalogProduct.brand) productSchema.brand = { '@type': 'Brand', name: String(catalogProduct.brand) };
@@ -346,7 +348,7 @@ function improveImages(html) {
   });
 }
 
-function enhanceHtml(html, filename, catalogProduct = null) {
+function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = null) {
   const meta = metaFor(filename, html);
   if (meta.product && catalogProduct) {
     meta.product = {
@@ -358,8 +360,8 @@ function enhanceHtml(html, filename, catalogProduct = null) {
     meta.heading = meta.product.name;
     meta.title = `${meta.product.name} in Sri Lanka | Pixel House`;
   }
-  const canonical = canonicalFor(filename);
-  const isIndexable = INDEXABLE_SET.has(filename);
+  const canonical = canonicalFor(filename, canonicalOverride);
+  const isIndexable = INDEXABLE_SET.has(filename) || Boolean(canonicalOverride && catalogProduct);
   const image = meta.product ? meta.product.image : DEFAULT_IMAGE;
   const robots = isIndexable
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
@@ -437,11 +439,20 @@ function createHtmlHandler({ rootDir, productLookup = null }) {
 
     try {
       const html = fs.readFileSync(filePath, 'utf8');
-      const catalogProduct = productLookup && extractProduct(html)
-        ? await productLookup(path.basename(filename, '.html'))
+      const dynamicSlug = filename === 'single-product.html' ? String(req.query.product || '') : '';
+      const isProductPage = Boolean(extractProduct(html));
+      const shouldResolveProduct = filename !== 'single-product.html' || Boolean(dynamicSlug);
+      const catalogProduct = productLookup && isProductPage && shouldResolveProduct
+        ? await productLookup(dynamicSlug || path.basename(filename, '.html'))
+        : null;
+      if (productLookup && isProductPage && shouldResolveProduct && !catalogProduct) {
+        return res.status(404).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product unavailable | Pixel House</title><body><main><h1>Product unavailable</h1><p>This product may have been removed or is no longer available.</p><a href="/products.html">Browse products</a></main></body></html>');
+      }
+      const canonicalOverride = dynamicSlug && catalogProduct
+        ? `${SITE_URL}/single-product.html?product=${encodeURIComponent(dynamicSlug)}`
         : null;
       res.set('Cache-Control', 'public, max-age=0, must-revalidate');
-      res.type('html').send(enhanceHtml(html, filename, catalogProduct));
+      res.type('html').send(enhanceHtml(html, filename, catalogProduct, canonicalOverride));
     } catch (error) {
       next(error);
     }
@@ -457,8 +468,8 @@ function xmlEscape(value) {
     .replace(/'/g, '&apos;');
 }
 
-function createSitemapHandler({ rootDir }) {
-  return function serveSitemap(req, res) {
+function createSitemapHandler({ rootDir, productList = null }) {
+  return async function serveSitemap(req, res) {
     const urls = INDEXABLE_PAGES
       .filter((filename) => fs.existsSync(path.join(rootDir, filename)))
       .map((filename) => {
@@ -466,6 +477,14 @@ function createSitemapHandler({ rootDir }) {
         const lastmod = stat.mtime.toISOString().slice(0, 10);
         return `  <url>\n    <loc>${xmlEscape(canonicalFor(filename))}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
       });
+
+    if (productList) {
+      const products = await productList();
+      for (const product of products) {
+        const url = `${SITE_URL}/single-product.html?product=${encodeURIComponent(product.slug)}`;
+        urls.push(`  <url>\n    <loc>${xmlEscape(url)}</loc>\n    <lastmod>${xmlEscape(String(product.updated_at || product.created_at || '').slice(0, 10))}</lastmod>\n  </url>`);
+      }
+    }
 
     res.type('application/xml').send(
       `<?xml version="1.0" encoding="UTF-8"?>\n` +

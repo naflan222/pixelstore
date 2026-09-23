@@ -327,23 +327,33 @@ router.put('/profile', requireAuth, async (req, res) => {
 /* ---------------- PRODUCTS ---------------- */
 
 router.get('/products', async (req, res) => {
-  const { category, featured, flash_sale, q } = req.query;
-  let sql = 'SELECT * FROM products WHERE 1=1';
+  const { category, category_id, featured, flash_sale, q } = req.query;
+  let sql = `SELECT p.*, c.name AS category_name, c.slug AS category_slug
+    FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.status = 'active'`;
   const params = [];
-  if (category) { sql += ' AND category = ?'; params.push(category); }
-  if (featured === '1') sql += ' AND featured = 1';
-  if (flash_sale === '1') sql += ' AND flash_sale = 1';
+  if (category_id) {
+    const id = Number(category_id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid category.' });
+    sql += ' AND p.category_id = ?'; params.push(id);
+  } else if (category) {
+    const value = String(category).trim();
+    sql += ' AND (lower(c.name) = lower(?) OR lower(c.slug) = lower(?) OR lower(p.category) = lower(?))';
+    params.push(value, value, value);
+  }
+  if (featured === '1') sql += ' AND p.featured = 1';
+  if (flash_sale === '1') sql += ' AND p.flash_sale = 1';
   // lower() both sides: case-insensitive on SQLite AND PostgreSQL alike.
-  if (q) { sql += ' AND lower(name) LIKE lower(?)'; params.push(`%${q}%`); }
-  sql += ' ORDER BY id';
+  if (q) { sql += ' AND lower(p.name) LIKE lower(?)'; params.push(`%${q}%`); }
+  sql += ' ORDER BY p.id DESC';
   res.json({ products: await db.all(sql, ...params) });
 });
 
 router.get('/products/:slug', async (req, res) => {
-  const product = await db.get('SELECT * FROM products WHERE slug = ?', req.params.slug);
+  const product = await db.get("SELECT * FROM products WHERE slug = ? AND status = 'active'", req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   const randomFn = db.engine === 'postgres' ? 'random()' : 'RANDOM()';
-  const related = await db.all(`SELECT * FROM products WHERE slug != ? ORDER BY ${randomFn} LIMIT 4`, req.params.slug);
+  const related = await db.all(`SELECT * FROM products WHERE slug != ? AND status = 'active' ORDER BY ${randomFn} LIMIT 4`, req.params.slug);
   const reviews = await db.all(`
     SELECT r.rating, r.comment, r.created_at, u.username
     FROM reviews r JOIN users u ON u.id = r.user_id

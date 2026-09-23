@@ -2549,6 +2549,48 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 .product-card .product-thumbnail img {
   width: 100%;
 }
+.catalog-product-card .product-thumbnail {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
+  overflow: hidden;
+  background: #f7f7fb;
+  border-radius: 0.5rem;
+}
+.catalog-product-card .product-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0 !important;
+  object-fit: contain;
+}
+.catalog-product-card .product-title {
+  display: block;
+  min-height: 2.8em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.catalog-empty-state {
+  padding: 1.5rem 1rem;
+  border-radius: 0.75rem;
+  background: #f7f7fb;
+  color: #6b7280;
+  text-align: center;
+}
+.dynamic-product-slide {
+  display: grid;
+  place-items: center;
+  background-color: #f7f7fb;
+  background-image: none !important;
+}
+.dynamic-product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .product-card .product-thumbnail .offer-countdown-timer {
   background-color: #ffaf00;
   position: absolute;

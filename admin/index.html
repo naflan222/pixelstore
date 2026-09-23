@@ -500,11 +500,11 @@ tr:last-child td{border-bottom:none}
       <input type="hidden" id="prodId">
       <div class="form-grid">
         <div class="form-group"><label>Name *</label><input type="text" id="prodName" required></div>
-        <div class="form-group"><label>Slug * (URL key, no spaces)</label><input type="text" id="prodSlug" required></div>
+        <div class="form-group"><label>Product URL (auto-created if blank)</label><input type="text" id="prodSlug" placeholder="Auto-created from product name"></div>
         <div class="form-group"><label>Price (Rs.) *</label><input type="number" step="0.01" id="prodPrice" required></div>
         <div class="form-group"><label>Old Price (Rs.)</label><input type="number" step="0.01" id="prodOldPrice"></div>
         <div class="form-group"><label>Legacy image path</label><input type="text" id="prodImage" placeholder="Optional: existing image path"></div>
-        <div class="form-group"><label>Category</label><select id="prodCategory"></select></div>
+        <div class="form-group"><label>Category *</label><select id="prodCategory" required></select></div>
         <div class="form-group"><label>Stock</label><input type="number" id="prodStock" value="100"></div>
         <div class="form-group"><label>Reorder at</label><input type="number" min="0" id="prodReorderThreshold" value="10"></div>
         <div class="form-group"><label>SKU</label><input type="text" id="prodSku" placeholder="Optional unique SKU"></div>
@@ -519,7 +519,7 @@ tr:last-child td{border-bottom:none}
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="prodFlashSale"> Flash Sale</label>
         </div>
         <div class="form-group full"><label>Description</label><textarea id="prodDesc"></textarea></div>
-        <div class="form-group full"><label>Product images</label><input type="file" id="prodFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple onchange="previewProductFiles(this.files)"><div id="productImageGallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div></div>
+        <div class="form-group full"><label>Product images</label><input type="file" id="prodFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple onchange="previewProductFiles(this.files)"><small>The first uploaded photo becomes the main product image. It will be fitted to the website’s product cards automatically.</small><div id="productImageGallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="saveProduct()">Save Product</button>
@@ -990,9 +990,12 @@ function closeProductModal() { $('#productModal').classList.remove('active'); }
 
 async function saveProduct() {
   const id = $('#prodId').value;
+  const productName = $('#prodName').value.trim();
+  const typedSlug = $('#prodSlug').value.trim();
+  const generatedSlug = productName.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const body = {
-    name: $('#prodName').value.trim(),
-    slug: $('#prodSlug').value.trim().replace(/\s+/g, '-').toLowerCase(),
+    name: productName,
+    slug: (typedSlug || generatedSlug || ('product-' + Date.now())).replace(/\s+/g, '-').toLowerCase(),
     price: parseFloat($('#prodPrice').value),
     old_price: $('#prodOldPrice').value ? parseFloat($('#prodOldPrice').value) : null,
     image: $('#prodImage').value.trim(),
@@ -1011,11 +1014,16 @@ async function saveProduct() {
     featured: $('#prodFeatured').checked,
     flash_sale: $('#prodFlashSale').checked,
   };
-  if (!body.name || !body.slug || body.price == null) {
-    toast('Name, slug and price are required', 'error');
+  if (!body.name || !body.slug || !Number.isFinite(body.price) || body.price < 0 || !body.category_id) {
+    toast('Enter a product name and price, then choose its category.', 'error');
+    return;
+  }
+  if (!id && !pendingProductFiles.length && !body.image) {
+    toast('Upload at least one product photo.', 'error');
     return;
   }
   try {
+    const isNewProduct = !id;
     let productId = id;
     if (id) {
       await apiPut('/admin/products/' + id, body);
@@ -1025,8 +1033,9 @@ async function saveProduct() {
       productId = result.id;
       toast('Product added');
     }
-    for (const file of pendingProductFiles) {
-      await apiPost('/admin/products/' + productId + '/images', { data: await fileToDataUrl(file), file_name: file.name, is_primary: false });
+    for (let index = 0; index < pendingProductFiles.length; index += 1) {
+      const file = pendingProductFiles[index];
+      await apiPost('/admin/products/' + productId + '/images', { data: await fileToDataUrl(file), file_name: file.name, is_primary: isNewProduct && index === 0 });
     }
     closeProductModal();
     loadProducts();
@@ -1034,7 +1043,7 @@ async function saveProduct() {
 }
 
 function renderCategoryOptions(selectedId) {
-  $('#prodCategory').innerHTML = '<option value="">Uncategorized</option>' + categories.filter(c => c.is_active || c.id === selectedId).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  $('#prodCategory').innerHTML = '<option value="">Choose a category</option>' + categories.filter(c => c.is_active || c.id === selectedId).map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
 }
 
 function fileToDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }

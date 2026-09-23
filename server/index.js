@@ -156,7 +156,7 @@ app.use('/api/admin', adminRoutes);
 const publicRoot = path.join(__dirname, '..');
 const seoHtmlHandler = createHtmlHandler({
   rootDir: publicRoot,
-  productLookup: (slug) => db.get('SELECT name, description, price, image, stock, status, sku, brand, mpn, gtin FROM products WHERE slug = ?', slug),
+  productLookup: (slug) => db.get("SELECT name, description, price, image, stock, status, sku, brand, mpn, gtin, slug FROM products WHERE slug = ? AND status = 'active'", slug),
 });
 const legacyStorefrontRedirects = new Map([
   ['/featured-products.html', '/products.html'],
@@ -174,7 +174,10 @@ app.get([...legacyStorefrontRedirects.keys()], (req, res) => {
 });
 app.get('/', seoHtmlHandler);
 app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, seoHtmlHandler);
-app.get('/sitemap.xml', createSitemapHandler({ rootDir: publicRoot }));
+app.get('/sitemap.xml', createSitemapHandler({
+  rootDir: publicRoot,
+  productList: () => db.all("SELECT slug, created_at FROM products WHERE status = 'active' ORDER BY id"),
+}));
 
 // ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
 app.use(express.static(publicRoot));

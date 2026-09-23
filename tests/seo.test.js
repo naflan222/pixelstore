@@ -39,15 +39,17 @@ test('product page receives Product and Offer schema without fake ratings', () =
   const result = enhanceHtml(source, 'wpdcase.html');
 
   assert.deepEqual(product, {
-    name: 'Water Proof Diving Case',
+    name: 'Waterproof Diving Case',
     price: '4300',
     image: 'https://pixelhouse.lk/img/bg-img/wpdcase1.jpg',
   });
-  assert.match(result, /<title>Water Proof Diving Case in Sri Lanka \| Pixel House<\/title>/);
+  assert.match(result, /<title>Waterproof Diving Case in Sri Lanka \| Pixel House<\/title>/);
   assert.match(result, /"@type":"Product"/);
   assert.match(result, /"priceCurrency":"LKR"/);
   assert.match(result, /"price":"4300"/);
   assert.doesNotMatch(result, /aggregateRating/);
+  assert.doesNotMatch(result, /Very good product\.|4 ratings|Flash sale end in/);
+  assert.match(result, /No verified reviews yet/);
 });
 
 test('private transactional pages are explicitly excluded from indexing', () => {
@@ -95,6 +97,7 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
     assert.match(sitemap.headers.get('content-type'), /application\/xml/);
     assert.match(sitemapText, /<loc>https:\/\/pixelhouse\.lk\/<\/loc>/);
     assert.match(sitemapText, /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+    assert.doesNotMatch(sitemapText, /featured-products\.html|flash-sale\.html/);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

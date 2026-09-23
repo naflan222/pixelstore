@@ -4,6 +4,16 @@ const db = require('./database');
 
 const SESSION_DAYS = 30;
 
+function cookieOptions(maxAge) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge,
+  };
+}
+
 async function createSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
   await db.run(
@@ -37,7 +47,7 @@ async function attachUser(req, res, next) {
   let guestId = req.cookies && req.cookies.pixels_guest;
   if (!guestId || !/^[a-f0-9]{32}$/.test(guestId)) {
     guestId = crypto.randomBytes(16).toString('hex');
-    res.cookie('pixels_guest', guestId, { httpOnly: true, sameSite: 'lax', maxAge: 365 * 24 * 3600 * 1000 });
+    res.cookie('pixels_guest', guestId, cookieOptions(365 * 24 * 3600 * 1000));
   }
   req.guestId = guestId;
   next();

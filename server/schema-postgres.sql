@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS products (
   category    TEXT DEFAULT 'GoPro Accessories',
   badge       TEXT,
   stock       INTEGER DEFAULT 100,
-  rating      DOUBLE PRECISION DEFAULT 4.5,
+  rating      DOUBLE PRECISION DEFAULT 0,
   rating_count INTEGER DEFAULT 0,
   featured    INTEGER DEFAULT 0,
   flash_sale  INTEGER DEFAULT 0,

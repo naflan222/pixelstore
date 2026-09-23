@@ -987,7 +987,7 @@ router.put('/products/:id', catalogAccess, async (req, res) => {
       WHERE id = ?`,
       String(name).trim(), String(slug).trim(), String(description || '').trim(), Number(price), old_price == null || old_price === '' ? null : Number(old_price),
       String(image || current.image).trim(), category ? category.name : 'GoPro Accessories', category && category.id, badge || null, stock != null ? Math.max(0, Number.parseInt(stock, 10) || 0) : current.stock,
-      featured ? 1 : 0, flash_sale ? 1 : 0, Number(rating) || 4.5, Math.max(0, Number(reorder_threshold) || 0), cleanSku, String(status || 'active'), String(brand || '').trim(), id);
+      featured ? 1 : 0, flash_sale ? 1 : 0, Number(rating) || 0, Math.max(0, Number(reorder_threshold) || 0), cleanSku, String(status || 'active'), String(brand || '').trim(), id);
     if (image && image !== current.image) {
       await tx.run('UPDATE product_images SET is_primary = 0 WHERE product_id = ?', id);
       await tx.run(`INSERT INTO product_images (product_id, image_data, mime_type, file_name, sort_order, is_primary)

@@ -1,29 +1,77 @@
 // Pixels store — Express server (API + static frontend)
-const express = require('express');
+const fs = require('fs');
 const path = require('path');
+
+// Minimal .env loader (no dependency) — only fills variables that are not
+// already set, so platform-provided env vars (e.g. on Railway) always win.
+(function loadDotEnv() {
+  const file = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!m || line.trim().startsWith('#')) continue;
+    let value = m[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+      value = value.slice(1, -1);
+    if (process.env[m[1]] === undefined) process.env[m[1]] = value;
+  }
+})();
+
+const express = require('express');
 const cookieParser = require('cookie-parser');
 
 const { attachUser } = require('./auth');
+const { describeConfig: describeMailConfig } = require('./mailer');
+const { maintenanceMode } = require('./maintenance');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
-const db = require('./db');
+const db = require('./database');
+const { createHtmlHandler, createSitemapHandler } = require('./seo');
+const { rateLimit, securityHeaders } = require('./security');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(securityHeaders);
+
 app.use(express.json({ limit: '7mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// ---- Health check (always available, even during maintenance) ----
+// Reports only non-sensitive facts: engine name and reachability. Never
+// includes DATABASE_URL, credentials, or any record contents.
+app.get('/api/health', async (req, res) => {
+  let reachable = false;
+  try {
+    await db.get('SELECT 1 AS ok');
+    reachable = true;
+  } catch (_) {
+    reachable = false;
+  }
+  res.status(reachable ? 200 : 503).json({
+    ok: reachable,
+    engine: db.engine,
+    db_reachable: reachable,
+    maintenance: process.env.MAINTENANCE_MODE === 'true',
+  });
+});
+
 app.use(attachUser);
+// Cutover guard: blocks state-changing API calls while enabled. Registered
+// after /api/health so health checks keep working during maintenance.
+app.use('/api', maintenanceMode);
 
 // ---- Chat endpoint ----
 // Works in TWO modes:
 //  1) Built-in smart shop assistant (always available, answers from the real product DB)
 //  2) Gemini AI (used automatically when GEMINI_API_KEY is set)
 
-function shopAssistant(message) {
+async function shopAssistant(message) {
   const msg = String(message).toLowerCase();
-  const products = db.prepare('SELECT name, price, old_price, slug, stock, badge FROM products').all();
+  const products = await db.all('SELECT name, price, old_price, slug, stock, badge FROM products');
   const fmt = (n) => 'Rs. ' + Number(n).toLocaleString('en-US');
 
   // Product search: match any word of the question against product names
@@ -51,9 +99,9 @@ function shopAssistant(message) {
   if (/buy|order|how can i get|purchase/.test(msg))
     return 'Ordering is easy — no account needed! Just tap a product, hit the "+" button to add it to your cart, then open the Cart tab and tap "Checkout Now". Fill in your name, phone and address, choose delivery and payment — done! 🛒';
   if (/shipping|deliver|courier|dispatch/.test(msg))
-    return 'We offer three delivery options at checkout: Fast Shipping (1 day, Rs. 500), Regular (3–7 days, Rs. 250), and Courier (5–8 days, free). You can pick your preferred one on the checkout page.';
+    return 'At checkout you can choose standard delivery (Rs. 500) or free pickup from PixelHouse. Contact us before ordering if you need a special delivery arrangement.';
   if (/payment|pay|card|paypal|cash/.test(msg))
-    return 'We accept Cash on Delivery, Credit/Debit Card, Bank Transfer and PayPal. You can choose your payment method at checkout.';
+    return 'We currently accept Cash on Delivery and Bank Transfer. Card and PayPal options are not available yet.';
   if (/order|track|status|purchase/.test(msg))
     return 'You can see all your orders on the "My Orders" page (my-order.html) after logging in. Each order shows its items, total and status.';
   if (/return|refund|exchange|warranty/.test(msg))
@@ -66,10 +114,11 @@ function shopAssistant(message) {
   return 'I can help with product prices, availability, current deals, shipping options and payment methods. Try asking "price of dome port" or "any deals?" 😊';
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', rateLimit({ windowMs: 60 * 1000, max: 20 }), async (req, res) => {
   try {
     const { message } = req.body || {};
     if (!message) return res.status(400).json({ error: 'Message is required.' });
+    if (String(message).length > 500) return res.status(400).json({ error: 'Message must be 500 characters or fewer.' });
 
     // Mode 2: Gemini when an API key is configured
     if (process.env.GEMINI_API_KEY) {
@@ -88,9 +137,10 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Mode 1: built-in assistant (always works)
-    res.json({ reply: shopAssistant(message) });
+    res.json({ reply: await shopAssistant(message) });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[CHAT ERROR]', error.message);
+    res.status(500).json({ error: 'Chat is temporarily unavailable. Please try again.' });
   }
 });
 
@@ -100,15 +150,64 @@ app.use('/api', apiRoutes);
 // ---- Admin API ----
 app.use('/api/admin', adminRoutes);
 
-// The template showcase is not part of the public storefront.
-app.get('/', (req, res) => res.redirect('/home.html'));
+// ---- Search-friendly storefront pages ----
+// HTML is enriched at response time with metadata and structured data. The
+// source markup and CSS are left unchanged, so this cannot alter the design.
+const publicRoot = path.join(__dirname, '..');
+const seoHtmlHandler = createHtmlHandler({ rootDir: publicRoot });
+const legacyStorefrontRedirects = new Map([
+  ['/featured-products.html', '/products.html'],
+  ['/flash-sale.html', '/products.html'],
+  ['/shop-grid.html', '/products.html'],
+  ['/shop-list.html', '/products.html'],
+  ['/blog-grid.html', '/'],
+  ['/blog-details.html', '/'],
+  ['/vendor-shop.html', '/products.html'],
+]);
+app.get([...legacyStorefrontRedirects.keys()], (req, res) => {
+  res.redirect(301, legacyStorefrontRedirects.get(req.path));
+});
+app.get('/', seoHtmlHandler);
+app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, seoHtmlHandler);
+app.get('/sitemap.xml', createSitemapHandler({ rootDir: publicRoot }));
 
 // ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(publicRoot));
 
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => console.log(`Pixels server running at http://localhost:${PORT}`));
+async function start(port = PORT) {
+  await db.init();
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(port, () => resolve(listener));
+  });
+  const actualPort = server.address() && server.address().port;
+  console.log(`Pixels server running at http://localhost:${actualPort} (db: ${db.engine})`);
+  const mail = describeMailConfig();
+  if (mail.email_enabled) {
+    const where = mail.transport === 'brevo_api'
+      ? 'Brevo HTTP API (api.brevo.com, HTTPS)'
+      : `SMTP ${mail.smtp_host}:${mail.smtp_port} as ${mail.smtp_user}`;
+    console.log(`[MAIL] enabled — transport: ${where}, from: ${mail.mail_from || '(SMTP user)'}` +
+      (mail.force_dev_codes ? ', FORCE_DEV_CODES=1 (dev mode — codes returned in API, no mail sent)' : ''));
+    if (mail.brevo_pixel_tracking_consent === 'declined')
+      console.log(mail.transport === 'brevo_api'
+        ? '[MAIL] Brevo open/click tracking declined for transactional sends (BREVO_PIXEL_TRACKING_CONSENT=off). Brevo still adds its List-Unsubscribe header — that is Brevo-side and cannot be removed from this app.'
+        : '[MAIL] BREVO_PIXEL_TRACKING_CONSENT=off has no effect on the SMTP transport — only the Brevo HTTP API carries per-recipient tracking consent. Set BREVO_API_KEY to use it, or ask Brevo Support to disable tracking for transactional mail on the account.');
+  } else {
+    console.log('[MAIL] NOT configured — reset codes will be printed to this log (dev mode). Set SMTP_* or BREVO_API_KEY env vars.');
+  }
+  return { server, port: actualPort };
+}
+
+if (require.main === module) {
+  start().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, start };

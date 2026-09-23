@@ -3,6 +3,13 @@
 
     var suhaWindow = $(window);
 
+    // Replace the legacy template avatar with the Pixel House logo.
+    // Real customer avatars loaded later by api-client.js are left untouched.
+    $('img[src="img/bg-img/9.jpg"]').attr({
+        src: 'img/core-img/logo-small.png',
+        alt: 'Pixel House'
+    });
+
     // :: Preloader
     suhaWindow.on('load', function () {
         $('#preloader').fadeOut('1000', function () {
@@ -251,13 +258,6 @@
     });
 
     // :: Toast 
-    var toastSuha = [].slice.call(document.querySelectorAll('.toast'));
-    var toastList = toastSuha.map(function (toast) {
-        return new bootstrap.Toast(toast);
-    });
-    toastList.forEach(toast => toast.show());
-
-    // :: Home Page Toast 
     var toastSuha = [].slice.call(document.querySelectorAll('.toast'));
     var toastList = toastSuha.map(function (toast) {
         return new bootstrap.Toast(toast);

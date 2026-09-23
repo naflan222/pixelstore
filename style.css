@@ -1131,6 +1131,16 @@ textarea:invalid {
   max-width: calc(100% - 3.125rem);
   width: calc(100% - 3.125rem);
 }
+/* When no alternative search-options button is present, let the search bar fill
+   the same container width as the rest of the mobile storefront. */
+.search-form > form:only-child {
+  -webkit-box-flex: 0;
+      -ms-flex: 0 0 100%;
+          flex: 0 0 100%;
+  max-width: 100%;
+  width: 100%;
+}
+
 .search-form form .form-control {
   width: 100%;
   background-color: #ffffff;
@@ -1921,6 +1931,29 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   padding-left: 2rem;
   padding-right: 1rem;
 }
+.dji-hero-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.9) 42%, rgba(255, 255, 255, 0) 66%);
+  pointer-events: none;
+}
+.dji-hero-slide .slide-content .slide-text {
+  width: 52%;
+  padding-left: 1.25rem;
+  padding-right: 0;
+}
+.dji-hero-slide .slide-content h4,
+.dji-hero-slide .slide-content p {
+  color: #161616;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+.dji-hero-slide .slide-content p {
+  line-height: 1.25;
+  margin: 0.25rem 0 0.75rem;
+}
 .single-hero-slide .slide-content h4 {
   font-weight: 600;
   margin-bottom: 0.25rem !important;
@@ -2376,6 +2409,52 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   background-position: center center;
   background-size: cover;
   border-radius: 0.5rem;
+}
+.category-premium-banner {
+  position: relative;
+  overflow: hidden;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+}
+.category-banner-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 52%;
+  padding: 1rem 1.25rem;
+  color: #ffffff;
+  text-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.55);
+}
+.category-banner-eyebrow,
+.category-banner-title {
+  display: block;
+}
+.category-banner-eyebrow {
+  margin-bottom: 0.25rem;
+  color: #aebdff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.category-banner-title {
+  color: #ffffff;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+@media only screen and (max-width:359px) {
+  .category-banner-copy {
+    max-width: 55%;
+    padding: 0.75rem 1rem;
+  }
+  .category-banner-title {
+    font-size: 1rem;
+  }
 }
 
 /* Flash Sale CSS */
@@ -3002,6 +3081,32 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 }
 .cart-form .quantity-button-handler:hover {
   color: #625AFA;
+}
+
+/* Order on WhatsApp Button */
+.btn-whatsapp {
+  color: #ffffff;
+  background-color: #25D366;
+  border-color: #20BD5A;
+  font-weight: 500;
+}
+.btn-whatsapp:hover,
+.btn-whatsapp:focus {
+  color: #ffffff;
+  background-color: #1EBE5B;
+  border-color: #1AA851;
+  box-shadow: none;
+}
+.btn-whatsapp:active {
+  color: #ffffff;
+  background-color: #1AA851;
+  border-color: #17984A;
+}
+.btn-whatsapp .ti-brand-whatsapp {
+  font-size: 1.1em;
+  line-height: 1;
+  vertical-align: -0.15em;
+  margin-right: 0.35rem;
 }
 
 .p-wishlist-share a {
@@ -5696,3 +5801,66 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
 
 /* Account balances are not part of the storefront experience. */
 .available-balance { display: none; }
+
+/* ---------- Rental Services & Camera Trade pages ---------- */
+.product-card .sale-price .rental-price-note {
+  color: #747794;
+  margin-left: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+/* The "Book" button on rental camera cards is the main call to action, so undo
+   the small circular ".product-card .btn" (+) styling used on shop cards. */
+.product-card .btn-rental-book {
+  position: static;
+  width: 100%;
+  height: auto;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  display: -webkit-inline-flex;
+  display: -ms-inline-flexbox;
+  display: inline-flex;
+}
+.product-card .btn-rental-book i {
+  font-size: 1.0625rem;
+  line-height: 1;
+  vertical-align: -0.125em;
+}
+[view-mode=rtl] .product-card .btn-rental-book {
+  right: auto;
+  left: auto;
+}
+.maintenance-icon {
+  display: inline-block;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: #625AFA;
+  margin-bottom: 0.75rem;
+}
+[theme-color=dark] .maintenance-icon {
+  color: #8b85ff;
+}
+.rental-step-card {
+  text-align: center;
+}
+.rental-step-card i {
+  font-size: 1.75rem;
+  color: #625AFA;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.rental-step-card h6 {
+  font-size: 0.85rem;
+}
+.rental-step-card p {
+  font-size: 0.75rem;
+  color: #747794;
+  margin-bottom: 0;
+}

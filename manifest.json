@@ -1,17 +1,17 @@
 {
-  "name": "Pixels Store",
-  "short_name": "Pixels",
+  "name": "Pixel House Sri Lanka",
+  "short_name": "Pixel House",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#625AFA",
   "theme_color": "#625AFA",
   "categories": [
-    "shop",
-    "ecommerce",
-    "fashion"
+    "shopping",
+    "photo",
+    "business"
   ],
   "orientation": "portrait",
-  "description": "Pixel House Store",
+  "description": "GoPro, DJI Osmo and Insta360 cameras, accessories and rentals from Pixel House Sri Lanka.",
   "icons": [
     {
       "src": "img/icons/icon-72x72.png",

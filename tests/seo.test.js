@@ -109,7 +109,8 @@ test('category pages declare their live catalog category', () => {
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
-  assert.match(source, /pixelhouse-static-v2/);
+  assert.match(source, /pixelhouse-static-v3/);
+  assert.match(source, /\\/js\\/api-client\\.js\\?v=20260923\\.1/);
   assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
   assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
 });

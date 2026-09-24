@@ -6,7 +6,7 @@
     // Replace the legacy template avatar with the Pixel House logo.
     // Real customer avatars loaded later by api-client.js are left untouched.
     $('img[src="img/bg-img/9.jpg"]').attr({
-        src: 'img/core-img/logo-small.png',
+        src: 'img/core-img/logo-mark-hd.png',
         alt: 'Pixel House'
     });
 

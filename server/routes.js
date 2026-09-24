@@ -326,6 +326,29 @@ router.put('/profile', requireAuth, async (req, res) => {
 
 /* ---------------- PRODUCTS ---------------- */
 
+const HOME_PRODUCT_SECTIONS = ['featured_gear', 'top_products', 'weekly_best_sellers', 'featured_products'];
+
+router.get('/homepage-sections', async (_req, res) => {
+  const rows = await db.all(`SELECT h.section_key, p.*
+    FROM homepage_section_products h
+    JOIN products p ON p.id = h.product_id
+    WHERE p.status = 'active'
+    ORDER BY h.section_key, h.sort_order, p.name`);
+  const sections = Object.fromEntries(HOME_PRODUCT_SECTIONS.map((key) => [key, []]));
+  rows.forEach((row) => { if (sections[row.section_key]) sections[row.section_key].push(row); });
+  res.json({ sections });
+});
+
+router.get('/reviews/recent', async (_req, res) => {
+  const reviews = await db.all(`SELECT r.rating, r.comment, r.created_at, u.username, p.name AS product_name
+    FROM reviews r
+    JOIN users u ON u.id = r.user_id
+    JOIN products p ON p.id = r.product_id
+    WHERE r.is_visible = 1 AND p.status = 'active' AND TRIM(COALESCE(r.comment, '')) <> ''
+    ORDER BY r.created_at DESC, r.id DESC LIMIT 6`);
+  res.json({ reviews });
+});
+
 router.get('/products', async (req, res) => {
   const { category, category_id, featured, flash_sale, q } = req.query;
   let where = ` WHERE p.status = 'active'`;

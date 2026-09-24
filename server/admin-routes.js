@@ -791,6 +791,40 @@ router.delete('/promotional-banners/:id', catalogAccess, async (req, res) => {
 });
 
 /* ---------------- PRODUCTS ---------------- */
+const HOME_PRODUCT_SECTIONS = ['featured_gear', 'top_products', 'weekly_best_sellers', 'featured_products'];
+router.get('/homepage-sections', catalogAccess, async (_req, res) => {
+  const [sectionsRows, products] = await Promise.all([
+    db.all('SELECT section_key, product_id FROM homepage_section_products ORDER BY section_key, sort_order'),
+    db.all("SELECT id, name, slug, status FROM products ORDER BY lower(name), id"),
+  ]);
+  const sections = Object.fromEntries(HOME_PRODUCT_SECTIONS.map((key) => [key, []]));
+  sectionsRows.forEach((row) => { if (sections[row.section_key]) sections[row.section_key].push(Number(row.product_id)); });
+  res.json({ sections, products });
+});
+
+router.put('/homepage-sections/:section', catalogAccess, async (req, res) => {
+  const section = String(req.params.section || '');
+  if (!HOME_PRODUCT_SECTIONS.includes(section)) return res.status(404).json({ error: 'Homepage section not found.' });
+  const ids = req.body && req.body.product_ids;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 24 || ids.some((id) => !productId(id)))
+    return res.status(400).json({ error: 'Choose between 1 and 24 products.' });
+  const normalized = ids.map(Number);
+  if (new Set(normalized).size !== normalized.length) return res.status(400).json({ error: 'A product can only be selected once in a section.' });
+  const placeholders = normalized.map(() => '?').join(',');
+  if (normalized.length) {
+    const active = await db.all(`SELECT id FROM products WHERE status = 'active' AND id IN (${placeholders})`, ...normalized);
+    if (active.length !== normalized.length) return res.status(400).json({ error: 'Selections must be active products.' });
+  }
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM homepage_section_products WHERE section_key = ?', section);
+    for (const [sortOrder, id] of normalized.entries()) {
+      await tx.run('INSERT INTO homepage_section_products (section_key, product_id, sort_order) VALUES (?, ?, ?)', section, id, sortOrder);
+    }
+  });
+  await audit(req, 'updated', 'homepage_section', null, section);
+  res.json({ ok: true, product_ids: normalized });
+});
+
 router.get('/products', catalogAccess, async (req, res) => {
   const { search, category } = req.query;
   let sql = 'SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE 1=1';

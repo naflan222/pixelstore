@@ -41,6 +41,23 @@ async function defineSuite(t, ctx) {
     assert.equal(typeof dome.created_at, 'string');
   });
 
+  await t.test('admin can select homepage products and the public homepage reads those selections', async () => {
+    await owner.post('/api/auth/login', { username: 'demo', password: 'demo1234' });
+    const products = await guest.get('/api/products');
+    const selected = products.data.products[0];
+    const before = await guest.get('/api/homepage-sections');
+    assert.equal(before.status, 200);
+    assert.deepEqual(before.data.sections.featured_gear, []);
+
+    const saved = await owner.put('/api/admin/homepage-sections/featured_gear', { product_ids: [selected.id] });
+    assert.equal(saved.status, 200);
+    const after = await guest.get('/api/homepage-sections');
+    assert.equal(after.status, 200);
+    assert.equal(after.data.sections.featured_gear[0].id, selected.id);
+    assert.equal((await guest.put('/api/admin/homepage-sections/top_products', { product_ids: [selected.id] })).status, 401);
+    assert.equal((await owner.put('/api/admin/homepage-sections/top_products', { product_ids: [999999] })).status, 400);
+  });
+
   await t.test('product search is case-insensitive', async () => {
     const lower = await guest.get('/api/products?q=dome');
     const upper = await guest.get('/api/products?q=DOME');
@@ -589,8 +606,12 @@ async function defineSuite(t, ctx) {
     assert.equal(prod.rating, 4);
     const list = await owner.get('/api/admin/reviews');
     const bobReview = list.data.reviews.find((x) => x.comment === 'Great dome!');
+    let publicReviews = await guest.get('/api/reviews/recent');
+    assert.ok(publicReviews.data.reviews.some((review) => review.comment === 'Great dome!'));
     r = await owner.put(`/api/admin/reviews/${bobReview.id}/visibility`, { is_visible: false });
     assert.equal(r.status, 200);
+    publicReviews = await guest.get('/api/reviews/recent');
+    assert.ok(!publicReviews.data.reviews.some((review) => review.comment === 'Great dome!'));
     prod = await ctx.db.get('SELECT rating, rating_count FROM products WHERE id = ?', dome.id);
     assert.equal(prod.rating_count, 1);
     assert.equal(prod.rating, 3);

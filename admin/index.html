@@ -188,6 +188,15 @@ tr:last-child td{border-bottom:none}
   .form-actions .btn{flex:1;min-width:140px}
   .table-wrap{margin:0 -2px}
 }
+
+.homepage-sections-card > p { color: var(--text2); font-size: 13px; }
+.homepage-section-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.homepage-section-group { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
+.homepage-section-group legend { width: auto; padding: 0 6px; color: var(--text); font-weight: 700; }
+.homepage-section-options { max-height: 270px; overflow: auto; display: grid; gap: 7px; margin: 6px 0 12px; }
+.homepage-section-options label { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-size: 12px; cursor: pointer; }
+.homepage-section-options input { flex: 0 0 auto; margin-top: 2px; }
+@media (max-width: 760px) { .homepage-section-editor { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -353,6 +362,7 @@ tr:last-child td{border-bottom:none}
       <!-- MARKETING -->
       <div class="tab" id="tab-marketing">
         <div class="section-toolbar"><button class="btn btn-primary" onclick="openCouponModal()"><i class="ti ti-plus"></i> Add Coupon</button><button class="btn btn-secondary" onclick="openBannerModal()"><i class="ti ti-photo-plus"></i> Add Banner</button></div>
+        <div class="card homepage-sections-card"><h3><i class="ti ti-layout-grid"></i> Homepage product sections</h3><p>Choose the products shown in each homepage row. Only active products are selectable.</p><div id="homepageSectionEditor" class="homepage-section-editor"><div class="empty">Loading homepage sections…</div></div></div>
         <div class="card"><h3><i class="ti ti-ticket"></i> Coupons</h3><div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Usage</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody id="couponsBody"></tbody></table></div></div>
         <div class="card"><h3><i class="ti ti-photo"></i> Promotional banners</h3><div class="table-wrap"><table><thead><tr><th>Preview</th><th>Title</th><th>Schedule</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody id="bannersBody"></tbody></table></div></div>
       </div>
@@ -1331,14 +1341,34 @@ async function loadAnalytics() {
 
 /* ---------- MARKETING ---------- */
 let coupons = [], banners = [];
+const homepageSectionNames = { featured_gear: 'Featured Gear', top_products: 'Top Products', weekly_best_sellers: 'Weekly Best Sellers', featured_products: 'Featured Products' };
+let homepageEditorProducts = [];
 const inputDateTime = value => value ? String(value).replace(' ', 'T').slice(0, 16) : '';
 async function loadMarketing() {
   $('#couponsBody').innerHTML = '<tr><td colspan="7" class="empty">Loading coupons...</td></tr>';
   $('#bannersBody').innerHTML = '<tr><td colspan="6" class="empty">Loading banners...</td></tr>';
   try {
-    const data = await Promise.all([api('/admin/coupons'), api('/admin/promotional-banners')]); coupons = data[0].coupons; banners = data[1].banners;
+    const data = await Promise.all([api('/admin/coupons'), api('/admin/promotional-banners'), api('/admin/homepage-sections')]); coupons = data[0].coupons; banners = data[1].banners;
+    homepageEditorProducts = data[2].products || [];
+    renderHomepageSectionEditor(data[2].sections || {});
     $('#couponsBody').innerHTML = coupons.map(c => `<tr><td><strong>${esc(c.code)}</strong></td><td>${c.discount_type === 'percentage' ? c.discount_value + '%' : money(c.discount_value)}${c.maximum_discount != null ? '<br><span style="font-size:11px;color:var(--text2)">Max ' + money(c.maximum_discount) + '</span>' : ''}</td><td>${money(c.minimum_order_amount)}</td><td>${c.usage_count}${c.usage_limit == null ? '' : ' / ' + c.usage_limit}</td><td>${esc(c.expires_at || 'Never')}</td><td><span class="badge ${c.is_active ? 'badge-success' : 'badge-danger'}">${c.is_active ? 'Active' : 'Disabled'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editCoupon(${c.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteCoupon(${c.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No coupons created yet</td></tr>';
     $('#bannersBody').innerHTML = banners.map(b => `<tr><td><img class="prod-img" src="../${esc(b.image)}" alt=""></td><td><strong>${esc(b.title)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(b.button_url || '')}</span></td><td style="font-size:12px">${esc(b.starts_at || 'Immediately')}<br>${esc(b.ends_at || 'No end date')}</td><td>${b.display_order}</td><td><span class="badge ${b.is_active ? 'badge-success' : 'badge-danger'}">${b.is_active ? 'Active' : 'Disabled'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editBanner(${b.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteBanner(${b.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No promotional banners created yet</td></tr>';
+  } catch (err) { toast(err.message, 'error'); }
+}
+function renderHomepageSectionEditor(selections) {
+  const editor = $('#homepageSectionEditor');
+  const activeProducts = homepageEditorProducts.filter(product => product.status === 'active');
+  editor.innerHTML = Object.entries(homepageSectionNames).map(([key, title]) => {
+    const selected = new Set((selections[key] || []).map(Number));
+    return `<fieldset class="homepage-section-group"><legend>${esc(title)}</legend><div class="homepage-section-options">${activeProducts.map(product => `<label><input type="checkbox" value="${product.id}" data-home-section="${key}" ${selected.has(Number(product.id)) ? 'checked' : ''}><span>${esc(product.name)}</span></label>`).join('') || '<span class="empty">No active products available.</span>'}</div><button class="btn btn-primary btn-sm" type="button" onclick="saveHomepageSection('${key}')">Save ${esc(title)}</button></fieldset>`;
+  }).join('');
+}
+async function saveHomepageSection(section) {
+  const checked = $$(`[data-home-section="${section}"]:checked`).map(input => Number(input.value));
+  if (!checked.length) { toast('Select at least one product for this homepage section.', 'error'); return; }
+  try {
+    await apiPut('/admin/homepage-sections/' + section, { product_ids: checked });
+    toast(homepageSectionNames[section] + ' saved');
   } catch (err) { toast(err.message, 'error'); }
 }
 function toggleCouponMaximum() { $('#couponMaximum').disabled = $('#couponType').value === 'fixed'; if ($('#couponMaximum').disabled) $('#couponMaximum').value = ''; }

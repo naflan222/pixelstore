@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS product_images (
   created_at  TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS homepage_section_products (
+  section_key TEXT NOT NULL,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (section_key, product_id)
+);
+
 CREATE TABLE IF NOT EXISTS carts (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -400,7 +407,7 @@ CREATE TABLE IF NOT EXISTS read_messages (
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now'))
     );
-    CREATE TABLE IF NOT EXISTS product_images (
+CREATE TABLE IF NOT EXISTS product_images (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       image_data TEXT NOT NULL,
@@ -409,6 +416,12 @@ CREATE TABLE IF NOT EXISTS read_messages (
       sort_order INTEGER NOT NULL DEFAULT 0,
       is_primary INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS homepage_section_products (
+      section_key TEXT NOT NULL,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (section_key, product_id)
     );
     CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_products_sku_unique ON products(sku) WHERE sku IS NOT NULL;

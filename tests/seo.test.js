@@ -109,8 +109,8 @@ test('category pages declare their live catalog category', () => {
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
-  assert.match(source, /pixelhouse-static-v4/);
-  assert.match(source, /\/js\/api-client\.js\?v=20260923\.2/);
+  assert.match(source, /pixelhouse-static-v5/);
+  assert.match(source, /\/js\/api-client\.js\?v=20260924\.1/);
   assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
   assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
 });
@@ -122,6 +122,25 @@ test('homepage adventure banner uses the new photo and GoPro category pages omit
     assert.doesNotMatch(source, /class="filter-option[^"]*"/);
     assert.match(source, /data-catalog-category="GoPro Accessories"/);
   }
+});
+
+test('storefront exposes the requested footer and admin-managed homepage sections', () => {
+  const home = read('home.html');
+  const apiClient = read('js/api-client.js');
+  const admin = read('admin/index.html');
+  for (const key of ['featured_gear', 'top_products', 'weekly_best_sellers', 'featured_products']) {
+    assert.match(home, new RegExp(`data-home-products="${key}"`));
+  }
+  assert.match(apiClient, /homepage-sections/);
+  assert.match(apiClient, /Quick delivery/);
+  assert.match(apiClient, /24\/7 support/);
+  assert.match(apiClient, /Genuine products/);
+  assert.match(apiClient, /Customer reviews/);
+  assert.match(apiClient, /wa\.me\/94777466675/);
+  assert.match(admin, /Homepage product sections/);
+  assert.match(read('shipping-policy.html'), /SHIPPING POLICY/);
+  assert.ok(fs.existsSync(path.join(root, 'img/core-img/logo-mark-hd.png')));
+  assert.ok(fs.existsSync(path.join(root, 'img/core-img/pixelhouse-footer-logo.jpg')));
 });
 
 test('private transactional pages are explicitly excluded from indexing', () => {

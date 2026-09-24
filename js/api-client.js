@@ -1128,6 +1128,63 @@
     })[character]);
   }
 
+  function homeProductCard(product, variant) {
+    if (variant === 'featured_gear') {
+      const image = escapeHtml(product.image || 'img/product/1.webp');
+      const name = escapeHtml(product.name);
+      const href = 'single-product.html?product=' + encodeURIComponent(product.slug);
+      return '<div class="card flash-sale-card"><div class="card-body"><a href="' + href + '"><img src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"><span class="product-title">' + name + '</span><p class="sale-price">' + money(product.price) + (product.old_price ? '<span class="real-price">' + money(product.old_price) + '</span>' : '') + '</p></a></div></div>';
+    }
+    return productCardHTML(product);
+  }
+
+  async function wireHomepageSections() {
+    if (page !== 'home.html') return;
+    try {
+      const { sections } = await get('/homepage-sections');
+      Object.entries(sections || {}).forEach(([key, products]) => {
+        const target = $('[data-home-products="' + key + '"]');
+        if (!target || !Array.isArray(products) || !products.length) return;
+        const markup = products.map((product) => homeProductCard(product, key)).join('');
+        if (key === 'featured_gear' && window.jQuery && window.jQuery(target).data('owl.carousel')) {
+          window.jQuery(target).trigger('replace.owl.carousel', [markup]).trigger('refresh.owl.carousel');
+        } else target.innerHTML = markup;
+        bindProductButtons(target);
+      });
+    } catch (_) { /* Keep the existing homepage cards if the section API is unavailable. */ }
+  }
+
+  function ensureStoreFooter() {
+    if (page === 'admin' || page === 'admin.html' || $('.site-footer') || !$('#footerNav')) return;
+    const footer = document.createElement('footer');
+    footer.className = 'site-footer';
+    footer.innerHTML = '<div class="container"><div class="site-footer-benefits" aria-label="Store services">' +
+      '<div><i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Quick delivery</span></div>' +
+      '<div><i class="ti ti-headset" aria-hidden="true"></i><span>24/7 support</span></div>' +
+      '<div><i class="ti ti-rosette-check" aria-hidden="true"></i><span>Genuine products</span></div></div>' +
+      '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2><div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div></section>' +
+      '<div class="site-footer-main"><section class="site-footer-about"><img src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
+      '<a href="https://www.facebook.com/share/1CCLYiQLMy/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +
+      '<a href="https://www.instagram.com/pixelhouse.store?stkn=Z2F5MXNtNmUweXB5" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
+      '<a href="https://wa.me/94777466675" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>' +
+      '<a href="https://www.tiktok.com/@pixelhouse.store?_r=1&_t=ZS-99zFSeQAKj2" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><i class="ti ti-brand-tiktok"></i></a></div></section>' +
+      '<nav class="site-footer-links" aria-label="Customer policies"><h2>Customer care</h2><a href="privacy-policy.html">Privacy policy</a><a href="terms.html">Terms and conditions</a><a href="return-policy.html">Exchange and return policy</a><a href="shipping-policy.html">Shipping policy</a></nav>' +
+      '<section class="site-footer-contact"><h2>Contact</h2><a href="tel:+94777466675" aria-label="Call 0777 4666 75"><i class="ti ti-phone" aria-hidden="true"></i><span>0777 4666 75</span></a><a href="mailto:contact@pixelhouse.lk" aria-label="Email contact@pixelhouse.lk"><i class="ti ti-mail" aria-hidden="true"></i><span>contact@pixelhouse.lk</span></a></section></div>' +
+      '<div class="site-footer-copyright">© ' + new Date().getFullYear() + ' PixelHouse. All rights reserved.</div></div>';
+    $('#footerNav').before(footer);
+    get('/reviews/recent').then(({ reviews }) => {
+      const list = $('[data-customer-reviews]', footer);
+      if (!list) return;
+      list.innerHTML = reviews && reviews.length ? reviews.map((review) => {
+        const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
+        return '<article class="site-footer-review"><div class="site-footer-stars" aria-label="' + rating + ' out of 5 stars">' + '★'.repeat(rating) + '☆'.repeat(5 - rating) + '</div><p>“' + escapeHtml(review.comment) + '”</p><span>' + escapeHtml(review.username || 'Customer') + ' · ' + escapeHtml(review.product_name) + '</span></article>';
+      }).join('') : '<p class="site-footer-muted">No customer reviews have been published yet.</p>';
+    }).catch(() => {
+      const list = $('[data-customer-reviews]', footer);
+      if (list) list.innerHTML = '<p class="site-footer-muted">Customer reviews are temporarily unavailable.</p>';
+    });
+  }
+
   async function wireProductReviews() {
     const slug = new URLSearchParams(location.search).get('product') || page.replace('.html', '');
     const form = $('.ratings-submit-form form');
@@ -1285,10 +1342,13 @@
     var pl = document.getElementById('preloader');
     if (pl) pl.style.display = 'none';
 
+    ensureStoreFooter();
+
     // Start catalog and product requests immediately instead of waiting for
     // the session check, so newly added products can render sooner.
     wireCategoryCatalog().catch(() => {});
     wireProductDetail().catch(() => {});
+    wireHomepageSections().catch(() => {});
     await loadSession();
     if (wiring[page]) await wiring[page]();
     hideRemovedCatalogCards();

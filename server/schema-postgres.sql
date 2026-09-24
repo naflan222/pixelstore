@@ -1,4 +1,4 @@
--- PixelStore PostgreSQL schema (all 23 tables).
+-- PixelStore PostgreSQL schema (all 24 tables).
 --
 -- Design notes (see docs/POSTGRES-MIGRATION-RUNBOOK.md for the full rationale):
 --   * Table and column names are identical to the SQLite schema so the exact
@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS product_images (
   sort_order  INTEGER NOT NULL DEFAULT 0,
   is_primary  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS homepage_section_products (
+  section_key TEXT NOT NULL,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (section_key, product_id)
 );
 
 CREATE TABLE IF NOT EXISTS carts (

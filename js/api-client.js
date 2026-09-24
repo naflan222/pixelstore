@@ -1155,7 +1155,7 @@
       '<div><i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Quick delivery</span></div>' +
       '<div><i class="ti ti-headset" aria-hidden="true"></i><span>24/7 support</span></div>' +
       '<div><img class="site-footer-benefit-image" src="img/core-img/genuine-product.png" alt="" width="24" height="24" loading="lazy" decoding="async"><span>Genuine products</span></div></div>' +
-      '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2><div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div></section>' +
+      '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2>' + ((page === 'home.html' || page === 'index.html') ? '<div class="site-footer-review-list site-footer-facebook-reviews"><div class="sk-ww-fb-page-reviews" data-embed-id="25716628"></div><p class="site-footer-facebook-link"><a href="https://www.facebook.com/share/1GKtqR61yY" target="_blank" rel="noopener noreferrer">Read all reviews on Facebook</a></p></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div>') + '</section>' +
       '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
       '<a href="https://www.facebook.com/share/1CCLYiQLMy/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +
       '<a href="https://www.instagram.com/pixelhouse.store?stkn=Z2F5MXNtNmUweXB5" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
@@ -1165,6 +1165,13 @@
       '<section class="site-footer-contact"><h2>Contact</h2><a href="tel:+94777466675" aria-label="Call 0777 4666 75"><i class="ti ti-phone" aria-hidden="true"></i><span>0777 4666 75</span></a><a href="mailto:contact@pixelhouse.lk" aria-label="Email contact@pixelhouse.lk"><i class="ti ti-mail" aria-hidden="true"></i><span>contact@pixelhouse.lk</span></a></section></div>' +
       '<div class="site-footer-copyright">© ' + new Date().getFullYear() + ' PixelHouse. All rights reserved.</div></div>';
     $('#footerNav').before(footer);
+    if (page === 'home.html' || page === 'index.html') {
+      const widgetScript = document.createElement('script');
+      widgetScript.src = 'https://widgets.sociablekit.com/facebook-page-reviews/widget.js';
+      widgetScript.async = true;
+      document.body.appendChild(widgetScript);
+      return;
+    }
     get('/reviews/recent').then(({ reviews }) => {
       const list = $('[data-customer-reviews]', footer);
       if (!list) return;

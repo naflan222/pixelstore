@@ -6237,3 +6237,9 @@ footer.site-footer .site-footer-contact a { line-height: 1.45; }
 footer.site-footer.site-footer-home { padding-bottom: 2rem; }
 .site-footer-benefit-image { width: 1.35rem; height: 1.35rem; flex: 0 0 1.35rem; display: block; object-fit: contain; border-radius: 50%; background: #fff; }
 @media (max-width: 767px) { .site-footer-benefit-image { width: 1.2rem; height: 1.2rem; flex-basis: 1.2rem; } }
+
+/* Facebook reviews widget: use the full footer column instead of the internal review grid. */
+.site-footer-review-list.site-footer-facebook-reviews { display: block; width: 100%; }
+.site-footer-facebook-reviews .sk-ww-fb-page-reviews { width: 100%; min-width: 0; }
+.site-footer-facebook-link { margin: .75rem 0 0; font-size: .85rem; }
+.site-footer-facebook-link a { color: #c7cce0; text-decoration: underline; text-underline-offset: .15em; }

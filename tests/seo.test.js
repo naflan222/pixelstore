@@ -30,7 +30,7 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /"@type":"WebSite"/);
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
-  assert.match(result, /href="style\.css\?v=20260924\.4"/);
+  assert.match(result, /href="style\.css\?v=20260924\.5"/);
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
 });
@@ -109,9 +109,9 @@ test('category pages declare their live catalog category', () => {
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
-  assert.match(source, /pixelhouse-static-v6/);
-  assert.match(source, /\/style\.css\?v=20260924\.4/);
-  assert.match(source, /\/js\/api-client\.js\?v=20260924\.2/);
+  assert.match(source, /pixelhouse-static-v7/);
+  assert.match(source, /\/style\.css\?v=20260924\.5/);
+  assert.match(source, /\/js\/api-client\.js\?v=20260924\.3/);
   assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
   assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
 });
@@ -137,7 +137,11 @@ test('storefront exposes the requested footer and admin-managed homepage section
   assert.match(apiClient, /24\/7 support/);
   assert.match(apiClient, /Genuine products/);
   assert.match(apiClient, /Customer reviews/);
+  assert.match(apiClient, /google-reviews/);
+  assert.match(apiClient, /data-review-next/);
+  assert.match(apiClient, /data-review-prev/);
   assert.match(apiClient, /wa\.me\/94777466675/);
+  assert.match(read('profile.html'), /style\.css\?v=20260924\.5/);
   assert.match(admin, /Homepage product sections/);
   assert.match(read('shipping-policy.html'), /SHIPPING POLICY/);
   assert.ok(fs.existsSync(path.join(root, 'img/core-img/logo-mark-hd.png')));

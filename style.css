@@ -6238,8 +6238,37 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
 .site-footer-benefit-image { width: 1.35rem; height: 1.35rem; flex: 0 0 1.35rem; display: block; object-fit: contain; border-radius: 50%; background: #fff; }
 @media (max-width: 767px) { .site-footer-benefit-image { width: 1.2rem; height: 1.2rem; flex-basis: 1.2rem; } }
 
-/* Facebook reviews widget: use the full footer column instead of the internal review grid. */
-.site-footer-review-list.site-footer-facebook-reviews { display: block; width: 100%; }
-.site-footer-facebook-reviews .sk-ww-fb-page-reviews { width: 100%; min-width: 0; }
-.site-footer-facebook-link { margin: .75rem 0 0; font-size: .85rem; }
-.site-footer-facebook-link a { color: #c7cce0; text-decoration: underline; text-underline-offset: .15em; }
+/* Compact manual customer-review slider for the Home footer. */
+.site-footer-manual-reviews { width: min(100%, 680px); margin: 0 auto; }
+.site-footer-manual-review-card {
+  min-height: 142px; padding: 1.15rem 1.25rem; border: 1px solid rgba(255,255,255,.13);
+  border-radius: 1rem; background: rgba(255,255,255,.055);
+}
+.site-footer-manual-review-card p {
+  margin: .65rem 0 .9rem; color: #eef0fa; font-size: .95rem; line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.site-footer-manual-review-author { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .55rem; }
+.site-footer-manual-review-author strong { color: #fff; font-size: .88rem; }
+.site-footer-manual-review-author span { color: #aeb5d0; font-size: .75rem; }
+.site-footer-manual-review-controls { display: flex; align-items: center; justify-content: center; gap: .85rem; margin-top: .7rem; }
+.site-footer-manual-review-controls button {
+  width: 2.2rem; height: 2.2rem; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: transparent; color: #fff;
+  font-size: 1.4rem; line-height: 1; cursor: pointer;
+}
+.site-footer-manual-review-controls button:hover, .site-footer-manual-review-controls button:focus-visible {
+  background: #625afa; border-color: #625afa; outline: none;
+}
+.site-footer-manual-review-controls [data-manual-review-position] { min-width: 3.2rem; color: #aeb5d0; font-size: .8rem; text-align: center; }
+.site-footer-manual-review-card.review-enter-right { animation: footer-review-from-right .24s ease both; }
+.site-footer-manual-review-card.review-enter-left { animation: footer-review-from-left .24s ease both; }
+@keyframes footer-review-from-right { from { opacity: .45; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes footer-review-from-left { from { opacity: .45; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+@media (max-width: 575px) {
+  .site-footer-manual-review-card { min-height: 132px; padding: 1rem; }
+  .site-footer-manual-review-card p { font-size: .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-footer-manual-review-card.review-enter-left, .site-footer-manual-review-card.review-enter-right { animation: none; }
+}

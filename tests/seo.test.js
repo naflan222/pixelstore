@@ -30,7 +30,7 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /"@type":"WebSite"/);
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
-  assert.match(result, /href="style\.css"/);
+  assert.match(result, /href="style\.css\?v=20260924\.4"/);
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
 });
@@ -109,8 +109,9 @@ test('category pages declare their live catalog category', () => {
 test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
   const source = read('service-worker.js');
 
-  assert.match(source, /pixelhouse-static-v5/);
-  assert.match(source, /\/js\/api-client\.js\?v=20260924\.1/);
+  assert.match(source, /pixelhouse-static-v6/);
+  assert.match(source, /\/style\.css\?v=20260924\.4/);
+  assert.match(source, /\/js\/api-client\.js\?v=20260924\.2/);
   assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
   assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
 });

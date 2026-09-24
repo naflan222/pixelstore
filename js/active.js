@@ -104,7 +104,9 @@
     }
 
     // :: Products Slides
-    if ($.fn.owlCarousel) {
+    var dynamicProductPage = (location.pathname.split('/').pop() === 'single-product.html') &&
+        new URLSearchParams(location.search).has('product');
+    if ($.fn.owlCarousel && !dynamicProductPage) {
         var productslides = $('.product-slides');
         productslides.owlCarousel({
             items: 1,

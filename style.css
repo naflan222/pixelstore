@@ -2609,11 +2609,43 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   color: #6b7280;
   text-align: center;
 }
+.catalog-loading {
+  padding: 1.5rem 1rem;
+  border-radius: 0.75rem;
+  background: #222344;
+  color: #d9dcf3;
+  text-align: center;
+}
 .dynamic-product-slide {
   display: grid;
   place-items: center;
   background-color: #f7f7fb;
   background-image: none !important;
+}
+html.dynamic-product-loading .product-slides {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 380px;
+  overflow: hidden;
+  background: #f7f7fb;
+  color: #747794;
+}
+html.dynamic-product-loading .product-slides > *,
+html.dynamic-product-loading .product-description > * {
+  display: none !important;
+}
+html.dynamic-product-loading .product-slides::after {
+  content: "Loading product…";
+  font-size: 1rem;
+}
+html.dynamic-product-loading .product-description::before {
+  content: "Loading product details…";
+  display: block;
+  padding: 1.5rem 1rem;
+  background: #ffffff;
+  color: #747794;
+  text-align: center;
 }
 .dynamic-product-image {
   width: 100%;
@@ -4403,6 +4435,30 @@ li.suha-dropdown-menu .dropdown-trigger-btn.active i {
   max-width: 4rem;
   width: 4rem;
   margin-right: 1rem;
+}
+.adventure-gear-card .discountIcon {
+  -webkit-box-flex: 0;
+      -ms-flex: 0 0 6rem;
+          flex: 0 0 6rem;
+  max-width: 6rem;
+  width: 6rem;
+}
+.adventure-gear-card .discountIcon img {
+  display: block;
+  width: 6rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+}
+@media (min-width: 992px) {
+  .adventure-gear-card .discountIcon,
+  .adventure-gear-card .discountIcon img {
+    -ms-flex-preferred-size: 7rem;
+    flex-basis: 7rem;
+    max-width: 7rem;
+    width: 7rem;
+    height: 7rem;
+  }
 }
 
 /* Profile Data CSS */

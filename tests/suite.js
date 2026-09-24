@@ -66,11 +66,32 @@ async function defineSuite(t, ctx) {
     });
     assert.equal(created.status, 201);
 
+    const second = await owner.post('/api/admin/products', {
+      name: 'Dynamic Test Product Two', slug: 'dynamic-test-product-two', price: 1350,
+      category_id: category.data.id, image: PNG_1PX, status: 'active',
+    });
+    assert.equal(second.status, 201);
+    const third = await owner.post('/api/admin/products', {
+      name: 'Dynamic Test Product Three', slug: 'dynamic-test-product-three', price: 1450,
+      category_id: category.data.id, image: PNG_1PX, status: 'active',
+    });
+    assert.equal(third.status, 201);
+
+    const firstPage = await guest.get('/api/products?category=dynamic-test-category&page=1&limit=2');
+    const secondPage = await guest.get('/api/products?category=dynamic-test-category&page=2&limit=2');
+    assert.equal(firstPage.status, 200);
+    assert.equal(firstPage.data.pagination.total, 3);
+    assert.equal(firstPage.data.pagination.pages, 2);
+    assert.equal(firstPage.data.pagination.page, 1);
+    assert.equal(secondPage.data.pagination.page, 2);
+    assert.equal(secondPage.data.products.length, 1);
+    assert.equal(new Set([...firstPage.data.products, ...secondPage.data.products].map((product) => product.id)).size, 3);
+
     let listing = await guest.get('/api/products?category=dynamic-test-category');
     assert.equal(listing.status, 200);
-    assert.equal(listing.data.products.length, 1);
-    assert.equal(listing.data.products[0].slug, 'dynamic-test-product');
-    assert.equal(listing.data.products[0].category_name, 'Dynamic Test Category');
+    assert.equal(listing.data.products.length, 3);
+    assert.ok(listing.data.products.some((product) => product.slug === 'dynamic-test-product'));
+    assert.ok(listing.data.products.every((product) => product.category_name === 'Dynamic Test Category'));
 
     const hidden = await owner.put(`/api/admin/products/${created.data.id}`, {
       name: 'Dynamic Test Product', slug: 'dynamic-test-product', price: 1250,
@@ -78,10 +99,13 @@ async function defineSuite(t, ctx) {
     });
     assert.equal(hidden.status, 200);
     listing = await guest.get('/api/products?category=Dynamic Test Category');
-    assert.deepEqual(listing.data.products, []);
+    assert.equal(listing.data.products.length, 2);
     assert.equal((await guest.get('/api/products/dynamic-test-product')).status, 404);
 
     await owner.del(`/api/admin/products/${created.data.id}`);
+    await owner.del(`/api/admin/products/${second.data.id}`);
+    await owner.del(`/api/admin/products/${third.data.id}`);
+    assert.deepEqual((await guest.get('/api/products?category=Dynamic Test Category')).data.products, []);
     await owner.del(`/api/admin/categories/${category.data.id}`);
   });
 

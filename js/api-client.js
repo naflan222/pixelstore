@@ -1150,11 +1150,11 @@
   function ensureStoreFooter() {
     if (page === 'admin' || page === 'admin.html' || $('.site-footer') || !$('#footerNav')) return;
     const footer = document.createElement('footer');
-    footer.className = 'site-footer';
+    footer.className = 'site-footer' + ((page === 'home.html' || page === 'index.html') ? ' site-footer-home' : '');
     footer.innerHTML = '<div class="container"><div class="site-footer-benefits" aria-label="Store services">' +
       '<div><i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Quick delivery</span></div>' +
       '<div><i class="ti ti-headset" aria-hidden="true"></i><span>24/7 support</span></div>' +
-      '<div><i class="ti ti-rosette-check" aria-hidden="true"></i><span>Genuine products</span></div></div>' +
+      '<div><img class="site-footer-benefit-image" src="img/core-img/genuine-product.png" alt="" width="24" height="24" loading="lazy" decoding="async"><span>Genuine products</span></div></div>' +
       '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2><div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div></section>' +
       '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
       '<a href="https://www.facebook.com/share/1CCLYiQLMy/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +

@@ -6231,3 +6231,9 @@ footer.site-footer .site-footer-contact a { line-height: 1.45; }
     max-height: 60px !important;
   }
 }
+
+
+/* Match the home footer clearance to the other mobile pages and size the genuine-product badge with the service icons. */
+footer.site-footer.site-footer-home { padding-bottom: 2rem; }
+.site-footer-benefit-image { width: 1.35rem; height: 1.35rem; flex: 0 0 1.35rem; display: block; object-fit: contain; border-radius: 50%; background: #fff; }
+@media (max-width: 767px) { .site-footer-benefit-image { width: 1.2rem; height: 1.2rem; flex-basis: 1.2rem; } }

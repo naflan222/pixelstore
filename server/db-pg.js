@@ -278,6 +278,14 @@ const pgEngine = {
     if (initialised) return;
     await pool.query(process.env.PG_MEM_TEST === '1' ? stripUnsupportedMemDdl(SCHEMA_SQL) : SCHEMA_SQL);
     await ensureStoreSettings(pool);
+    // Existing IDs/invoices remain untouched. PostgreSQL's identity sequence
+    // records the highest issued ID even if an order is later deleted.
+    const firstOrderNumber = Number(process.env.ORDER_NUMBER_START || 1232);
+    if (process.env.PG_MEM_TEST !== '1' && Number.isSafeInteger(firstOrderNumber) && firstOrderNumber > 1) {
+      await pool.query(`SELECT setval('orders_id_seq', GREATEST(
+        (SELECT last_value FROM orders_id_seq),
+        COALESCE((SELECT MAX(id) FROM orders), 0), $1), true)`, [firstOrderNumber - 1]);
+    }
     if (process.env.SEED_DEMO_DATA === 'true') await seedDemoData(pool);
     initialised = true;
   },

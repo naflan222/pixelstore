@@ -657,6 +657,30 @@ router.get('/orders/:id/invoice', orderAccess, async (req, res) => {
   sendInvoice(res, order, items);
 });
 
+router.delete('/orders/:id', owners, async (req, res) => {
+  const id = productId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid order ID.' });
+  const deleted = await db.transaction(async (tx) => {
+    const order = await tx.get(`SELECT id, full_name, total, status FROM orders WHERE id = ?${db.forUpdate()}`, id);
+    if (!order) return false;
+    // Payments, items and status history cascade with the order. Keep the audit
+    // entry independently so the removal itself remains traceable.
+    await tx.run('DELETE FROM orders WHERE id = ?', id);
+    await tx.run('INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',
+      req.user.id, 'deleted order', 'order', String(id),
+      `Customer: ${order.full_name}; total: ${order.total}; status: ${order.status}`);
+    return true;
+  });
+  if (!deleted) return res.status(404).json({ error: 'Order not found.' });
+  res.json({ ok: true });
+});
+
+router.get('/invoices/catalog', orderAccess, async (_req, res) => {
+  const products = await db.all(`SELECT id, name, description, sku, price FROM products
+    WHERE status = 'active' ORDER BY lower(name), id`);
+  res.json({ products });
+});
+
 // Create an offline phone/WhatsApp/in-store order and email its branded invoice.
 // These lines are intentionally not linked to catalog products, so issuing an
 // invoice does not alter stock; order totals still appear in sales reporting.

@@ -542,6 +542,10 @@ async function defineSuite(t, ctx) {
     try {
       assert.equal((await guest.post('/api/admin/invoices/offline', payload)).status, 401);
       const product = await ctx.db.get("SELECT id, stock FROM products WHERE slug = 'domeport'");
+      const catalog = await owner.get('/api/admin/invoices/catalog');
+      assert.equal(catalog.status, 200);
+      assert.ok(catalog.data.products.some(p => p.id === product.id && p.name && Number.isFinite(Number(p.price))));
+      assert.equal((await guest.get('/api/admin/invoices/catalog')).status, 401);
       const response = await owner.post('/api/admin/invoices/offline', payload);
       assert.equal(response.status, 201, JSON.stringify(response.data));
       assert.match(response.data.invoice_number, /^PH-INV-\d{4}-\d{5}$/);
@@ -571,6 +575,14 @@ async function defineSuite(t, ctx) {
       assert.match(download.headers.get('content-type'), /application\/pdf/);
       const bytes = Buffer.from(await download.arrayBuffer());
       assert.equal(bytes.subarray(0, 4).toString(), '%PDF');
+      assert.equal((await guest.del(`/api/admin/orders/${saved.id}`)).status, 401);
+      assert.equal((await owner.del(`/api/admin/orders/${saved.id}`)).status, 200);
+      assert.equal((await owner.get(`/api/admin/orders/${saved.id}`)).status, 404);
+      assert.equal((await owner.request('GET', response.data.invoice_url)).status, 404);
+      assert.equal((await ctx.db.get('SELECT id FROM payments WHERE order_id = ?', saved.id)), undefined);
+      assert.equal((await ctx.db.get('SELECT id FROM order_items WHERE order_id = ?', saved.id)), undefined);
+      assert.ok((await ctx.db.get("SELECT id FROM audit_logs WHERE action = 'deleted order' AND entity_id = ?", String(saved.id))).id);
+      assert.equal((await owner.del(`/api/admin/orders/${saved.id}`)).status, 404);
     } finally {
       global.fetch = realFetch;
       for (const [key, value] of Object.entries(mailEnv)) {

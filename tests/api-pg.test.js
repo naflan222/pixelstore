@@ -12,6 +12,12 @@ const test = require('node:test');
 const { withServer } = require('./helpers');
 const { defineSuite } = require('./suite');
 
+// Keep API tests isolated from real mail accounts. The invoice test stubs
+// Brevo explicitly when it needs to verify the PDF attachment.
+for (const key of ['BREVO_API_KEY', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM', 'MAIL_FROM_NAME', 'MAIL_REPLY_TO']) {
+  delete process.env[key];
+}
+
 test('store API on PostgreSQL', async (t) => {
   const url = process.env.TEST_DATABASE_URL;
   if (url) {

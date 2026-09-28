@@ -519,6 +519,67 @@ async function defineSuite(t, ctx) {
     assert.equal(stranger.status, 404);
   });
 
+  await t.test('admin can create and download an offline invoice without changing stock', async () => {
+    await owner.post('/api/auth/login', { username: 'demo', password: 'demo1234' });
+    const mailEnv = Object.fromEntries(['BREVO_API_KEY', 'MAIL_FROM'].map((key) => [key, process.env[key]]));
+    const realFetch = global.fetch;
+    let capturedEmail;
+    process.env.BREVO_API_KEY = 'test-brevo-api-key';
+    process.env.MAIL_FROM = 'orders@example.test';
+    global.fetch = async (url, options) => {
+      if (String(url) === 'https://api.brevo.com/v3/smtp/email') {
+        capturedEmail = { url: String(url), options };
+        return new Response(JSON.stringify({ messageId: 'test-message-id' }), { status: 201, headers: { 'content-type': 'application/json' } });
+      }
+      return realFetch(url, options);
+    };
+    const payload = {
+      full_name: 'Offline Invoice Customer', email: 'offline-invoice@example.test', phone: '0771234567',
+      address: '12 Camera Street, Colombo', source: 'phone', shipping_method: 'standard',
+      payment_method: 'cash', payment_status: 'pending', shipping_fee: 500, discount_amount: 250,
+      items: [{ name: 'Phone order camera kit', price: 8500, quantity: 1 }],
+    };
+    try {
+      assert.equal((await guest.post('/api/admin/invoices/offline', payload)).status, 401);
+      const product = await ctx.db.get("SELECT id, stock FROM products WHERE slug = 'domeport'");
+      const response = await owner.post('/api/admin/invoices/offline', payload);
+      assert.equal(response.status, 201, JSON.stringify(response.data));
+      assert.match(response.data.invoice_number, /^PH-INV-\d{4}-\d{5}$/);
+      assert.equal(response.data.email_sent, true);
+      assert.ok(response.data.invoice_url);
+      assert.ok(capturedEmail);
+      const emailBody = JSON.parse(capturedEmail.options.body);
+      assert.equal(emailBody.to[0].email, payload.email);
+      assert.match(emailBody.attachment[0].name, /\.pdf$/);
+      assert.equal(Buffer.from(emailBody.attachment[0].content, 'base64').subarray(0, 4).toString(), '%PDF');
+
+      const saved = await ctx.db.get('SELECT * FROM orders WHERE id = ?', response.data.order_id);
+      assert.equal(saved.email, payload.email);
+      assert.equal(saved.payment_method, 'cash');
+      assert.equal(Number(saved.total), 8750);
+      const payment = await ctx.db.get('SELECT payment_status, amount_paid FROM payments WHERE order_id = ?', saved.id);
+      assert.equal(payment.payment_status, 'pending');
+      assert.equal(Number(payment.amount_paid), 0);
+      const items = await ctx.db.all('SELECT product_id, name, price, quantity FROM order_items WHERE order_id = ?', saved.id);
+      assert.deepEqual(items.map(({ product_id, name, price, quantity }) => ({ product_id, name, price: Number(price), quantity })), [
+        { product_id: null, name: 'Phone order camera kit', price: 8500, quantity: 1 },
+      ]);
+      assert.equal(Number((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock), Number(product.stock));
+
+      const download = await owner.request('GET', response.data.invoice_url);
+      assert.equal(download.status, 200);
+      assert.match(download.headers.get('content-type'), /application\/pdf/);
+      const bytes = Buffer.from(await download.arrayBuffer());
+      assert.equal(bytes.subarray(0, 4).toString(), '%PDF');
+    } finally {
+      global.fetch = realFetch;
+      for (const [key, value] of Object.entries(mailEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   await t.test('cancel restores stock exactly once', async () => {
     const fh = await ctx.db.get("SELECT id, stock FROM products WHERE slug = 'fhstick'");
     await bob.post('/api/cart', { product_id: fh.id, quantity: 1 });

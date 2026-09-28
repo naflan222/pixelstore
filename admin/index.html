@@ -100,6 +100,16 @@ tr:last-child td{border-bottom:none}
 .form-group textarea{resize:vertical;min-height:80px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 .form-grid .full{grid-column:1/-1}
+.offline-invoice-row{display:grid;grid-template-columns:minmax(180px,2fr) minmax(90px,.7fr) minmax(130px,1fr) minmax(120px,1fr) 40px;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--border)}
+.offline-invoice-row:last-child{border-bottom:none}
+.offline-invoice-row .form-group{margin-bottom:0}
+.offline-invoice-row .line-total{min-height:40px;display:flex;align-items:center;font-size:13px;font-weight:700}
+.invoice-result{display:none;margin-top:16px;padding:14px;border-radius:var(--radius-sm);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--text);font-size:13px;line-height:1.6}
+.invoice-result.error{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.35)}
+.invoice-result a{display:inline-block;margin-top:8px;color:#86efac;font-weight:700;text-decoration:underline}
+.invoice-totals{max-width:340px;margin:16px 0 0 auto;display:grid;gap:8px}
+.invoice-total-row{display:flex;justify-content:space-between;gap:16px;color:var(--text2);font-size:13px}
+.invoice-total-row.grand{border-top:1px solid var(--border);padding-top:10px;color:var(--text);font-size:16px;font-weight:800}
 .form-actions{display:flex;gap:10px;margin-top:20px}
 .btn{padding:10px 20px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
 .btn-primary{background:var(--primary);color:#fff}
@@ -157,6 +167,8 @@ tr:last-child td{border-bottom:none}
   .hamburger{display:block}
   .overlay.show{display:block}
   .form-grid{grid-template-columns:1fr}
+  .offline-invoice-row{grid-template-columns:1fr 1fr;align-items:start}
+  .offline-invoice-row .description{grid-column:1/-1}
   .stats-grid{grid-template-columns:1fr 1fr}
   .dashboard-grid{grid-template-columns:1fr !important}
   .order-detail-grid{grid-template-columns:1fr !important}
@@ -228,6 +240,7 @@ tr:last-child td{border-bottom:none}
     <nav>
       <a class="active" data-tab="dashboard" onclick="showTab('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
       <a data-tab="orders" data-roles="owner,admin,order_manager" onclick="showTab('orders')"><i class="ti ti-shopping-bag"></i> Orders</a>
+      <a data-tab="invoices" data-roles="owner,admin,order_manager" onclick="showTab('invoices')"><i class="ti ti-file-invoice"></i> Invoice Generator</a>
       <a data-tab="products" data-roles="owner,admin,catalog_manager" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
       <a data-tab="categories" data-roles="owner,admin,catalog_manager" onclick="showTab('categories')"><i class="ti ti-category"></i> Categories</a>
       <a data-tab="inventory" data-roles="owner,admin,catalog_manager" onclick="showTab('inventory')"><i class="ti ti-box-seam"></i> Inventory</a>
@@ -308,6 +321,43 @@ tr:last-child td{border-bottom:none}
             </table>
           </div>
           <div class="pagination" id="orderPagination"></div>
+        </div>
+      </div>
+
+      <!-- OFFLINE INVOICE GENERATOR -->
+      <div class="tab" id="tab-invoices">
+        <div class="card">
+          <h3><i class="ti ti-file-invoice"></i> Create an offline order invoice</h3>
+          <p style="color:var(--text2);font-size:13px;line-height:1.6;margin:-6px 0 18px">Enter the customer and order details. The branded PDF is emailed to the customer and can be downloaded. This creates an order record for reporting; inventory is not changed.</p>
+          <form id="offlineInvoiceForm" onsubmit="submitOfflineInvoice(event)">
+            <div class="form-grid">
+              <div class="form-group"><label for="offlineCustomerName">Customer name *</label><input id="offlineCustomerName" maxlength="120" autocomplete="name" required></div>
+              <div class="form-group"><label for="offlineCustomerEmail">Customer email *</label><input id="offlineCustomerEmail" type="email" maxlength="254" autocomplete="email" required></div>
+              <div class="form-group"><label for="offlineCustomerPhone">Phone number</label><input id="offlineCustomerPhone" maxlength="50" autocomplete="tel"></div>
+              <div class="form-group"><label for="offlineOrderSource">Order source</label><select id="offlineOrderSource"><option value="phone">Phone order</option><option value="whatsapp">WhatsApp order</option><option value="in_store">In-store order</option><option value="other">Other offline order</option></select></div>
+              <div class="form-group full"><label for="offlineCustomerAddress">Delivery address</label><textarea id="offlineCustomerAddress" maxlength="1000" autocomplete="street-address" placeholder="Enter the delivery address, or leave blank for collection"></textarea></div>
+              <div class="form-group"><label for="offlineShippingMethod">Delivery method</label><select id="offlineShippingMethod"><option value="standard">Standard delivery</option><option value="express">Express delivery</option><option value="pickup">Store pickup</option><option value="courier">Courier</option></select></div>
+              <div class="form-group"><label for="offlinePaymentMethod">Payment method</label><select id="offlinePaymentMethod"><option value="cash">Cash on delivery</option><option value="bank">Bank transfer</option><option value="credit-card">Card</option><option value="paypal">PayPal</option></select></div>
+              <div class="form-group"><label for="offlinePaymentStatus">Payment status</label><select id="offlinePaymentStatus"><option value="pending">Unpaid</option><option value="paid">Paid</option></select></div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 4px">
+              <h4 style="font-size:14px">Items</h4>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addOfflineInvoiceItem()"><i class="ti ti-plus"></i> Add item</button>
+            </div>
+            <div id="offlineInvoiceItems"></div>
+
+            <div class="form-grid" style="margin-top:18px">
+              <div class="form-group"><label for="offlineShippingFee">Delivery fee (LKR)</label><input id="offlineShippingFee" type="number" min="0" max="100000000" step="0.01" value="0"></div>
+              <div class="form-group"><label for="offlineDiscount">Discount (LKR)</label><input id="offlineDiscount" type="number" min="0" max="100000000" step="0.01" value="0"></div>
+            </div>
+            <div class="invoice-totals" aria-live="polite">
+              <div class="invoice-total-row"><span>Items subtotal</span><strong id="offlineSubtotal">Rs. 0.00</strong></div>
+              <div class="invoice-total-row grand"><span>Invoice total</span><strong id="offlineTotal">Rs. 0.00</strong></div>
+            </div>
+            <div class="invoice-result" id="offlineInvoiceResult" role="status"><span id="offlineInvoiceResultText"></span><br><a id="downloadOfflineInvoice" href="#" hidden>Download PDF invoice</a></div>
+            <div class="form-actions"><button class="btn btn-primary" type="submit" id="createOfflineInvoiceBtn"><i class="ti ti-mail-forward"></i> Create and email invoice</button><button class="btn btn-secondary" type="button" onclick="resetOfflineInvoiceForm()">New invoice</button></div>
+          </form>
         </div>
       </div>
 
@@ -658,12 +708,13 @@ function showTab(tab) {
   $('#tab-' + tab).classList.add('active');
   $$('.sidebar nav a').forEach(a => a.classList.remove('active'));
   $$(`.sidebar nav a[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
-  const titles = { dashboard: 'Dashboard', orders: 'Orders', products: 'Products', categories: 'Categories', inventory: 'Inventory', users: 'Users', customers: 'Customers', analytics: 'Sales Analytics', marketing: 'Marketing', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', notifications: 'Notifications', audit: 'Activity Log', 'admin-users': 'Admin Users', settings: 'Settings' };
+  const titles = { dashboard: 'Dashboard', orders: 'Orders', invoices: 'Invoice Generator', products: 'Products', categories: 'Categories', inventory: 'Inventory', users: 'Users', customers: 'Customers', analytics: 'Sales Analytics', marketing: 'Marketing', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', notifications: 'Notifications', audit: 'Activity Log', 'admin-users': 'Admin Users', settings: 'Settings' };
   $('#pageTitle').textContent = titles[tab] || tab;
   $('#breadcrumb').textContent = 'Admin / ' + (titles[tab] || tab);
   // Load data
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'orders') loadOrders();
+  if (tab === 'invoices') initOfflineInvoiceForm();
   if (tab === 'products') loadProducts();
   if (tab === 'categories') loadCategories();
   if (tab === 'inventory') loadInventory();
@@ -750,6 +801,114 @@ async function loadDashboard() {
     `).join('') || '<tr><td colspan="7" class="empty">No orders yet</td></tr>';
   } catch (err) {
     toast('Failed to load dashboard: ' + err.message, 'error');
+  }
+}
+
+/* ---------- OFFLINE INVOICE GENERATOR ---------- */
+let offlineInvoiceInitialized = false;
+
+function initOfflineInvoiceForm() {
+  if (offlineInvoiceInitialized) return;
+  offlineInvoiceInitialized = true;
+  addOfflineInvoiceItem();
+  ['offlineShippingFee', 'offlineDiscount'].forEach(id => $('#' + id).addEventListener('input', updateOfflineInvoiceTotals));
+  updateOfflineInvoiceTotals();
+}
+
+function addOfflineInvoiceItem() {
+  const row = document.createElement('div');
+  row.className = 'offline-invoice-row';
+  row.innerHTML = `
+    <div class="form-group description"><label>Product / description *</label><input class="offline-item-name" maxlength="160" required placeholder="Product or service"></div>
+    <div class="form-group"><label>Quantity *</label><input class="offline-item-quantity" type="number" min="1" max="10000" step="1" value="1" required></div>
+    <div class="form-group"><label>Unit price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
+    <div class="form-group"><label>Line total</label><div class="line-total">Rs. 0.00</div></div>
+    <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>`;
+  row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateOfflineInvoiceTotals));
+  row.querySelector('.offline-item-remove').addEventListener('click', () => {
+    if ($('#offlineInvoiceItems').children.length === 1) {
+      row.querySelector('.offline-item-name').value = '';
+      row.querySelector('.offline-item-quantity').value = '1';
+      row.querySelector('.offline-item-price').value = '';
+    } else row.remove();
+    updateOfflineInvoiceTotals();
+  });
+  $('#offlineInvoiceItems').appendChild(row);
+  updateOfflineInvoiceTotals();
+}
+
+function collectOfflineInvoiceItems() {
+  return Array.from($('#offlineInvoiceItems').querySelectorAll('.offline-invoice-row')).map(row => ({
+    name: row.querySelector('.offline-item-name').value.trim(),
+    quantity: Number(row.querySelector('.offline-item-quantity').value),
+    price: Number(row.querySelector('.offline-item-price').value),
+  })).filter(item => item.name || item.price > 0);
+}
+
+function updateOfflineInvoiceTotals() {
+  let subtotal = 0;
+  $$('#offlineInvoiceItems .offline-invoice-row').forEach(row => {
+    const quantity = Number(row.querySelector('.offline-item-quantity').value) || 0;
+    const price = Number(row.querySelector('.offline-item-price').value) || 0;
+    const line = quantity * price;
+    subtotal += line;
+    row.querySelector('.line-total').textContent = money(line);
+  });
+  const shipping = Number($('#offlineShippingFee').value) || 0;
+  const discount = Number($('#offlineDiscount').value) || 0;
+  $('#offlineSubtotal').textContent = money(subtotal);
+  $('#offlineTotal').textContent = money(Math.max(0, subtotal + shipping - discount));
+}
+
+function resetOfflineInvoiceForm() {
+  $('#offlineInvoiceForm').reset();
+  $('#offlineInvoiceItems').innerHTML = '';
+  $('#offlineInvoiceResult').style.display = 'none';
+  $('#offlineInvoiceResult').classList.remove('error');
+  $('#downloadOfflineInvoice').hidden = true;
+  addOfflineInvoiceItem();
+  updateOfflineInvoiceTotals();
+}
+
+async function submitOfflineInvoice(event) {
+  event.preventDefault();
+  const items = collectOfflineInvoiceItems();
+  if (!items.length) return toast('Add at least one item to the invoice.', 'error');
+  const button = $('#createOfflineInvoiceBtn');
+  button.disabled = true;
+  button.textContent = 'Creating invoice…';
+  try {
+    const data = await apiPost('/admin/invoices/offline', {
+      full_name: $('#offlineCustomerName').value.trim(),
+      email: $('#offlineCustomerEmail').value.trim(),
+      phone: $('#offlineCustomerPhone').value.trim(),
+      address: $('#offlineCustomerAddress').value.trim(),
+      source: $('#offlineOrderSource').value,
+      shipping_method: $('#offlineShippingMethod').value,
+      payment_method: $('#offlinePaymentMethod').value,
+      payment_status: $('#offlinePaymentStatus').value,
+      shipping_fee: Number($('#offlineShippingFee').value) || 0,
+      discount_amount: Number($('#offlineDiscount').value) || 0,
+      items,
+    });
+    const link = $('#downloadOfflineInvoice');
+    link.href = data.invoice_url;
+    link.hidden = false;
+    $('#offlineInvoiceResult').style.display = 'block';
+    $('#offlineInvoiceResult').classList.toggle('error', !data.email_sent);
+    $('#offlineInvoiceResultText').textContent = data.email_sent
+      ? `Invoice ${data.invoice_number} created and emailed to ${$('#offlineCustomerEmail').value.trim()}.`
+      : `Invoice ${data.invoice_number} was created, but the email was not sent. ${data.email_error || ''}`;
+    if (data.email_sent) toast('Invoice emailed to the customer.');
+    else toast('Invoice created, but email delivery failed.', 'error');
+    // Keep the download link visible as a reliable fallback if the browser
+    // blocks the automatic attachment download.
+    link.click();
+  } catch (error) {
+    toast(error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<i class="ti ti-mail-forward"></i> Create and email invoice';
   }
 }
 

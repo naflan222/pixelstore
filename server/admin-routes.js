@@ -4,7 +4,8 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const db = require('./database');
 const { requireAdmin, requirePermission } = require('./auth');
-const { sendInvoice } = require('./invoice');
+const { sendInvoice, buildInvoiceModel, renderPdf, invoiceNumberFor } = require('./invoice');
+const { emailEnabled, sendOrderConfirmationEmail } = require('./mailer');
 
 const router = express.Router();
 
@@ -654,6 +655,112 @@ router.get('/orders/:id/invoice', orderAccess, async (req, res) => {
     WHERE oi.order_id = ? ORDER BY oi.id`, id);
   await audit(req, 'downloaded invoice', 'order', id);
   sendInvoice(res, order, items);
+});
+
+// Create an offline phone/WhatsApp/in-store order and email its branded invoice.
+// These lines are intentionally not linked to catalog products, so issuing an
+// invoice does not alter stock; order totals still appear in sales reporting.
+router.post('/invoices/offline', orderAccess, async (req, res) => {
+  const source = req.body || {};
+  const fullName = String(source.full_name || '').trim();
+  const email = String(source.email || '').trim().toLowerCase();
+  const phone = String(source.phone || '').trim();
+  const address = String(source.address || '').trim() || '—';
+  const orderSource = String(source.source || 'phone');
+  const paymentMethod = String(source.payment_method || 'cash').trim().toLowerCase();
+  const paymentStatus = String(source.payment_status || 'pending').trim().toLowerCase();
+  const shippingMethod = String(source.shipping_method || 'standard').trim().toLowerCase();
+  const allowedSources = new Set(['phone', 'whatsapp', 'in_store', 'other']);
+  const allowedPayments = new Set(['cash', 'bank', 'credit-card', 'paypal']);
+  const allowedShipping = new Set(['standard', 'express', 'pickup', 'courier']);
+
+  if (!fullName || fullName.length > 120) return res.status(400).json({ error: 'Enter the customer name (up to 120 characters).' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+    return res.status(400).json({ error: 'Enter a valid customer email address so the invoice can be sent.' });
+  if (phone.length > 50 || address.length > 1000) return res.status(400).json({ error: 'Phone or address is too long.' });
+  if (!allowedSources.has(orderSource) || !allowedPayments.has(paymentMethod) || !allowedShipping.has(shippingMethod))
+    return res.status(400).json({ error: 'Choose a valid order source, payment method, and delivery method.' });
+  if (!['pending', 'paid'].includes(paymentStatus)) return res.status(400).json({ error: 'Payment status must be unpaid or paid.' });
+  if (!Array.isArray(source.items) || source.items.length < 1 || source.items.length > 40)
+    return res.status(400).json({ error: 'Add between 1 and 40 invoice items.' });
+
+  const items = [];
+  for (const [index, raw] of source.items.entries()) {
+    const name = String(raw?.name || '').trim();
+    const price = Number(raw?.price);
+    const quantity = Number(raw?.quantity);
+    if (!name || name.length > 160 || !Number.isFinite(price) || price < 0 || price > 100000000 ||
+        !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10000) {
+      return res.status(400).json({ error: `Check item ${index + 1}: enter a name, a valid price, and a whole-number quantity.` });
+    }
+    items.push({ name, price: Math.round(price * 100) / 100, quantity });
+  }
+
+  const subtotal = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100;
+  const shippingFeeInput = finiteMoney(source.shipping_fee ?? 0, { min: 0, required: true });
+  const discountAmountInput = finiteMoney(source.discount_amount ?? 0, { min: 0, required: true });
+  if (shippingFeeInput === null || shippingFeeInput > 100000000 || discountAmountInput === null ||
+      discountAmountInput > 100000000 || discountAmountInput > subtotal)
+    return res.status(400).json({ error: 'Enter valid delivery and discount amounts. The discount cannot exceed the item subtotal.' });
+  const shippingFee = Math.round(shippingFeeInput * 100) / 100;
+  const discountAmount = Math.round(discountAmountInput * 100) / 100;
+  const total = Math.round((subtotal + shippingFee - discountAmount) * 100) / 100;
+  if (total > 1000000000) return res.status(400).json({ error: 'Invoice total is too large.' });
+
+  try {
+    const orderId = await db.transaction(async (tx) => {
+      const created = await tx.insert(`INSERT INTO orders
+        (user_id, guest_id, full_name, email, phone, address, shipping_method, payment_method,
+         subtotal, shipping_fee, discount_amount, coupon_code, total, internal_notes)
+        VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)` ,
+      fullName, email, phone, address, shippingMethod, paymentMethod, subtotal, shippingFee,
+      discountAmount, total, `Offline order (${orderSource}). Inventory was not adjusted by invoice generation.`);
+      const id = created.id;
+      const paidAt = paymentStatus === 'paid' ? db.utcNow() : null;
+      await tx.run(`INSERT INTO payments (order_id, payment_method, payment_status, amount_paid, paid_at)
+        VALUES (?, ?, ?, ?, ?)`, id, paymentMethod, paymentStatus, paymentStatus === 'paid' ? total : 0, paidAt);
+      for (const item of items) {
+        await tx.run('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, NULL, ?, ?, ?)',
+          id, item.name, item.price, item.quantity);
+      }
+      await tx.run('INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',
+        req.user.id, 'generated offline invoice', 'order', String(id), `Source: ${orderSource}`);
+      return id;
+    });
+
+    const order = await db.get('SELECT * FROM orders WHERE id = ?', orderId);
+    const orderItems = await db.all('SELECT name, price, quantity FROM order_items WHERE order_id = ? ORDER BY id', orderId);
+    const payment = await db.get('SELECT payment_method, payment_status, amount_paid, paid_at FROM payments WHERE order_id = ?', orderId);
+    const invoiceUrl = `/api/admin/orders/${orderId}/invoice`;
+    let emailSent = false;
+    let emailError = null;
+
+    try {
+      const model = await buildInvoiceModel(order, orderItems, { payment });
+      const pdfBuffer = await renderPdf(model);
+      if (!emailEnabled()) {
+        emailError = 'The invoice was created, but the website email service is not configured.';
+      } else {
+        await sendOrderConfirmationEmail(email, { order, model, pdfBuffer });
+        emailSent = true;
+      }
+    } catch (error) {
+      console.error(`[admin invoice] created order #${orderId}, but invoice email failed:`, error.message);
+      emailError = `The invoice was created, but the email could not be sent. ${error.message}`;
+    }
+
+    res.status(201).json({
+      ok: true,
+      order_id: orderId,
+      invoice_number: invoiceNumberFor(orderId, order.created_at).number,
+      invoice_url: invoiceUrl,
+      email_sent: emailSent,
+      email_error: emailError,
+    });
+  } catch (error) {
+    console.error('[admin invoice] could not create offline invoice:', error.message);
+    res.status(500).json({ error: 'Could not create the invoice. Please check the details and try again.' });
+  }
 });
 
 router.put('/orders/:id/status', orderAccess, async (req, res) => {

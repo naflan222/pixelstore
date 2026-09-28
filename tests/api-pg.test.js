@@ -19,6 +19,7 @@ for (const key of ['BREVO_API_KEY', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP
 }
 
 test('store API on PostgreSQL', async (t) => {
+  process.env.ORDER_NUMBER_START = '1';
   const url = process.env.TEST_DATABASE_URL;
   if (url) {
     // eslint-disable-next-line global-require

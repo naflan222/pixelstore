@@ -36,16 +36,16 @@ a{text-decoration:none;color:inherit}
 
 /* App layout */
 .app{display:none;min-height:100vh}
-.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--panel);border-right:1px solid var(--border);padding:20px 0;overflow-y:auto;z-index:100;transition:transform .3s}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--panel);border-right:1px solid var(--border);padding:20px 0 12px;overflow-y:auto;z-index:100;transition:transform .3s;display:flex;flex-direction:column}
 .sidebar.active{transform:translateX(0)}
 .sidebar .logo{padding:0 24px 20px;font-size:18px;font-weight:800;color:#fff;border-bottom:1px solid var(--border)}
 .sidebar .logo span{color:var(--primary)}
-.sidebar nav{padding:12px 12px}
+.sidebar nav{padding:12px 12px;flex:1 0 auto}
 .sidebar nav a{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:var(--text2);font-size:14px;font-weight:500;transition:all .15s;cursor:pointer}
 .sidebar nav a:hover{background:var(--panel2);color:var(--text)}
 .sidebar nav a.active{background:var(--primary);color:#fff}
 .sidebar nav a i{font-size:20px}
-.sidebar .logout{position:absolute;bottom:20px;left:12px;right:12px}
+.sidebar .logout{position:static;margin:12px 12px 0;padding-top:12px;border-top:1px solid var(--border);flex-shrink:0}
 .sidebar .logout a{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);color:var(--red);font-size:14px;font-weight:500;cursor:pointer;transition:background .15s}
 .sidebar .logout a:hover{background:rgba(239,68,68,.1)}
 
@@ -806,34 +806,65 @@ async function loadDashboard() {
 
 /* ---------- OFFLINE INVOICE GENERATOR ---------- */
 let offlineInvoiceInitialized = false;
+let offlineCatalog = [];
 
 function initOfflineInvoiceForm() {
   if (offlineInvoiceInitialized) return;
   offlineInvoiceInitialized = true;
   addOfflineInvoiceItem();
+  api('/admin/invoices/catalog').then(data => {
+    offlineCatalog = data.products || [];
+    $$('#offlineInvoiceItems .offline-item-options').forEach(fillOfflineItemOptions);
+  }).catch(error => toast('Could not load product suggestions: ' + error.message, 'error'));
   ['offlineShippingFee', 'offlineDiscount'].forEach(id => $('#' + id).addEventListener('input', updateOfflineInvoiceTotals));
+  updateOfflineInvoiceTotals();
+}
+
+function fillOfflineItemOptions(list) {
+  list.replaceChildren(...offlineCatalog.map(product => {
+    const option = document.createElement('option');
+    option.value = product.name;
+    option.label = `${money(product.price)}${product.sku ? ' · ' + product.sku : ''}`;
+    return option;
+  }));
+}
+
+function selectOfflineCatalogProduct(row) {
+  const input = row.querySelector('.offline-item-name');
+  const match = offlineCatalog.find(product => product.name.toLocaleLowerCase() === input.value.trim().toLocaleLowerCase());
+  if (!match) {
+    row.querySelector('.offline-item-info').textContent = '';
+    return;
+  }
+  row.querySelector('.offline-item-price').value = Number(match.price).toFixed(2);
+  row.querySelector('.offline-item-info').textContent = [match.sku && `SKU ${match.sku}`, match.description].filter(Boolean).join(' · ').slice(0, 180);
   updateOfflineInvoiceTotals();
 }
 
 function addOfflineInvoiceItem() {
   const row = document.createElement('div');
   row.className = 'offline-invoice-row';
+  const listId = `offline-products-${Math.random().toString(36).slice(2)}`;
   row.innerHTML = `
-    <div class="form-group description"><label>Product / description *</label><input class="offline-item-name" maxlength="160" required placeholder="Product or service"></div>
+    <div class="form-group description"><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
     <div class="form-group"><label>Quantity *</label><input class="offline-item-quantity" type="number" min="1" max="10000" step="1" value="1" required></div>
     <div class="form-group"><label>Unit price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
     <div class="form-group"><label>Line total</label><div class="line-total">Rs. 0.00</div></div>
     <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>`;
   row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateOfflineInvoiceTotals));
+  row.querySelector('.offline-item-name').addEventListener('input', () => selectOfflineCatalogProduct(row));
+  row.querySelector('.offline-item-name').addEventListener('change', () => selectOfflineCatalogProduct(row));
   row.querySelector('.offline-item-remove').addEventListener('click', () => {
     if ($('#offlineInvoiceItems').children.length === 1) {
       row.querySelector('.offline-item-name').value = '';
       row.querySelector('.offline-item-quantity').value = '1';
       row.querySelector('.offline-item-price').value = '';
+      row.querySelector('.offline-item-info').textContent = '';
     } else row.remove();
     updateOfflineInvoiceTotals();
   });
   $('#offlineInvoiceItems').appendChild(row);
+  fillOfflineItemOptions(row.querySelector('.offline-item-options'));
   updateOfflineInvoiceTotals();
 }
 
@@ -928,6 +959,10 @@ async function loadOrders() {
     if (date) params.set('date', date);
     params.set('page', orderPage);
     const data = await api('/admin/orders?' + params.toString());
+    if (!data.orders.length && data.total && orderPage > 1) {
+      orderPage = Math.max(1, data.pages);
+      return loadOrders();
+    }
     $('#ordersBody').innerHTML = data.orders.map(o => `
       <tr>
         <td>#${o.id}</td>
@@ -942,6 +977,7 @@ async function loadOrders() {
         <td style="white-space:nowrap">
           <button class="btn btn-secondary btn-sm" onclick="viewOrder(${o.id})" title="View order" aria-label="View order #${o.id}"><i class="ti ti-eye"></i></button>
           <a class="btn btn-secondary btn-sm" href="/api/admin/orders/${o.id}/invoice" download title="Download PDF invoice" aria-label="Download PDF invoice for order #${o.id}"><i class="ti ti-download"></i></a>
+          ${['owner', 'admin'].includes(adminUser?.role) ? `<button class="btn btn-danger btn-sm" onclick="deleteOrder(${o.id})" title="Delete order" aria-label="Delete order #${o.id}"><i class="ti ti-trash"></i></button>` : ''}
           <select onchange="updateOrderStatus(${o.id},this.value)" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
             <option value="">Set Status...</option>
             <option value="pending">Pending</option>
@@ -975,6 +1011,17 @@ async function loadOrders() {
 }
 
 function searchOrders(e) { if (e.key === 'Enter') { orderPage = 1; loadOrders(); } }
+
+async function deleteOrder(id) {
+  if (!confirm(`Permanently delete order #${id}? Its invoice and order history will also be removed. This cannot be undone.`)) return;
+  try {
+    await apiDel('/admin/orders/' + id);
+    closeOrderModal();
+    toast(`Order #${id} deleted`);
+    await loadOrders();
+    loadDashboard();
+  } catch (err) { toast(err.message, 'error'); }
+}
 
 async function viewOrder(id) {
   try {

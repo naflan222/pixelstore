@@ -485,6 +485,16 @@ CREATE TABLE IF NOT EXISTS product_images (
   db.exec('PRAGMA foreign_keys = ON');
 })();
 
+// Order IDs are the customer-facing order numbers. Advance the AUTOINCREMENT
+// counter once so the next real order starts at #1232, without changing any
+// existing order or reusing a number after deletions/restarts.
+const firstOrderNumber = Number(process.env.ORDER_NUMBER_START || 1232);
+if (Number.isSafeInteger(firstOrderNumber) && firstOrderNumber > 1) {
+  const previous = db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'orders'").get();
+  if (previous) db.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'orders'").run(firstOrderNumber - 1);
+  else db.prepare("INSERT INTO sqlite_sequence (name, seq) VALUES ('orders', ?)").run(firstOrderNumber - 1);
+}
+
 // This singleton stores operational display choices only; credentials remain environment-only.
 db.prepare(`INSERT OR IGNORE INTO store_settings
   (id, contact, payment_methods, shipping_fee, delivery_options, notification_preferences)

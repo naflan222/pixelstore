@@ -11,6 +11,7 @@ for (const key of ['BREVO_API_KEY', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP
 }
 
 test('store API on SQLite (default engine)', async (t) => {
+  process.env.ORDER_NUMBER_START = '1';
   delete process.env.DB_ENGINE;
   delete process.env.DATABASE_URL;
   delete process.env.PG_MEM_TEST;

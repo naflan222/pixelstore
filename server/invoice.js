@@ -580,6 +580,26 @@ function drawTotalsAndNotes(doc, model, startY) {
   return Math.max(totalsY, notesY) + 16;
 }
 
+function drawOrderSummary(doc, model, y) {
+  const top = y + 22;
+  drawLabel(doc, 'Order at a glance', PAGE.margin, top);
+  const cardY = top + 17;
+  doc.roundedRect(PAGE.margin, cardY, CONTENT_WIDTH, 56, 6).fillAndStroke(BRAND.zebra, BRAND.line);
+  const entries = [
+    ['PAYMENT METHOD', model.meta.find(row => row[0] === 'Payment method')?.[1] || '—'],
+    ['DELIVERY', model.delivery.method],
+    ['PAYMENT DUE', model.dueOn],
+  ];
+  const width = CONTENT_WIDTH / entries.length;
+  entries.forEach(([label, value], index) => {
+    const x = PAGE.margin + index * width + 14;
+    writeText(doc, label, x, cardY + 12, { size: 7, color: BRAND.muted, spacing: 0.6, lineBreak: false });
+    writeText(doc, value, x, cardY + 29, { font: 'Helvetica-Bold', size: 9.1, color: BRAND.ink,
+      width: width - 25, lineBreak: false });
+  });
+  return cardY + 78;
+}
+
 function drawFooter(doc, model, pageNumber, pageCount) {
   const footerY = PAGE.height - 52;
   doc.moveTo(PAGE.margin, footerY).lineTo(CONTENT_RIGHT, footerY).lineWidth(0.7).strokeColor(BRAND.line).stroke();
@@ -636,9 +656,15 @@ function renderPdf(model) {
       drawLetterhead(doc, model);
       let y = drawAddressBlocks(doc, model, TOP_BAR + ACCENT_BAR + 26);
       y = drawItemsTable(doc, model, y);
+      // Short invoices should occupy the A4 page with a deliberate summary
+      // and balanced spacing. Long invoices retain the natural flow/pagination.
+      if (model.lines.length <= 4 && doc.bufferedPageRange().count === 1 && y < 420) {
+        y = drawOrderSummary(doc, model, y);
+        y = Math.max(y, 530);
+      }
       y = drawTotalsAndNotes(doc, model, y);
 
-      const closingY = Math.min(y + 4, BODY_FLOOR - 6);
+      const closingY = Math.min(Math.max(y + 14, doc.bufferedPageRange().count === 1 ? 690 : y + 14), BODY_FLOOR - 6);
       writeText(doc, `Thank you for choosing ${model.shop.name}. ${model.shop.tagline}`, PAGE.margin, closingY, {
         font: 'Helvetica-Bold', size: 8.2, color: BRAND.accentDeep, width: CONTENT_WIDTH, align: 'center', lineBreak: false,
       });

@@ -244,7 +244,7 @@ tr:last-child td{border-bottom:none}
       <a data-tab="products" data-roles="owner,admin,catalog_manager" onclick="showTab('products')"><i class="ti ti-packages"></i> Products</a>
       <a data-tab="categories" data-roles="owner,admin,catalog_manager" onclick="showTab('categories')"><i class="ti ti-category"></i> Categories</a>
       <a data-tab="inventory" data-roles="owner,admin,catalog_manager" onclick="showTab('inventory')"><i class="ti ti-box-seam"></i> Inventory</a>
-      <a data-tab="users" data-roles="owner,admin" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
+      <a data-tab="users" data-roles="owner" onclick="showTab('users')"><i class="ti ti-users"></i> Users</a>
       <a data-tab="customers" data-roles="owner,admin" onclick="showTab('customers')"><i class="ti ti-user-heart"></i> Customers</a>
       <a data-tab="analytics" data-roles="owner,admin,order_manager" onclick="showTab('analytics')"><i class="ti ti-chart-line"></i> Analytics</a>
       <a data-tab="marketing" data-roles="owner,admin,catalog_manager" onclick="showTab('marketing')"><i class="ti ti-speakerphone"></i> Marketing</a>
@@ -704,6 +704,8 @@ async function doLogout() {
 
 /* ---------- NAVIGATION ---------- */
 function showTab(tab) {
+  const link = $(`.sidebar nav a[data-tab="${tab}"]`);
+  if (link?.dataset.roles && !link.dataset.roles.split(',').includes(adminUser?.role)) return;
   $$('.tab').forEach(t => t.classList.remove('active'));
   $('#tab-' + tab).classList.add('active');
   $$('.sidebar nav a').forEach(a => a.classList.remove('active'));

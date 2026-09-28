@@ -773,6 +773,17 @@ async function defineSuite(t, ctx) {
       username: 'weak', email: 'weak@example.com', password: 'short', role: 'admin',
     });
     assert.equal(r.status, 400);
+    r = await owner.post('/api/admin/admin-users', {
+      username: 'staff1', email: 'staff1@example.com', password: 'staffpass12', role: 'admin',
+    });
+    assert.equal(r.status, 201);
+    const admin = ctx.makeSession();
+    r = await admin.post('/api/auth/login', { username: 'staff1', password: 'staffpass12' });
+    assert.equal(r.status, 200);
+    r = await admin.get('/api/admin/users');
+    assert.equal(r.status, 403);
+    r = await admin.get('/api/admin/customers');
+    assert.equal(r.status, 200);
     const mgr = ctx.makeSession();
     r = await mgr.post('/api/auth/login', { username: 'mgr1', password: 'mgrpass12' });
     assert.equal(r.status, 200);

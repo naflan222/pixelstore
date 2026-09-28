@@ -1347,7 +1347,7 @@ router.post('/notifications/read', async (req, res) => {
 });
 
 /* ---------------- USERS ---------------- */
-router.get('/users', owners, async (req, res) => {
+router.get('/users', ownerOnly, async (req, res) => {
   const { search } = req.query;
   let sql = `SELECT id, username, email, full_name, phone, role, created_at,
     'active' AS account_status

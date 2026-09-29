@@ -322,7 +322,7 @@ function buildSchema(meta, canonical, filename, catalogProduct = null) {
     .replace(/</g, '\\u003c');
 }
 
-function improveImages(html) {
+function improveImages(html, fallbackAlt = '') {
   let seen = 0;
   return html.replace(/<img\b([^>]*)>/gi, (tag, attrs) => {
     seen += 1;
@@ -332,6 +332,16 @@ function improveImages(html) {
 
     if (src && IMAGE_ALT[src] && /\balt=["']\s*["']/i.test(updated)) {
       updated = updated.replace(/\balt=["']\s*["']/i, `alt="${escapeHtml(IMAGE_ALT[src])}"`);
+    } else if (
+      fallbackAlt &&
+      src &&
+      /^img\/(?:product|bg-img)\//i.test(src) &&
+      /\balt=["']\s*["']/i.test(updated)
+    ) {
+      updated = updated.replace(
+        /\balt=["']\s*["']/i,
+        `alt="${escapeHtml(fallbackAlt)} product image"`
+      );
     }
 
     const isPriorityImage = seen <= 3 || (src && /logo-small|icon-\d+x\d+/.test(src));
@@ -356,7 +366,12 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
       price: String(catalogProduct.price ?? meta.product.price),
       image: absoluteUrl(catalogProduct.image || meta.product.image),
     };
-    if (catalogProduct.description) meta.description = textOnly(catalogProduct.description);
+    const catalogDescription = textOnly(catalogProduct.description);
+    if (catalogDescription) {
+      meta.description = catalogDescription.length >= 80
+        ? catalogDescription
+        : `${catalogDescription.replace(/[.!?]?$/, '.')} Buy ${meta.product.name} from Pixel House Sri Lanka with delivery, product support and current availability.`;
+    }
     meta.heading = meta.product.name;
     meta.title = `${meta.product.name} in Sri Lanka | Pixel House`;
   }
@@ -426,7 +441,18 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     );
   }
 
-  return improveImages(output);
+  return improveImages(output, meta.product ? meta.product.name : '');
+}
+
+function staticProductFilenameForSlug(rootDir, slug) {
+  const safeSlug = String(slug || '');
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(safeSlug)) return null;
+  const filename = `${safeSlug}.html`;
+  if (!PRODUCT_PAGES.includes(filename)) return null;
+
+  const filePath = path.join(rootDir, filename);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return null;
+  return filename;
 }
 
 function createHtmlHandler({ rootDir, productLookup = null }) {
@@ -438,8 +464,13 @@ function createHtmlHandler({ rootDir, productLookup = null }) {
     if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return next();
 
     try {
-      const html = fs.readFileSync(filePath, 'utf8');
       const dynamicSlug = filename === 'single-product.html' ? String(req.query.product || '') : '';
+      if (dynamicSlug) {
+        const staticProductFilename = staticProductFilenameForSlug(rootDir, dynamicSlug);
+        if (staticProductFilename) return res.redirect(301, `/${staticProductFilename}`);
+      }
+
+      const html = fs.readFileSync(filePath, 'utf8');
       const isProductPage = Boolean(extractProduct(html));
       const shouldResolveProduct = filename !== 'single-product.html' || Boolean(dynamicSlug);
       const catalogProduct = productLookup && isProductPage && shouldResolveProduct
@@ -481,6 +512,7 @@ function createSitemapHandler({ rootDir, productList = null }) {
     if (productList) {
       const products = await productList();
       for (const product of products) {
+        if (staticProductFilenameForSlug(rootDir, product.slug)) continue;
         const url = `${SITE_URL}/single-product.html?product=${encodeURIComponent(product.slug)}`;
         urls.push(`  <url>\n    <loc>${xmlEscape(url)}</loc>\n    <lastmod>${xmlEscape(String(product.updated_at || product.created_at || '').slice(0, 10))}</lastmod>\n  </url>`);
       }
@@ -501,4 +533,5 @@ module.exports = {
   extractProduct,
   createHtmlHandler,
   createSitemapHandler,
+  staticProductFilenameForSlug,
 };

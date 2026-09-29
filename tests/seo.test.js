@@ -92,6 +92,28 @@ test('dynamic catalog product pages receive their own canonical and metadata', a
   }
 });
 
+test('legacy dynamic URLs for products with static pages redirect to the clean canonical URL', async () => {
+  const app = express();
+  app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, createHtmlHandler({
+    rootDir: root,
+    productLookup: async () => {
+      throw new Error('Static duplicate should redirect before the database lookup');
+    },
+  }));
+
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/single-product.html?product=3mstick`, { redirect: 'manual' });
+    assert.equal(response.status, 301);
+    assert.equal(response.headers.get('location'), '/3mstick.html');
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test('category pages declare their live catalog category', () => {
   const categories = [
     ['catagory.html', 'GoPro Accessories'],
@@ -169,7 +191,13 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
   const htmlHandler = createHtmlHandler({ rootDir: root });
   app.get('/', htmlHandler);
   app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, htmlHandler);
-  app.get('/sitemap.xml', createSitemapHandler({ rootDir: root, productList: async () => [{ slug: 'new-tripod', created_at: '2026-09-23' }] }));
+  app.get('/sitemap.xml', createSitemapHandler({
+    rootDir: root,
+    productList: async () => [
+      { slug: '3mstick', created_at: '2026-09-22' },
+      { slug: 'new-tripod', created_at: '2026-09-23' },
+    ],
+  }));
 
   const server = await new Promise((resolve) => {
     const listener = app.listen(0, () => resolve(listener));
@@ -194,6 +222,9 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
     assert.match(sitemapText, /<loc>https:\/\/pixelhouse\.lk\/<\/loc>/);
     assert.match(sitemapText, /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
     assert.match(sitemapText, /https:\/\/pixelhouse\.lk\/single-product\.html\?product=new-tripod/);
+    assert.match(sitemapText, /https:\/\/pixelhouse\.lk\/3mstick\.html/);
+    assert.doesNotMatch(sitemapText, /single-product\.html\?product=3mstick/);
+    assert.equal((sitemapText.match(/https:\/\/pixelhouse\.lk\/3mstick\.html/g) || []).length, 1);
     assert.doesNotMatch(sitemapText, /featured-products\.html|flash-sale\.html/);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

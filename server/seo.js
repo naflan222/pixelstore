@@ -8,8 +8,8 @@ const DEFAULT_IMAGE = `${SITE_URL}/img/icons/icon-512x512.png`;
 
 const PAGE_META = {
   'home.html': {
-    title: 'Pixel House Sri Lanka | GoPro, DJI & Insta360 Gear',
-    description: 'Shop GoPro, DJI Osmo and Insta360 cameras, mounts, batteries, cases and action-camera accessories from Pixel House in Sri Lanka.',
+    title: 'PixelHouse | GoPro, DJI & Insta360 Cameras in Sri Lanka',
+    description: 'Shop GoPro, DJI Osmo and Insta360 cameras and accessories at PixelHouse, Dikwella. Check current prices, mounts, batteries and cases, or explore GoPro rentals.',
     heading: 'Action Cameras and Accessories in Sri Lanka',
   },
   'products.html': {
@@ -490,6 +490,15 @@ function createHtmlHandler({ rootDir, productLookup = null }) {
   };
 }
 
+// Home aliases share the root canonical; make that preference explicit to crawlers.
+function canonicalHomepageRedirect(req, res, next) {
+  if (!['GET', 'HEAD'].includes(req.method)
+      || !['/home.html', '/index.html'].includes(req.path)) return next();
+  const queryIndex = req.originalUrl.indexOf('?');
+  const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+  return res.redirect(301, `/${query}`);
+}
+
 function xmlEscape(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -528,6 +537,7 @@ function createSitemapHandler({ rootDir, productList = null }) {
 }
 
 module.exports = {
+  canonicalHomepageRedirect,
   INDEXABLE_PAGES,
   enhanceHtml,
   extractProduct,

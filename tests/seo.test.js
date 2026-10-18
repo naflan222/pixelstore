@@ -11,6 +11,7 @@ const {
   extractProduct,
   createHtmlHandler,
   createSitemapHandler,
+  canonicalHomepageRedirect,
 } = require('../server/seo');
 
 const root = path.join(__dirname, '..');
@@ -19,11 +20,36 @@ function read(filename) {
   return fs.readFileSync(path.join(root, filename), 'utf8');
 }
 
+test('home aliases redirect once and preserve query strings without changing API or checkout routes', async () => {
+  const app = express();
+  app.use(canonicalHomepageRedirect);
+  app.use((req, res) => res.status(200).send('unchanged'));
+  const server = app.listen(0);
+  await new Promise(resolve => server.on('listening', resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    for (const pathname of ['/home.html', '/index.html']) {
+      const response = await fetch(`${base}${pathname}?utm_source=google&x=a%2Fb`, { redirect: 'manual' });
+      assert.equal(response.status, 301);
+      assert.equal(response.headers.get('location'), '/?utm_source=google&x=a%2Fb');
+      const target = await fetch(new URL(response.headers.get('location'), base));
+      assert.equal(target.status, 200);
+    }
+    assert.equal((await fetch(`${base}/home.html`, { method: 'HEAD', redirect: 'manual' })).status, 301);
+    for (const pathname of ['/', '/api/products', '/checkout.html', '/admin/', '/products.html']) {
+      assert.equal((await fetch(base + pathname, { redirect: 'manual' })).status, 200);
+    }
+    assert.equal((await fetch(`${base}/home.html`, { method: 'POST', redirect: 'manual' })).status, 200);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('homepage receives SEO metadata without removing storefront content', () => {
   const source = read('home.html');
   const result = enhanceHtml(source, 'home.html');
 
-  assert.match(result, /<title>Pixel House Sri Lanka \| GoPro, DJI &amp; Insta360 Gear<\/title>/);
+  assert.match(result, /<title>PixelHouse \| GoPro, DJI &amp; Insta360 Cameras in Sri Lanka<\/title>/);
   assert.match(result, /<link rel="canonical" href="https:\/\/pixelhouse\.lk\/">/);
   assert.match(result, /<h1 class="visually-hidden">Action Cameras and Accessories in Sri Lanka<\/h1>/);
   assert.match(result, /"@type":"ElectronicsStore"/);

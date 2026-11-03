@@ -509,7 +509,7 @@ db.prepare(`INSERT OR IGNORE INTO store_settings
 
 // Ensure the demo user has admin role (for databases created before admin panel)
 const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@pixels.com'").get();
-if (demoUser) {
+if (demoUser && process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO_DATA !== 'false') {
   db.prepare("UPDATE users SET role = 'owner' WHERE id = ? AND role IN ('customer', 'admin')").run(demoUser.id);
 }
 
@@ -555,7 +555,7 @@ db.exec(`UPDATE products SET category_id = (
 // Demo owner account so a fresh development shop works out of the box.
 // (SQLite dev convenience only. Credentials are NEVER logged.)
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
-if (userCount === 0 && SEEDING_ALLOWED) {
+if (userCount === 0 && SEEDING_ALLOWED && process.env.NODE_ENV !== 'production') {
   const hash = bcrypt.hashSync('demo1234', 10);
   db.prepare(`INSERT INTO users (username, email, password_hash, full_name, phone, address, balance, role)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)

@@ -202,6 +202,13 @@ router.post('/auth/forgot-password', resetLimiter, async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ error: 'Please enter a valid email address.' });
 
+  // Never fall back to returning reset secrets in a production deployment.
+  // Check before looking up the account so the response cannot enumerate users.
+  if (process.env.NODE_ENV === 'production' &&
+      (!emailEnabled() || process.env.FORCE_DEV_CODES === '1')) {
+    return res.status(503).json({ error: 'Password reset is temporarily unavailable. Please contact support.' });
+  }
+
   // Housekeeping: drop codes that expired more than a day ago.
   await db.run('DELETE FROM password_resets WHERE expires_at < ?', db.utcNow(-ONE_DAY_MS));
 

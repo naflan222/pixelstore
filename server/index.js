@@ -180,8 +180,14 @@ app.get('/sitemap.xml', createSitemapHandler({
   productList: () => db.all("SELECT slug, created_at FROM products WHERE status = 'active' ORDER BY id"),
 }));
 
-// ---- Static frontend (all existing HTML/CSS/JS/images stay untouched at the root) ----
-app.use(express.static(publicRoot));
+// Serve only storefront assets. The project root also contains application
+// source and, by default, the customer database; those must never be public.
+for (const directory of ['css', 'js', 'img', 'admin']) {
+  app.use(`/${directory}`, express.static(path.join(publicRoot, directory)));
+}
+app.get([
+  '/style.css', '/service-worker.js', '/manifest.json', '/robots.txt',
+], express.static(publicRoot));
 
 app.use((err, req, res, next) => {
   console.error(err);

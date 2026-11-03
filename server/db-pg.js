@@ -188,7 +188,7 @@ async function seedDemoData(executor) {
     console.log(`Seeded ${SEED_PRODUCTS.length} demo products (SEED_DEMO_DATA=true)`);
   }
   const users = await executor.query('SELECT COUNT(*) AS c FROM users');
-  if (Number(users.rows[0].c) === 0) {
+  if (Number(users.rows[0].c) === 0 && process.env.NODE_ENV !== 'production') {
     await executor.query(
       `INSERT INTO users (username, email, password_hash, full_name, phone, address, balance, role, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)`,

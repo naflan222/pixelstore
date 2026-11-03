@@ -675,32 +675,53 @@
         return { full_name: name, email, phone, address };
       }
 
-      // Shipping methods: radio id → { api method, fee }
-      const SHIPPING = {
-        standardShipping: { method: 'standard', fee: 500 },
-        storePickup: { method: 'pickup', fee: 0 },
-      };
-
+      const shippingList = $('.shipping-method-choose-card ul');
+      if (shippingList) shippingList.style.display = 'none';
+      let deliveryOptions = [];
+      let checkoutReady = false;
       let subtotal = 0;
       try {
-        const data = await get('/cart');
+        const [data, settings] = await Promise.all([get('/cart'), get('/checkout-settings')]);
         subtotal = data.subtotal;
+        deliveryOptions = settings.delivery_options;
+        const radioIds = { standard: 'standardShipping', express: 'expressShipping', pickup: 'storePickup' };
+        if (shippingList) {
+          shippingList.innerHTML = deliveryOptions.map((option, index) => {
+            const id = radioIds[option.method];
+            return '<li><input id="' + id + '" type="radio" name="selector" value="' + option.method + '"' + (index === 0 ? ' checked' : '') + '>' +
+              '<label for="' + id + '">' + escapeHtml(option.label) + '<span>' +
+              (option.fee === 0 ? 'FREE' : money(option.fee)) + '</span></label><div class="check"></div></li>';
+          }).join('');
+          shippingList.style.display = '';
+        }
+        checkoutReady = settings.store_open && deliveryOptions.length > 0;
+        if (!checkoutReady) {
+          const err = $('#billError');
+          if (err) {
+            err.textContent = settings.store_open ? 'No delivery methods are currently available. Please contact us.' : 'The store is currently closed. Please try again later.';
+            err.style.display = 'block';
+          }
+        }
         if (!data.items.length) {
           const btn = $('.cart-amount-area .btn');
           if (btn) { btn.textContent = 'Cart is Empty'; btn.classList.add('disabled'); }
         }
-      } catch (_) {}
+      } catch (_) {
+        const err = $('#billError');
+        if (err) { err.textContent = 'Could not load checkout. Please refresh and try again.'; err.style.display = 'block'; }
+      }
 
       // Live total: subtotal + selected shipping fee, updates when user picks shipping
       function selectedShipping() {
         const checked = $('input[name="selector"]:checked');
-        return SHIPPING[checked ? checked.id : 'standardShipping'] || SHIPPING.standardShipping;
+        return deliveryOptions.find(option => checked && option.method === checked.value) || deliveryOptions[0];
       }
       function updateTotal() {
         const totalEl = $('.cart-amount-area .cart-total');
-        if (totalEl) totalEl.textContent = (subtotal + selectedShipping().fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const selected = selectedShipping();
+        if (totalEl && selected) totalEl.textContent = (subtotal + selected.fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         // Only reveal the total bar once it holds the REAL cart total
-        if (checkoutTotal && subtotal > 0) checkoutTotal.style.display = '';
+        if (checkoutTotal && subtotal > 0 && checkoutReady) checkoutTotal.style.display = '';
       }
       $$('input[name="selector"]').forEach((r) => r.addEventListener('change', updateTotal));
       updateTotal();
@@ -709,6 +730,7 @@
       $$('a[href="checkout-payment.html"]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
+          if (!checkoutReady || !selectedShipping()) { alert('Checkout is currently unavailable. Please refresh or contact us.'); return; }
           if (!subtotal) { alert('Your cart is empty.'); return; }
           const b = billingValid();
           if (!b) return; // missing name / phone / address → block

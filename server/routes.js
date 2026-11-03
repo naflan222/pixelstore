@@ -8,6 +8,7 @@ const { emailEnabled, describeConfig, sendOtpEmail, sendOrderConfirmationEmail }
 const { createAdminNotification } = require('./admin-notifications');
 const { sendInvoice, invoiceNumberFor, buildInvoiceModel, renderPdf } = require('./invoice');
 const { rateLimit } = require('./security');
+const { checkoutSettings } = require('./checkout-settings');
 
 const router = express.Router();
 
@@ -76,7 +77,6 @@ function emailOrderConfirmation(orderId) {
   return task;
 }
 
-const SHIPPING_FEES = { standard: 500, pickup: 0 };
 const IMPLEMENTED_PAYMENT_METHODS = new Set(['cash', 'bank']);
 const COUPON_CODE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
 
@@ -311,8 +311,12 @@ router.post('/auth/change-password', requireAuth, async (req, res) => {  const {
   const user = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
   if (!bcrypt.compareSync(current_password, user.password_hash))
     return res.status(401).json({ error: 'Current password is incorrect.' });
-  await db.run('UPDATE users SET password_hash = ? WHERE id = ?',
-    bcrypt.hashSync(new_password, 10), req.user.id);
+  const hash = bcrypt.hashSync(new_password, 10);
+  await db.transaction(async (tx) => {
+    await tx.run('UPDATE users SET password_hash = ? WHERE id = ?', hash, req.user.id);
+    await tx.run('DELETE FROM sessions WHERE user_id = ? AND token != ?',
+      req.user.id, req.cookies.pixels_session);
+  });
   res.json({ ok: true });
 });
 
@@ -456,7 +460,7 @@ router.get('/cart', async (req, res) => {
 
 router.post('/cart', async (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};
-  const product = await db.get('SELECT id, stock FROM products WHERE id = ?', product_id);
+  const product = await db.get("SELECT id, stock FROM products WHERE id = ? AND status = 'active'", product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
@@ -493,7 +497,7 @@ router.delete('/cart/:id', async (req, res) => {
 router.post('/cart/by-slug', async (req, res) => {
   const { slug, quantity = 1 } = req.body || {};
   if (!slug) return res.status(400).json({ error: 'Product slug is required.' });
-  const product = await db.get('SELECT id, stock FROM products WHERE slug = ?', slug);
+  const product = await db.get("SELECT id, stock FROM products WHERE slug = ? AND status = 'active'", slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
@@ -548,6 +552,11 @@ router.delete('/wishlist/:id', async (req, res) => {
 
 /* ---------------- ORDERS / CHECKOUT ---------------- */
 
+router.get('/checkout-settings', async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(checkoutSettings(await db.get('SELECT * FROM store_settings WHERE id = 1')));
+});
+
 router.post('/orders', async (req, res) => {
   const { full_name, email, phone, address, shipping_method = 'standard', payment_method = 'cash', coupon_code } = req.body || {};
   const paymentMethod = String(payment_method).trim().toLowerCase();
@@ -556,7 +565,7 @@ router.post('/orders', async (req, res) => {
   if (!String(full_name).trim() || String(full_name).length > 120 || String(email).length > 254 ||
       !String(phone).trim() || String(phone).length > 50 || !String(address).trim() || String(address).length > 1000)
     return res.status(400).json({ error: 'Phone number and shipping address are required.' });
-  if (!Object.prototype.hasOwnProperty.call(SHIPPING_FEES, shipping_method))
+  if (!['standard', 'express', 'pickup'].includes(shipping_method))
     return res.status(400).json({ error: 'Invalid shipping method.' });
   const availablePaymentMethods = await enabledPaymentMethods();
   if (!availablePaymentMethods.has(paymentMethod))
@@ -567,21 +576,30 @@ router.post('/orders', async (req, res) => {
   if (items.length === 0) return res.status(400).json({ error: 'Your cart is empty.' });
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const shippingFee = SHIPPING_FEES[shipping_method];
 
   try {
     const order = await db.transaction(async (tx) => {
+      const settings = checkoutSettings(await tx.get(
+        `SELECT * FROM store_settings WHERE id = 1${db.forUpdate()}`));
+      if (!settings.store_open) throw new Error('The store is currently closed. Please try again later.');
+      const delivery = settings.delivery_options.find(option => option.method === shipping_method);
+      if (!delivery) throw new Error('This delivery method is no longer available. Please return to checkout.');
+      if (!settings.payment_methods.includes(paymentMethod))
+        throw new Error('This payment method is not currently available.');
+      const shippingFee = delivery.fee;
       // CONCURRENCY: lock the product rows first (FOR UPDATE on PostgreSQL;
       // SQLite transactions are fully serialised by the engine queue), then
       // validate stock against the LOCKED rows — two simultaneous checkouts
       // can no longer both pass validation for the last unit.
       const placeholders = items.map(() => '?').join(',');
       const locked = await tx.all(
-        `SELECT id, stock FROM products WHERE id IN (${placeholders})${db.forUpdate()}`,
+        `SELECT id, stock, status FROM products WHERE id IN (${placeholders})${db.forUpdate()}`,
         ...items.map((i) => i.id)
       );
       const stockById = new Map(locked.map((p) => [Number(p.id), Number(p.stock)]));
+      const activeIds = new Set(locked.filter(p => p.status === 'active').map(p => Number(p.id)));
       for (const i of items) {
+        if (!activeIds.has(Number(i.id))) throw new Error(`${i.name} is no longer available. Please remove it from your cart.`);
         if ((stockById.get(Number(i.id)) ?? 0) < i.quantity)
           throw new Error(`Not enough stock for ${i.name}.`);
       }

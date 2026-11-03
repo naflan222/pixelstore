@@ -465,7 +465,9 @@ async function defineSuite(t, ctx) {
     assert.equal(r.status, 200);
     const discount = Math.round(subtotal * 0.1 * 100) / 100;
     assert.equal(r.data.discount_amount, discount);
-    assert.equal(r.data.total, subtotal - discount + 500);
+    const checkoutSettings = await bob.get('/api/checkout-settings');
+    const shippingFee = checkoutSettings.data.delivery_options.find(option => option.method === 'standard').fee;
+    assert.equal(r.data.total, subtotal - discount + shippingFee);
     assert.match(r.data.invoice_number, /^PH-INV-\d{4}-\d{5}$/);
     state.orderId = r.data.order_id;
     assert.equal((await ctx.db.get('SELECT stock FROM products WHERE id = ?', dome.id)).stock, dome.stock - 1);
@@ -611,6 +613,99 @@ async function defineSuite(t, ctx) {
     assert.equal(detail.data.history.filter((h) => h.status === 'cancelled').length, 2);
     const moves = await owner.get('/api/admin/inventory');
     assert.ok(moves.data.movements.some((m) => m.reason === `Order #${placed.data.order_id} cancelled`));
+    for (const status of ['processing', 'pending', 'shipped', 'delivered']) {
+      const reopened = await owner.put(`/api/admin/orders/${placed.data.order_id}/status`, { status });
+      assert.equal(reopened.status, 409);
+    }
+    assert.equal((await owner.put(`/api/admin/orders/${placed.data.order_id}/status`, { status: 'refunded' })).status, 200);
+    assert.equal((await owner.put(`/api/admin/orders/${placed.data.order_id}/status`, { status: 'processing' })).status, 409);
+    assert.equal((await owner.put(`/api/admin/orders/${placed.data.order_id}/status`, { status: 'cancelled' })).status, 200);
+    assert.equal((await ctx.db.get('SELECT stock FROM products WHERE id = ?', fh.id)).stock, fh.stock);
+  });
+
+  await t.test('checkout uses configured fees and blocks closed or disabled delivery', async () => {
+    const previous = await ctx.db.get('SELECT * FROM store_settings WHERE id = 1');
+    const product = await ctx.db.get("SELECT id, stock FROM products WHERE slug = 'fhstick'");
+    const shopper = ctx.makeSession();
+    const body = { full_name: 'Guest', email: 'guest@example.test', phone: '1', address: 'a', payment_method: 'cash' };
+    try {
+      await ctx.db.run(`UPDATE store_settings SET shipping_fee = 900, store_status = 'open',
+        payment_methods = ?, delivery_options = ? WHERE id = 1`, JSON.stringify(['cash', 'bank']), JSON.stringify([
+        { method: 'standard', fee: 250, enabled: true },
+        { method: 'express', fee: 1200, enabled: true },
+      ]));
+      const settings = await shopper.get('/api/checkout-settings');
+      assert.equal(settings.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(settings.data.delivery_options.map(option => [option.method, option.fee]),
+        [['standard', 900], ['express', 1200], ['pickup', 0]]);
+      for (const [method, fee] of [['standard', 900], ['express', 1200], ['pickup', 0]]) {
+        await shopper.post('/api/cart', { product_id: product.id, quantity: 1 });
+        const result = await shopper.post('/api/orders', { ...body, shipping_method: method, shipping_fee: 0 });
+        assert.equal(result.status, 200);
+        const saved = await ctx.db.get('SELECT shipping_fee, subtotal, total FROM orders WHERE id = ?', result.data.order_id);
+        assert.equal(saved.shipping_fee, fee);
+        assert.equal(saved.total, saved.subtotal + fee);
+      }
+      await shopper.post('/api/cart', { product_id: product.id, quantity: 1 });
+      const before = await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id);
+      const ordersBefore = Number((await ctx.db.get('SELECT COUNT(*) AS c FROM orders')).c);
+      await ctx.db.run("UPDATE store_settings SET store_status = 'closed' WHERE id = 1");
+      assert.equal((await shopper.get('/api/checkout-settings')).data.store_open, false);
+      assert.equal((await shopper.post('/api/orders', { ...body, shipping_method: 'standard' })).status, 400);
+      await ctx.db.run("UPDATE store_settings SET store_status = 'open', delivery_options = ? WHERE id = 1", JSON.stringify([
+        { method: 'standard', fee: 900, enabled: false },
+        { method: 'express', fee: 1200, enabled: false },
+        { method: 'pickup', fee: 0, enabled: false },
+      ]));
+      assert.deepEqual((await shopper.get('/api/checkout-settings')).data.delivery_options, []);
+      for (const method of ['standard', 'express', 'pickup'])
+        assert.equal((await shopper.post('/api/orders', { ...body, shipping_method: method })).status, 400);
+      assert.equal(Number((await ctx.db.get('SELECT COUNT(*) AS c FROM orders')).c), ordersBefore);
+      assert.equal((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock, before.stock);
+      assert.equal((await shopper.get('/api/cart')).data.items.length, 1);
+    } finally {
+      await ctx.db.run('UPDATE store_settings SET shipping_fee = ?, store_status = ?, payment_methods = ?, delivery_options = ? WHERE id = 1',
+        previous.shipping_fee, previous.store_status, previous.payment_methods, previous.delivery_options);
+    }
+  });
+
+  await t.test('inactive products cannot be added or purchased from an existing cart', async () => {
+    const shopper = ctx.makeSession();
+    const product = await ctx.db.get("SELECT id, slug, stock FROM products WHERE slug = 'fhstick'");
+    await shopper.post('/api/cart', { product_id: product.id, quantity: 1 });
+    const ordersBefore = Number((await ctx.db.get('SELECT COUNT(*) AS c FROM orders')).c);
+    try {
+      await ctx.db.run("UPDATE products SET status = 'inactive' WHERE id = ?", product.id);
+      assert.equal((await shopper.post('/api/cart', { product_id: product.id })).status, 404);
+      assert.equal((await shopper.post('/api/cart/by-slug', { slug: product.slug })).status, 404);
+      const result = await shopper.post('/api/orders', {
+        full_name: 'Guest', email: 'guest@example.test', phone: '1', address: 'a', shipping_method: 'pickup', payment_method: 'cash',
+      });
+      assert.equal(result.status, 400);
+      assert.match(result.data.error, /no longer available/);
+      assert.equal(Number((await ctx.db.get('SELECT COUNT(*) AS c FROM orders')).c), ordersBefore);
+      assert.equal((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock, product.stock);
+      assert.equal((await shopper.get('/api/cart')).data.items.length, 1);
+    } finally {
+      await ctx.db.run("UPDATE products SET status = 'active' WHERE id = ?", product.id);
+    }
+  });
+
+  await t.test('password change revokes other sessions and preserves the current session', async () => {
+    const primary = ctx.makeSession();
+    const other = ctx.makeSession();
+    const credentials = { username: 'sessioncheck', email: 'sessioncheck@example.test', password: 'sessioncheckpass' };
+    assert.equal((await primary.post('/api/auth/register', credentials)).status, 200);
+    await ctx.db.run("UPDATE users SET role = 'support' WHERE username = ?", credentials.username);
+    for (const session of [primary, other]) assert.equal((await session.post('/api/auth/login', credentials)).status, 200);
+    assert.equal((await primary.post('/api/auth/change-password', { current_password: 'wrongpass', new_password: 'newsessionpass' })).status, 401);
+    assert.equal((await other.get('/api/auth/me')).status, 200);
+    assert.equal((await primary.post('/api/auth/change-password', { current_password: credentials.password, new_password: 'newsessionpass' })).status, 200);
+    assert.equal((await primary.get('/api/auth/me')).status, 200);
+    assert.equal((await other.get('/api/auth/me')).status, 401);
+    assert.equal((await other.get('/api/admin/stats')).status, 401);
+    assert.equal((await other.post('/api/auth/login', credentials)).status, 401);
+    assert.equal((await other.post('/api/auth/login', { username: credentials.username, password: 'newsessionpass' })).status, 200);
   });
 
   await t.test('checkout guards: empty cart, bad methods, no stock, coupon limit', async () => {

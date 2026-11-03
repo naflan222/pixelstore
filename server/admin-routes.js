@@ -794,22 +794,32 @@ router.put('/orders/:id/status', orderAccess, async (req, res) => {
   if (!id || !valid.includes(status) || String(note || '').length > 2000) return res.status(400).json({ error: 'Invalid order status or note.' });
   const existing = await db.get('SELECT status FROM orders WHERE id = ?', id);
   if (!existing) return res.status(404).json({ error: 'Order not found' });
-  await db.transaction(async (tx) => {
-    // Re-read under lock so the cancel/refund restock decision cannot race a
-    // concurrent status change on PostgreSQL.
-    const current = await tx.get(`SELECT status FROM orders WHERE id = ?${db.forUpdate()}`, id);
-    await tx.run('UPDATE orders SET status = ? WHERE id = ?', status, id);
-    if (['cancelled', 'refunded'].includes(status) && !['cancelled', 'refunded'].includes(current.status)) {
-      const items = await tx.all('SELECT product_id, quantity FROM order_items WHERE order_id = ? AND product_id IS NOT NULL', id);
-      for (const item of items) {
-        await tx.run('UPDATE products SET stock = stock + ? WHERE id = ?', item.quantity, item.product_id);
-        await tx.run('INSERT INTO inventory_movements (product_id, change, reason, note, changed_by) VALUES (?, ?, ?, ?, ?)',
-          item.product_id, item.quantity, `Order #${id} ${status}`, String(note || ''), req.user.id);
+  try {
+    await db.transaction(async (tx) => {
+      // Re-read under lock so the cancel/refund restock decision cannot race a
+      // concurrent status change on PostgreSQL.
+      const current = await tx.get(`SELECT status FROM orders WHERE id = ?${db.forUpdate()}`, id);
+      if (['cancelled', 'refunded'].includes(current.status) && !['cancelled', 'refunded'].includes(status)) {
+        const error = new Error('Cancelled or refunded orders cannot be reopened. Please create a new order.');
+        error.status = 409;
+        throw error;
       }
-    }
-    await tx.run('INSERT INTO order_status_history (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)',
-      id, status, String(note || ''), req.user.id);
-  });
+      await tx.run('UPDATE orders SET status = ? WHERE id = ?', status, id);
+      if (['cancelled', 'refunded'].includes(status) && !['cancelled', 'refunded'].includes(current.status)) {
+        const items = await tx.all('SELECT product_id, quantity FROM order_items WHERE order_id = ? AND product_id IS NOT NULL', id);
+        for (const item of items) {
+          await tx.run('UPDATE products SET stock = stock + ? WHERE id = ?', item.quantity, item.product_id);
+          await tx.run('INSERT INTO inventory_movements (product_id, change, reason, note, changed_by) VALUES (?, ?, ?, ?, ?)',
+            item.product_id, item.quantity, `Order #${id} ${status}`, String(note || ''), req.user.id);
+        }
+      }
+      await tx.run('INSERT INTO order_status_history (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)',
+        id, status, String(note || ''), req.user.id);
+    });
+  } catch (error) {
+    if (error.status === 409) return res.status(409).json({ error: error.message });
+    throw error;
+  }
   await audit(req, 'updated status', 'order', id, `${existing.status} → ${status}`);
   // Notify user if they have an account
   const order = await db.get('SELECT user_id, full_name FROM orders WHERE id = ?', id);

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="description" content="PixelHouse - GoPro & Action Camera Accessories Store">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="theme-color" content="#625AFA">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <!-- The above tags *must* come first in the head, any other head content must come *after* these tags -->
+    <!-- Title -->
+    <title>PixelHouse - GoPro & Action Camera Accessories Store</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&amp;display=swap" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" href="img/icons/icon-72x72.png">
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="img/icons/icon-96x96.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="img/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="img/icons/icon-167x167.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="img/icons/icon-180x180.png">
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/tabler-icons.min.css">
+    <link rel="stylesheet" href="css/animate.css">
+    <link rel="stylesheet" href="css/owl.carousel.min.css">
+    <link rel="stylesheet" href="css/magnific-popup.css">
+    <link rel="stylesheet" href="css/nice-select.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css?v=20260924.7">
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+  </head>
+  <body>
+    <!-- Preloader-->
+    <div class="preloader" id="preloader">
+      <div class="spinner-grow text-secondary" role="status">
+        <div class="sr-only"></div>
+      </div>
+    </div>
+    <!-- Internet Connection Status-->
+    <div class="internet-connection-status" id="internetStatus"></div>
+    <!-- Header Area-->
+    <div class="header-area" id="headerArea">
+      <div class="container h-100 d-flex align-items-center justify-content-between rtl-flex-d-row-r">
+        <!-- Back Button-->
+        <div class="back-button me-2"><a href="home.html"><i class="ti ti-arrow-left"></i></a></div>
+        <!-- Page Title-->
+        <div class="page-heading">
+          <h6 class="mb-0">Live Chat</h6>
+        </div>
+        <!-- Navbar Toggler-->
+        <div class="suha-navbar-toggler ms-2" data-bs-toggle="offcanvas" data-bs-target="#suhaOffcanvas" aria-controls="suhaOffcanvas">
+          <div><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="offcanvas offcanvas-start suha-offcanvas-wrap" tabindex="-1" id="suhaOffcanvas" aria-labelledby="suhaOffcanvasLabel">
+      <!-- Close button-->
+      <button class="btn-close btn-close-white" type="button" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      <!-- Offcanvas body-->
+      <div class="offcanvas-body">
+        <!-- Sidenav Profile-->
+        <div class="sidenav-profile">
+          <div class="user-profile"><img src="img/bg-img/9.jpg" alt=""></div>
+          <div class="user-info">
+            <h5 class="user-name mb-1 text-white">PixelHouse User</h5>
+          </div>
+        </div>
+        <!-- Sidenav Nav-->
+        <ul class="sidenav-nav ps-0">
+          <li><a href="profile.html"><i class="ti ti-user"></i>My Profile</a></li>
+          
+          <li><a href="intro.html"><i class="ti ti-logout"></i>Sign Out</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="page-content-wrapper">
+      <!-- Live Chat Intro-->
+      <div class="live-chat-intro mb-3">
+        <p>Start a conversation</p><img src="img/bg-img/9.jpg" alt="">
+        <div class="status online">We're online</div>
+        <!-- Use this code for "Offline" Status-->
+        <!-- .status.offline We’ll be back soon-->
+      </div>
+      <!-- Support Wrapper-->
+      <div class="live-chat-wrapper" id="chatBox">
+      <div class="support-wrapper py-3">
+        <div class="container">
+          <!-- Live Chat Wrapper-->
+          <div class="live-chat-wrapper">
+            <!-- Agent Welcome Message-->
+            <div class="agent-message-content d-flex align-items-start">
+              <div class="agent-thumbnail me-2 mt-2"><img src="img/bg-img/9.jpg" alt=""></div>
+              <div class="agent-message-text">
+                <div class="d-block">
+                  <p>Hi there! 👋 Welcome to PixelHouse. Ask me about products, prices, deals, shipping or payments — I'm here to help.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <!-- Type Message Form-->
+    <div class="type-text-form">
+      <form action="#" class="chat-input-form">
+        <label class="visually-hidden" for="message">Message PixelHouse support</label>
+        <textarea class="form-control" id="message" placeholder="Ask about products, prices, shipping..." rows="1"></textarea>
+        <button type="button" id="sendBtn" class="chat-send-btn" aria-label="Send message">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11zM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493z"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+
+   
+<script>
+
+const chatBox = document.getElementById("chatBox");
+const input = document.getElementById("message");
+const sendBtn = document.getElementById("sendBtn");
+
+
+
+function addUser(msg){
+
+chatBox.innerHTML += `
+
+<div class="user-message-content">
+
+<div class="user-message-text">
+
+<div class="d-block">
+
+<p>${msg}</p>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+chatBox.scrollTop = chatBox.scrollHeight;
+
+}
+
+
+
+
+function addBot(msg){
+
+chatBox.innerHTML += `
+
+<div class="agent-message-content d-flex align-items-start">
+
+<div class="agent-thumbnail me-2 mt-2">
+
+<img src="img/bg-img/9.jpg" alt="">
+
+</div>
+
+
+<div class="agent-message-text">
+
+<div class="d-block">
+
+<p>${msg}</p>
+
+</div>
+
+</div>
+
+
+</div>
+
+`;
+
+chatBox.scrollTop = chatBox.scrollHeight;
+
+}
+
+
+
+
+
+async function askGemini(question){
+
+
+addUser(question);
+
+
+input.value = "";
+
+
+addBot("Typing...");
+
+
+
+try {
+
+
+const response = await fetch("/api/chat", {
+
+method: "POST",
+
+headers: {
+
+"Content-Type": "application/json"
+
+},
+
+body: JSON.stringify({
+
+message: question
+
+})
+
+});
+
+
+
+const data = await response.json();
+
+
+
+document.querySelector(".agent-message-content:last-child").remove();
+
+
+
+if(data.reply){
+
+addBot(data.reply);
+
+}
+else{
+
+addBot("Sorry, I could not get a response.");
+
+}
+
+
+
+}
+
+catch(error){
+
+
+document.querySelector(".agent-message-content:last-child").remove();
+
+
+addBot("Connection error. Please try again.");
+
+
+console.log(error);
+
+
+}
+
+
+
+}
+
+
+
+
+
+sendBtn.addEventListener("click", function(){
+
+
+let text = input.value.trim();
+
+
+if(text !== ""){
+
+askGemini(text);
+
+}
+
+
+});
+
+
+
+
+
+input.addEventListener("keypress", function(e){
+
+
+if(e.key === "Enter"){
+
+e.preventDefault();
+
+sendBtn.click();
+
+}
+
+
+});
+
+
+</script>
+
+    <!-- All JavaScript Files-->
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/waypoints.min.js"></script>
+    <script src="js/jquery.easing.min.js"></script>
+    <script src="js/owl.carousel.min.js"></script>
+    <script src="js/jquery.magnific-popup.min.js"></script>
+    <script src="js/jquery.counterup.min.js"></script>
+    <script src="js/jquery.countdown.min.js"></script>
+    <script src="js/jquery.passwordstrength.js"></script>
+    <script src="js/jquery.nice-select.min.js"></script>
+    <script src="js/theme-switching.js"></script>
+    <script src="js/no-internet.js"></script>
+    <script src="js/active.js"></script>
+    <script src="js/pwa.js"></script>
+      <script src="js/api-client.js?v=20260924.4"></script>
+  </body>
+</html>

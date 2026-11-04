@@ -6031,12 +6031,17 @@ html.dynamic-product-loading .product-description::before {
 /* Storefront polish: crisp brand mark, consistent catalog cards, and shared footer. */
 .header-area .logo-wrapper img {
   display: block;
-  width: 35px !important;
-  height: 35px !important;
-  max-width: 35px !important;
-  max-height: 35px !important;
+  width: min(160px, 42vw) !important;
+  height: 40px !important;
+  max-width: 160px !important;
+  max-height: 40px !important;
   object-fit: contain;
   image-rendering: auto;
+  /* Keep the white wordmark readable on the existing light header. */
+  filter: invert(1) hue-rotate(180deg);
+}
+[theme-color=dark] .header-area .logo-wrapper img {
+  filter: none;
 }
 .user-profile-icon a img {
   display: block;

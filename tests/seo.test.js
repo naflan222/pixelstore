@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 const express = require('express');
 
 const {
@@ -18,6 +19,13 @@ const root = path.join(__dirname, '..');
 
 function read(filename) {
   return fs.readFileSync(path.join(root, filename), 'utf8');
+}
+
+function stylesheetHref(html) {
+  const match = html.match(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="(style\.css(?:\?[^"\s]+)?)"/);
+  assert.ok(match, 'Page must load the storefront stylesheet');
+  assert.ok(fs.existsSync(path.join(root, match[1].split('?')[0])));
+  return match[1];
 }
 
 test('home aliases redirect once and preserve query strings without changing API or checkout routes', async () => {
@@ -56,7 +64,7 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /"@type":"WebSite"/);
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
-  assert.match(result, /href="style\.css\?v=20260924\.5"/);
+  assert.equal(stylesheetHref(result), stylesheetHref(source), 'SEO must preserve the page stylesheet, including its cache version');
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
 });
@@ -154,14 +162,68 @@ test('category pages declare their live catalog category', () => {
   }
 });
 
-test('service worker refreshes deployed CSS and JavaScript before using cache', () => {
-  const source = read('service-worker.js');
+test('service worker installs current assets and refreshes CSS and JavaScript before using cache', async () => {
+  const listeners = {};
+  const calls = [];
+  let installedAssets;
+  let offline = false;
+  const fresh = { ok: true, clone: () => 'fresh-copy' };
+  const cached = { cached: true };
+  vm.runInNewContext(read('service-worker.js'), {
+    URL,
+    self: {
+      location: { origin: 'https://pixelhouse.lk' },
+      addEventListener: (name, handler) => { listeners[name] = handler; },
+      skipWaiting: () => {},
+    },
+    caches: {
+      open: async () => ({
+        addAll: async assets => { installedAssets = Array.from(assets); },
+        put: async () => { calls.push('put'); },
+      }),
+      match: async () => { calls.push('cache'); return cached; },
+    },
+    fetch: async () => {
+      calls.push('network');
+      if (offline) throw new Error('Offline');
+      return fresh;
+    },
+  });
+  let installation;
+  listeners.install({ waitUntil: promise => { installation = promise; } });
+  await installation;
+  const stylesheet = '/' + stylesheetHref(read('home.html'));
+  const client = read('home.html').match(/<script\b[^>]*src="(js\/api-client\.js(?:\?[^"\s]+)?)"/);
+  assert.ok(client, 'Homepage must load the storefront client');
+  assert.ok(installedAssets.includes(stylesheet), 'Offline shell must use the homepage stylesheet version');
+  assert.ok(installedAssets.includes('/' + client[1]), 'Offline shell must use the homepage client version');
+  for (const asset of installedAssets) {
+    if (asset !== '/') assert.ok(fs.existsSync(path.join(root, asset.split('?')[0])), `Missing offline asset: ${asset}`);
+  }
 
-  assert.match(source, /pixelhouse-static-v7/);
-  assert.match(source, /\/style\.css\?v=20260924\.5/);
-  assert.match(source, /\/js\/api-client\.js\?v=20260924\.3/);
-  assert.match(source, /\['style', 'script'\]\.includes\(request\.destination\)/);
-  assert.match(source, /fetch\(request\)[\s\S]*catch\(\(\) => caches\.match\(request\)\)/);
+  for (const destination of ['style', 'script']) {
+    const request = { method: 'GET', url: 'https://pixelhouse.lk/' + (destination === 'style' ? 'style.css' : 'js/api-client.js'), destination };
+    for (const isOffline of [false, true]) {
+      offline = isOffline;
+      calls.length = 0;
+      let response;
+      listeners.fetch({ request, respondWith: promise => { response = promise; } });
+      assert.ok(response, 'Static assets must be handled by the service worker');
+      assert.equal(await response, isOffline ? cached : fresh);
+      assert.equal(calls[0], 'network');
+      assert.equal(calls.includes('cache'), isOffline, 'Cache is only used when the network fails');
+      if (!isOffline) assert.ok(calls.includes('put'), 'Fresh assets must update the offline cache');
+    }
+  }
+
+  for (const pathname of ['/api/products', '/api/checkout-settings', '/admin/', '/cart.html', '/checkout.html', '/profile.html']) {
+    let intercepted = false;
+    listeners.fetch({
+      request: { method: 'GET', url: 'https://pixelhouse.lk' + pathname, mode: 'navigate' },
+      respondWith: () => { intercepted = true; },
+    });
+    assert.equal(intercepted, false, `Private/live data must bypass the cache: ${pathname}`);
+  }
 });
 
 test('homepage adventure banner uses the new photo and GoPro category pages omit the filter trigger', () => {
@@ -185,11 +247,16 @@ test('storefront exposes the requested footer and admin-managed homepage section
   assert.match(apiClient, /24\/7 support/);
   assert.match(apiClient, /Genuine products/);
   assert.match(apiClient, /Customer reviews/);
-  assert.match(apiClient, /google-reviews/);
-  assert.match(apiClient, /data-review-next/);
-  assert.match(apiClient, /data-review-prev/);
+  assert.match(apiClient, /aria-label="Facebook customer reviews"/);
+  assert.match(apiClient, /data-manual-review-text/);
+  assert.match(apiClient, /data-manual-review-author/);
+  assert.match(apiClient, /data-manual-review-position/);
+  assert.match(apiClient, /data-manual-review-next/);
+  assert.match(apiClient, /data-manual-review-prev/);
+  assert.match(apiClient, /data-customer-reviews/);
+  assert.match(apiClient, /get\('\/reviews\/recent'\)/);
   assert.match(apiClient, /wa\.me\/94777466675/);
-  assert.match(read('profile.html'), /style\.css\?v=20260924\.5/);
+  stylesheetHref(read('profile.html'));
   assert.match(admin, /Homepage product sections/);
   assert.match(read('shipping-policy.html'), /SHIPPING POLICY/);
   assert.ok(fs.existsSync(path.join(root, 'img/core-img/logo-mark-hd.png')));

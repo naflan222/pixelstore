@@ -77,7 +77,7 @@
     const average = Math.max(0, Math.min(5, Number(product.rating) || 0)).toFixed(1);
     const label = count + ' review' + (count === 1 ? '' : 's');
     return '<div class="product-rating" aria-label="' + average + ' out of 5 stars, ' + label + '">' +
-      '<i class="ti ti-star-filled" aria-hidden="true"></i>' + average + ' <span class="ms-1">(' + label + ')</span></div>';
+      '<i class="ti ti-star-filled" aria-hidden="true"></i>' + average + ' <span class="ms-1" title="' + label + '">(' + count + ')</span></div>';
   }
 
   let homepageRatingsLoading = false;

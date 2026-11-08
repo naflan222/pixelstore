@@ -38,6 +38,7 @@ test('root homepage and its aliases replace static placeholders with the actual 
     await h.api.refreshHomepageRatings();
     assert.match(h.rating.outerHTML, /5\.0/);
     assert.match(h.rating.outerHTML, /1 review/);
+    assert.match(h.rating.outerHTML, />\(1\)<\/span>/);
     assert.equal(h.rating.outerHTML, h.dynamicRating.outerHTML);
     assert.equal(h.requests[0].options.cache, 'no-store');
     assert.deepEqual(h.dispatched, ['pixelhouse:reviews-refreshed']);
@@ -50,6 +51,7 @@ test('periodic/focus/tab notifications refresh counts while failed requests pres
   h.setProduct({ slug: 'fhstick', rating: 4.5, rating_count: 2 });
   h.tick(); await flush();
   assert.match(h.rating.outerHTML, /2 reviews/);
+  assert.match(h.rating.outerHTML, />\(2\)<\/span>/);
   assert.match(h.rating.outerHTML, /4\.5/);
   assert.equal(h.dispatched.length, 2);
   h.windowEvents.focus(); await flush();

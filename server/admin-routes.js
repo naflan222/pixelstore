@@ -1094,6 +1094,8 @@ router.post('/products/import', catalogAccess, async (req, res) => {
     }
     if (conflicts.length) return res.status(409).json({ error: 'CSV would create duplicate products.', errors: conflicts });
 
+    if (req.query.dry_run === 'true') return res.json({ valid: true, count: products.length, message: 'Validation passed. No products were created.' });
+
     await db.transaction(async (tx) => {
       for (const product of products) {
         let id = product.id;

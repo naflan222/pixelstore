@@ -960,6 +960,10 @@ async function defineSuite(t, ctx) {
     assert.equal(r.status, 400); // confirm required
     // CSV round-trip with an explicit high id (also exercises sequence repair).
     const csv = 'name,slug,price,stock,image,id\nCSV Widget,csv-widget,1234,7,img/product/1.webp,91001\n';
+    const preview = await owner.request('POST', '/api/admin/products/import?dry_run=true', { rawBody: csv, contentType: 'text/csv' });
+    assert.equal(preview.status, 200);
+    assert.equal((await preview.json()).valid, true);
+    assert.equal(await ctx.db.get('SELECT id FROM products WHERE slug = ?', 'csv-widget'), undefined);
     const imp = await owner.request('POST', '/api/admin/products/import', { rawBody: csv, contentType: 'text/csv' });
     assert.equal(imp.status, 201);
     assert.equal(await imp.json().then((d) => d.count), 1);

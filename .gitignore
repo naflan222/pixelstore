@@ -2,3 +2,11 @@ node_modules
 data
 server.log
 .env
+
+# Android local configuration, build outputs and private signing material
+android/.gradle/
+android/**/build/
+android/local.properties
+android/**/google-services.json
+*.jks
+*.keystore

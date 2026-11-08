@@ -95,6 +95,19 @@ const PAGE_META = {
   },
 };
 
+// Curated search snippets for the two priority product pages. Other products
+// continue using catalog descriptions and names from the database.
+const FEATURED_PRODUCT_META = {
+  'hero13.html': {
+    title: 'GoPro HERO13 Black Camera in Sri Lanka | Pixel House',
+    description: 'Explore the GoPro HERO13 Black at Pixel House Sri Lanka. Check the camera price, package contents, available accessories and ordering options.',
+  },
+  '3mstick.html': {
+    title: '3M Selfie Stick in Sri Lanka | Price & Details | Pixel House',
+    description: 'Explore the 3M extendable selfie stick at Pixel House Sri Lanka. Check its features, current price, camera mounting requirements and buying options.',
+  },
+};
+
 const PRODUCT_PAGES = [
   '12in1kit.html', '19kit.html', '27mstick.html', '3mstick.html',
   '3slotcharger.html', '3waystick.html', 'antifog.html', 'btrychrger13.html',
@@ -213,8 +226,9 @@ function metaFor(filename, html) {
   const product = extractProduct(html);
   if (product) {
     return {
-      title: `${product.name} in Sri Lanka | Pixel House`,
-      description: `Buy ${product.name} from Pixel House Sri Lanka. View the current price, product details and compatible camera accessories.`,
+      title: FEATURED_PRODUCT_META[filename]?.title || `${product.name} in Sri Lanka | Pixel House`,
+      description: FEATURED_PRODUCT_META[filename]?.description ||
+        `Buy ${product.name} from Pixel House Sri Lanka. View the current price, product details and compatible camera accessories.`,
       heading: product.name,
       product,
     };
@@ -368,13 +382,17 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
       image: absoluteUrl(catalogProduct.image || meta.product.image),
     };
     const catalogDescription = textOnly(catalogProduct.description);
-    if (catalogDescription) {
+    // Keep curated snippets even when the API catalog supplies a short/generic
+    // description. The catalog still controls price, image, name and stock.
+    if (catalogDescription && !FEATURED_PRODUCT_META[filename]) {
       meta.description = catalogDescription.length >= 80
         ? catalogDescription
         : `${catalogDescription.replace(/[.!?]?$/, '.')} Buy ${meta.product.name} from Pixel House Sri Lanka with delivery, product support and current availability.`;
     }
     meta.heading = meta.product.name;
-    meta.title = `${meta.product.name} in Sri Lanka | Pixel House`;
+    if (!FEATURED_PRODUCT_META[filename]) {
+      meta.title = `${meta.product.name} in Sri Lanka | Pixel House`;
+    }
   }
   const canonical = canonicalFor(filename, canonicalOverride);
   const isIndexable = INDEXABLE_SET.has(filename) || Boolean(canonicalOverride && catalogProduct);

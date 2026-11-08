@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SITE_URL = 'https://pixelhouse.lk';
+const GA4_MEASUREMENT_ID = 'G-JJWCEW1DGE';
 const DEFAULT_IMAGE = `${SITE_URL}/img/icons/icon-512x512.png`;
 
 const PAGE_META = {
@@ -404,6 +405,8 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <meta name="twitter:description" content="${escapeHtml(meta.description)}">`,
     `    <meta name="twitter:image" content="${image}">`,
     `    <script type="application/ld+json" data-seo-managed="true">${buildSchema(meta, canonical, filename, catalogProduct)}</script>`,
+    `    <script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}"></script>`,
+    `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);

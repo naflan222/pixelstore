@@ -33,7 +33,7 @@ class AdminAppTest {
                 path == "/api/mobile/capabilities" -> """{"native_admin_version":1,"csv_dry_run":true,"push_configured":false,"settings_patch":true}"""
                 path == "/api/auth/me" -> """{"user":{"id":1,"username":"test-owner","role":"$role"}}"""
                 path == "/api/admin/orders/301" -> """{"order":{"id":301,"full_name":"Test customer","total":1450,"status":"pending"},"payment":{"payment_status":"pending"},"items":[],"history":[]}"""
-                path == "/api/admin/settings" -> """{"settings":{"store_name":"PixelHouse","currency":"LKR","shipping_fee":250,"store_open":true,"cash_enabled":true,"bank_enabled":true,"standard_delivery_enabled":true,"express_delivery_enabled":true,"order_notifications":true,"low_stock_notifications":true,"vendor_notifications":true}}"""
+                path == "/api/admin/settings" -> """{"settings":{"store_name":"PixelHouse","currency":"LKR","store_email":"","store_phone":"","shipping_fee":250,"store_open":true,"cash_enabled":true,"bank_enabled":true,"standard_delivery_enabled":true,"express_delivery_enabled":true,"order_notifications":true,"low_stock_notifications":true,"vendor_notifications":true}}"""
                 path == "/api/admin/products" -> """{"products":[{"id":42,"name":"Test GoPro grip","slug":"test-grip","price":1200,"image":"","stock":5,"status":"active","featured":0,"flash_sale":0,"rating":4.5,"reorder_threshold":10}]}"""
                 path == "/api/admin/homepage-sections" -> """{"sections":{"featured_gear":[]},"products":[]}"""
                 path.endsWith("stats") -> """{"orders":2,"revenue":2900}"""

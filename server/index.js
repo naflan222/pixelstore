@@ -150,7 +150,16 @@ app.post('/api/chat', rateLimit({ windowMs: 60 * 1000, max: 20 }), async (req, r
 app.use('/api', apiRoutes);
 
 // ---- Admin API ----
+// The native app is owner-only. Headerless browser clients retain existing roles.
+app.use('/api/admin', (req, res, next) => {
+  if (req.get('X-PixelHouse-Android') === '1' && req.user?.role !== 'owner')
+    return res.status(req.user ? 403 : 401).json({ error: 'Owner access is required for the Android app.' });
+  next();
+});
 app.use('/api/admin', adminRoutes);
+const { createMobilePush, firebaseSender, firebaseConfigured } = require('./mobile-push');
+const mobilePush = createMobilePush({ db, send: firebaseSender(), enabled: process.env.MOBILE_PUSH_ENABLED === 'true' && firebaseConfigured() });
+app.use('/api/mobile', mobilePush.router);
 
 // ---- Search-friendly storefront pages ----
 // HTML is enriched at response time with metadata and structured data. The
@@ -204,9 +213,14 @@ async function start(port = PORT) {
     // transaction rolls back its writes if any part fails.
     console.error('[REVIEW CLEANUP]', error.message);
   }
+  let stopMobilePush = () => {};
+  if (process.env.MOBILE_PUSH_ENABLED === 'true' && !firebaseConfigured()) console.error('[MOBILE PUSH] Disabled: valid Firebase server credentials are required.');
+  try { if (await mobilePush.init()) stopMobilePush = mobilePush.start(); }
+  catch (_) { console.error('[MOBILE PUSH] Setup unavailable; storefront stays online.'); }
   const server = await new Promise((resolve) => {
     const listener = app.listen(port, () => resolve(listener));
   });
+  server.once('close', () => stopMobilePush());
   const actualPort = server.address() && server.address().port;
   console.log(`Pixels server running at http://localhost:${actualPort} (db: ${db.engine})`);
   const mail = describeMailConfig();

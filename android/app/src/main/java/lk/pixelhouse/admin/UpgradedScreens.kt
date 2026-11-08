@@ -6,6 +6,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -114,7 +120,18 @@ import java.time.temporal.ChronoUnit
             val points = if(days > 90) salesPoints(data.optJSONArray("sales_by_month"), true) else dailyPoints(data.optJSONArray("sales_by_day"), range.display("start"), range.display("end"))
             val maximum = points.maxOfOrNull { it.sales }?.coerceAtLeast(1.0) ?: 1.0
             if(points.isEmpty()) Text("No sales in this period.")
-            points.forEach { point -> Text("${displayDay(point.day)} · ${displayMoney(point.sales, currency)} · ${point.orders} orders", style = MaterialTheme.typography.bodySmall); LinearProgressIndicator(progress = { (point.sales / maximum).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp)) }
+            var selectedDay by remember(range.toString()) { mutableStateOf("") }
+            val selected = points.firstOrNull { it.day == selectedDay } ?: points.lastOrNull()
+            selected?.let { Text("${displayDay(it.day)} · ${displayMoney(it.sales, currency)} · ${it.orders} orders", style = MaterialTheme.typography.bodyMedium) }
+            Text("Swipe the chart and tap a bar for details.", style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                points.forEach { point ->
+                    Column(Modifier.width(if(days > 90) 64.dp else 48.dp).clickable { selectedDay = point.day }.semantics { contentDescription = "${point.day}: ${displayMoney(point.sales, currency)}, ${point.orders} orders" }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.BottomCenter) { Box(Modifier.width(24.dp).height((120f * (point.sales / maximum).toFloat()).coerceIn(2f, 120f).dp).background(if(selected?.day == point.day) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary, MaterialTheme.shapes.extraSmall)) }
+                        Text(if(days > 90) point.day else point.day.takeLast(5), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
         } }
         listOf("top_products" to "Top products", "top_categories" to "Top categories").forEach { (key,title) -> item { InfoCard(title) { val rows = data.optJSONArray(key)?.objects().orEmpty(); if(rows.isEmpty()) Text("No sales yet in this period."); rows.forEachIndexed { index,row -> Text("${index + 1}. ${row.display("name")}", style = MaterialTheme.typography.titleSmall); Text("${row.display("quantity_sold")} sold · ${displayMoney(row.number("revenue"), currency)}"); HorizontalDivider() } } } }
     }

@@ -70,23 +70,32 @@ class MainActivity: ComponentActivity() {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var confirmLogout by remember { mutableStateOf(false) }
+    val settingsDirty by vm.settingsDirty.collectAsStateWithLifecycle()
+    var discardAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    fun guarded(action: () -> Unit) { if(settingsDirty) discardAction = action else action() }
     ModalNavigationDrawer(drawerState = drawer, drawerContent = {
         ModalDrawerSheet { LazyColumn(Modifier.fillMaxWidth(0.88f).testTag("admin-menu")) {
             item { Text("PixelHouse Admin", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(24.dp)) }
-            items(modules) { m -> NavigationDrawerItem(label = { Text(m.title) }, selected = module == m, onClick = { vm.select(m); scope.launch { drawer.close() } }, modifier = Modifier.padding(horizontal = 12.dp)) }
-            item { TextButton(onClick = { confirmLogout = true }, modifier = Modifier.padding(12.dp)) { Text("Sign out") } }
+            items(modules) { m -> NavigationDrawerItem(label = { Text(m.title) }, selected = module == m, onClick = { scope.launch { drawer.close() }; guarded { vm.select(m) } }, modifier = Modifier.padding(horizontal = 12.dp)) }
+            item { TextButton(onClick = { guarded { confirmLogout = true } }, modifier = Modifier.padding(12.dp)) { Text("Sign out") } }
         } }
     }) {
-        Scaffold(topBar = { TopAppBar(title = { Text(module.title) }, navigationIcon = { TextButton(onClick = { scope.launch { drawer.open() } }) { Text("☰") } }, actions = { TextButton(enabled = !busy, onClick = { vm.load() }) { Text("Refresh") } }) }) { padding ->
+        Scaffold(topBar = { TopAppBar(title = { Text(module.title) }, navigationIcon = { TextButton(onClick = { scope.launch { drawer.open() } }) { Text("☰") } }, actions = { TextButton(enabled = !busy, onClick = { guarded { vm.load() } }) { Text("Refresh") } }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (message.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer) { Text(message, Modifier.fillMaxWidth().padding(12.dp)) }
                 if (module.endpoint == "@phone") PhoneAlerts(vm)
+                else if (detail?.has("order") == true) OrderDetailsScreen(vm, detail!!)
                 else if (detail != null) DetailScreen(vm, detail!!)
+                else if (module.endpoint == "stats") DashboardScreen(vm, data)
+                else if (module.endpoint == "orders") OrdersScreen(vm, data, busy)
+                else if (module.endpoint == "analytics") AnalyticsScreen(vm, data)
+                else if (module.endpoint == "settings") StoreSettingsScreen(vm, data, busy)
                 else ModuleScreen(vm, module, data, busy)
             }
         }
     }
+    discardAction?.let { action -> AlertDialog(onDismissRequest = { discardAction = null }, title = { Text("Discard unsaved settings?") }, text = { Text("Your changes have not been saved.") }, confirmButton = { TextButton(onClick = { discardAction = null; vm.settingsDirty.value = false; action() }) { Text("Discard changes") } }, dismissButton = { TextButton(onClick = { discardAction = null }) { Text("Keep editing") } }) }
     if (confirmLogout) AlertDialog(onDismissRequest = { confirmLogout = false }, title = { Text("Sign out?") }, text = { Text("Order alerts for this session will stop. An internet connection is needed to revoke the session.") }, confirmButton = { TextButton(onClick = { confirmLogout = false; vm.logout() }) { Text("Sign out") } }, dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } })
 }
 

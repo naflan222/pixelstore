@@ -11,7 +11,7 @@ function createMobilePush({ db, send, enabled = process.env.MOBILE_PUSH_ENABLED 
   const digest = value => crypto.createHash('sha256').update(value).digest('hex');
   const router = express.Router();
   router.use(requireAuth, requirePermission('owner'));
-  router.get('/capabilities', (req, res) => res.json({ native_admin_version: 1, csv_dry_run: true, push_configured: ready }));
+  router.get('/capabilities', (req, res) => res.json({ native_admin_version: 1, csv_dry_run: true, settings_patch: true, push_configured: ready }));
   router.use((req, res, next) => ready ? next() : res.status(503).json({ error: 'Android alerts are not configured yet.' }));
   router.use(rateLimit({ windowMs: 60000, max: 30 }));
 

@@ -48,12 +48,15 @@ async function defineSuite(t, ctx) {
     const before = await guest.get('/api/homepage-sections');
     assert.equal(before.status, 200);
     assert.deepEqual(before.data.sections.featured_gear, []);
+    assert.deepEqual(before.data.configured_sections, []);
 
     const saved = await owner.put('/api/admin/homepage-sections/featured_gear', { product_ids: [selected.id] });
     assert.equal(saved.status, 200);
     const after = await guest.get('/api/homepage-sections');
     assert.equal(after.status, 200);
     assert.equal(after.data.sections.featured_gear[0].id, selected.id);
+    assert.ok(after.data.configured_sections.includes("featured_gear"));
+    assert.match(after.headers.get("cache-control"), /no-cache/);
     assert.equal((await guest.put('/api/admin/homepage-sections/top_products', { product_ids: [selected.id] })).status, 401);
     assert.equal((await owner.put('/api/admin/homepage-sections/top_products', { product_ids: [999999] })).status, 400);
   });
@@ -917,6 +920,50 @@ async function defineSuite(t, ctx) {
     r = await owner.put('/api/admin/settings', { store_name: 'x' });
     assert.equal(r.status, 400);
     await owner.put('/api/admin/settings', { ...payload, currency: 'LKR' });
+  });
+
+  await t.test('partial settings updates preserve hidden contact and delivery configuration', async () => {
+    const previous = await ctx.db.get('SELECT * FROM store_settings WHERE id = 1');
+    const contact = { email: 'shop@example.test', phone: '011', address: 'Keep this address' };
+    const delivery = [{ method: 'standard', label: 'Custom standard', fee: 300, enabled: true }, { method: 'express', label: 'Priority', fee: 850, enabled: true }, { method: 'pickup', label: 'Collect', fee: 0, enabled: true }];
+    await ctx.db.run('UPDATE store_settings SET contact = ?, delivery_options = ?, notification_preferences = ? WHERE id = 1', JSON.stringify(contact), JSON.stringify(delivery), JSON.stringify({ new_orders: true, custom_preference: 'keep' }));
+    const result = await owner.call('PATCH', '/api/admin/settings', { shipping_fee: 450, store_name: 'Updated store' });
+    assert.equal(result.status, 200, JSON.stringify(result.data));
+    const row = await ctx.db.get('SELECT * FROM store_settings WHERE id = 1');
+    assert.deepEqual(JSON.parse(row.contact), contact);
+    const options = JSON.parse(row.delivery_options);
+    assert.equal(options[0].fee, 450);
+    assert.equal(options[0].label, 'Custom standard');
+    assert.deepEqual(options.slice(1), delivery.slice(1));
+    assert.equal(JSON.parse(row.notification_preferences).custom_preference, 'keep');
+    assert.equal((await owner.call('PATCH', '/api/admin/settings', { bogus: 1 })).status, 400);
+    assert.equal((await owner.call('PATCH', '/api/admin/settings', { cash_enabled: 'false' })).status, 400);
+    assert.equal((await guest.call('PATCH', '/api/admin/settings', { store_name: 'No' })).status, 401);
+    await ctx.db.run('UPDATE store_settings SET store_name = ?, contact = ?, shipping_fee = ?, delivery_options = ?, notification_preferences = ? WHERE id = 1', previous.store_name, previous.contact, previous.shipping_fee, previous.delivery_options, previous.notification_preferences);
+  });
+
+  await t.test('Sri Lanka reports and order filters agree at local midnight', async () => {
+    const ids = [];
+    for (const [created, amount] of [['2020-01-01 18:29:59', 10], ['2020-01-01 18:30:00', 20], ['2020-01-02 18:29:59', 30], ['2020-01-02 18:30:00', 40]]) {
+      const result = await ctx.db.insert("INSERT INTO orders (full_name, email, phone, address, total, subtotal, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 'Timezone fixture', 'time@example.test', '', '', amount, amount, 'pending', created);
+      ids.push(result.id);
+    }
+    try {
+      const report = await owner.get('/api/admin/analytics?range=custom&start=2020-01-02&end=2020-01-02&timezone=Asia%2FColombo');
+      assert.equal(report.status, 200, JSON.stringify(report.data));
+      assert.equal(Number(report.data.summary.range_revenue), 50);
+      assert.equal(Number(report.data.summary.range_orders), 2);
+      assert.equal(report.data.range.timezone, 'Asia/Colombo');
+      assert.equal(report.data.sales_by_day[0].date, '2020-01-02');
+      assert.equal(Number(report.data.sales_by_day[0].revenue), 50);
+      const orders = await owner.get('/api/admin/orders?date=2020-01-02&timezone=Asia%2FColombo');
+      assert.equal(orders.status, 200);
+      assert.deepEqual(orders.data.orders.map(row => Number(row.id)).sort((a,b)=>a-b), ids.slice(1,3));
+      const utc = await owner.get('/api/admin/analytics?range=custom&start=2020-01-02&end=2020-01-02');
+      assert.equal(Number(utc.data.summary.range_revenue), 70);
+      assert.equal((await owner.get('/api/admin/analytics?timezone=Unknown')).status, 400);
+      assert.equal((await owner.get('/api/admin/orders?date=2020-02-31')).status, 400);
+    } finally { for (const id of ids) await ctx.db.run('DELETE FROM orders WHERE id = ?', id); }
   });
 
   await t.test('promotional banners', async () => {

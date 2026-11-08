@@ -1,5 +1,6 @@
 // Admin API routes for the Pixels store
 const express = require('express');
+const reporting = require('./reporting-time');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const db = require('./database');
@@ -77,7 +78,7 @@ function addUtcDays(date, days) {
 }
 
 function analyticsDateRange(query) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = reporting.localDate(new Date(), reporting.timezone(query.timezone));
   const currentMonth = `${today.slice(0, 7)}-01`;
   const nextMonth = addUtcDays(`${today.slice(0, 7)}-01`, 32).slice(0, 7) + '-01';
   const requestedRange = String(query.range || 'last_30_days').toLowerCase().replace(/[\s-]+/g, '_');
@@ -126,7 +127,7 @@ function finiteMoney(value, { min = 0, required = false } = {}) {
 function parseSettingsJson(value, fallback) {
   try {
     const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed : fallback;
+    return parsed && typeof parsed === 'object' && Array.isArray(parsed) === Array.isArray(fallback) ? parsed : fallback;
   } catch (_) {
     return fallback;
   }
@@ -345,11 +346,13 @@ async function importProductRow(row, rowNumber, seen) {
 // engines. SQLite keeps DATE()/strftime(); PostgreSQL extracts year/month/day
 // parts in a subquery (grouping on plain columns) and labels are assembled
 // here, avoiding dialect-only date-truncation functions either way.
-async function salesBuckets(bucket, where, params) {
+async function salesBuckets(bucket, where, params, zone = 'UTC') {
+  const dateExpression = zone === 'Asia/Colombo'
+    ? (db.engine === 'postgres' ? "(created_at + INTERVAL '330 minutes')" : "datetime(created_at, '+330 minutes')") : 'created_at';
   if (db.engine === 'postgres') {
-    const inner = bucket === 'day'
+    const inner = (bucket === 'day'
       ? 'EXTRACT(YEAR FROM created_at) AS y, EXTRACT(MONTH FROM created_at) AS m, EXTRACT(DAY FROM created_at) AS d'
-      : 'EXTRACT(YEAR FROM created_at) AS y, EXTRACT(MONTH FROM created_at) AS m';
+      : 'EXTRACT(YEAR FROM created_at) AS y, EXTRACT(MONTH FROM created_at) AS m').replaceAll('created_at', dateExpression);
     const cols = bucket === 'day' ? 'y, m, d' : 'y, m';
     const rows = await db.all(
       `SELECT ${cols}, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
@@ -366,11 +369,11 @@ async function salesBuckets(bucket, where, params) {
     });
   }
   if (bucket === 'day') {
-    return db.all(`SELECT DATE(created_at) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-      FROM orders WHERE ${where} GROUP BY DATE(created_at) ORDER BY date`, ...params);
+    return db.all(`SELECT DATE(${dateExpression}) AS date, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
+      FROM orders WHERE ${where} GROUP BY DATE(${dateExpression}) ORDER BY date`, ...params);
   }
-  return db.all(`SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
-    FROM orders WHERE ${where} GROUP BY strftime('%Y-%m', created_at) ORDER BY month`, ...params);
+  return db.all(`SELECT strftime('%Y-%m', ${dateExpression}) AS month, COALESCE(SUM(total), 0) AS revenue, COUNT(*) AS orders
+    FROM orders WHERE ${where} GROUP BY strftime('%Y-%m', ${dateExpression}) ORDER BY month`, ...params);
 }
 
 // Per-user order aggregates without correlated subqueries (portable across
@@ -498,6 +501,49 @@ router.put('/settings', owners, async (req, res) => {
   res.json({ ok: true, settings: storeSettingsResponse(await db.get('SELECT * FROM store_settings WHERE id = 1')) });
 });
 
+// Partial updates are used by the native settings groups. The legacy PUT
+// contract remains intact for existing web/admin clients.
+router.patch('/settings', owners, async (req, res) => {
+  const patch = req.body;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch) || !Object.keys(patch).length)
+    return res.status(400).json({ error: 'Choose a setting to update.' });
+  try {
+    await db.transaction(async tx => {
+      const row = await tx.get(`SELECT * FROM store_settings WHERE id = 1${db.forUpdate()}`);
+      const current = storeSettingsResponse(row);
+      delete current.updated_at;
+      const validated = storeSettingsPayload({ ...current, ...patch });
+      if (validated.error) throw Object.assign(new Error(validated.error), { status: 400 });
+      const contact = parseSettingsJson(row.contact, {});
+      const payments = new Set(parseSettingsJson(row.payment_methods, []));
+      const delivery = parseSettingsJson(row.delivery_options, []);
+      const preferences = parseSettingsJson(row.notification_preferences, {});
+      if ('store_email' in patch) contact.email = validated.contact.email;
+      if ('store_phone' in patch) contact.phone = validated.contact.phone;
+      for (const method of ['cash', 'bank']) if (`${method}_enabled` in patch) {
+        if (patch[`${method}_enabled`]) payments.add(method); else payments.delete(method);
+      }
+      for (const method of ['standard', 'express']) {
+        if (`${method}_delivery_enabled` in patch || (method === 'standard' && 'shipping_fee' in patch)) {
+          let option = delivery.find(value => value.method === method);
+          if (!option) { option = { method, label: method === 'standard' ? 'Standard delivery' : 'Express delivery', fee: Number(row.shipping_fee), enabled: false }; delivery.push(option); }
+          if (`${method}_delivery_enabled` in patch) option.enabled = patch[`${method}_delivery_enabled`];
+          if (method === 'standard' && 'shipping_fee' in patch) option.fee = validated.shippingFee;
+        }
+      }
+      const preferenceKeys = { order_notifications: 'new_orders', low_stock_notifications: 'low_stock', vendor_notifications: 'vendor_applications' };
+      for (const [field, key] of Object.entries(preferenceKeys)) if (field in patch) preferences[key] = patch[field];
+      if ('vendor_notifications' in patch && 'new_vendor_applications' in preferences) preferences.new_vendor_applications = patch.vendor_notifications;
+      await tx.run(`UPDATE store_settings SET store_name = ?, contact = ?, currency = ?, store_status = ?, payment_methods = ?,
+        shipping_fee = ?, delivery_options = ?, notification_preferences = ?, updated_at = ? WHERE id = 1`,
+        validated.storeName, JSON.stringify(contact), validated.currency, validated.storeStatus, JSON.stringify([...payments]),
+        validated.shippingFee, JSON.stringify(delivery), JSON.stringify(preferences), db.utcNow());
+    });
+  } catch (error) { if (error.status === 400) return res.status(400).json({ error: error.message }); throw error; }
+  await audit(req, 'updated', 'store_settings', 1, 'Updated settings: ' + Object.keys(patch).join(', '));
+  res.json({ ok: true, settings: storeSettingsResponse(await db.get('SELECT * FROM store_settings WHERE id = 1')) });
+});
+
 /* ---------------- DASHBOARD STATS ---------------- */
 router.get('/stats', async (req, res) => {
   const stats = {
@@ -529,24 +575,26 @@ router.get('/stats', async (req, res) => {
 
 /* ---------------- SALES ANALYTICS ---------------- */
 router.get('/analytics', orderAccess, async (req, res) => {
-  let range;
+  let range, zone;
   try {
+    zone = reporting.timezone(req.query.timezone);
     range = analyticsDateRange(req.query);
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
 
   const salesRange = `created_at >= ? AND created_at < ? AND ${SALES_ORDER_FILTER}`;
-  const rangeParams = [range.start, range.end];
-  const today = new Date().toISOString().slice(0, 10);
+  const boundary = day => reporting.utcBoundary(day, zone);
+  const rangeParams = [boundary(range.start), boundary(range.end)];
+  const today = reporting.localDate(new Date(), zone);
   const thisMonth = `${today.slice(0, 7)}-01`;
   const nextMonth = addUtcDays(thisMonth, 32).slice(0, 7) + '-01';
   const summary = {
     total_revenue: (await db.get(`SELECT COALESCE(SUM(total), 0) AS value FROM orders WHERE ${SALES_ORDER_FILTER}`)).value,
     today_revenue: (await db.get(`SELECT COALESCE(SUM(total), 0) AS value FROM orders
-      WHERE ${salesRange}`, today, addUtcDays(today, 1))).value,
+      WHERE ${salesRange}`, boundary(today), boundary(addUtcDays(today, 1)))).value,
     this_month_revenue: (await db.get(`SELECT COALESCE(SUM(total), 0) AS value FROM orders
-      WHERE ${salesRange}`, thisMonth, nextMonth)).value,
+      WHERE ${salesRange}`, boundary(thisMonth), boundary(nextMonth))).value,
     total_orders: (await db.get('SELECT COUNT(*) AS value FROM orders')).value,
     pending_orders: (await db.get("SELECT COUNT(*) AS value FROM orders WHERE status = 'pending'")).value,
     total_customers: (await db.get("SELECT COUNT(*) AS value FROM users WHERE role = 'customer'")).value,
@@ -557,8 +605,8 @@ router.get('/analytics', orderAccess, async (req, res) => {
   };
   summary.average_order_value = summary.range_orders ? summary.range_revenue / summary.range_orders : 0;
 
-  const salesByDay = await salesBuckets('day', salesRange, rangeParams);
-  const salesByMonth = await salesBuckets('month', salesRange, rangeParams);
+  const salesByDay = await salesBuckets('day', salesRange, rangeParams, zone);
+  const salesByMonth = await salesBuckets('month', salesRange, rangeParams, zone);
   const topProducts = await db.all(`SELECT oi.product_id, oi.name, SUM(oi.quantity) AS quantity_sold,
       COALESCE(SUM(oi.quantity * oi.price), 0) AS revenue, MAX(p.image) AS image
     FROM order_items oi JOIN orders o ON o.id = oi.order_id
@@ -574,7 +622,7 @@ router.get('/analytics', orderAccess, async (req, res) => {
     GROUP BY name ORDER BY revenue DESC, quantity_sold DESC, lower(name) LIMIT 10`, ...rangeParams);
 
   res.json({
-    range: { ...range, end: addUtcDays(range.end, -1) },
+    range: { ...range, end: addUtcDays(range.end, -1), timezone: zone },
     summary,
     sales_by_day: salesByDay,
     sales_by_month: salesByMonth,
@@ -586,6 +634,9 @@ router.get('/analytics', orderAccess, async (req, res) => {
 /* ---------------- ORDERS ---------------- */
 router.get('/orders', orderAccess, async (req, res) => {
   const { status, search, payment_method, payment_status, date, page: pageNum } = req.query;
+  let zone;
+  try { zone = reporting.timezone(req.query.timezone); } catch (error) { return res.status(400).json({ error: error.message }); }
+  if (date && !dateOnly(date)) return res.status(400).json({ error: 'Choose a valid order date.' });
   const perPage = 20;
   const page = Math.max(1, parseInt(pageNum) || 1);
   const offset = (page - 1) * perPage;
@@ -596,7 +647,7 @@ router.get('/orders', orderAccess, async (req, res) => {
   if (status && status !== 'all') { sql += ' AND o.status = ?'; params.push(status); }
   if (payment_method && payment_method !== 'all') { sql += ' AND o.payment_method = ?'; params.push(payment_method); }
   if (payment_status && payment_status !== 'all') { sql += ' AND p.payment_status = ?'; params.push(payment_status); }
-  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) { sql += ' AND o.created_at >= ? AND o.created_at < ?'; params.push(date, addUtcDays(date, 1)); }
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) { sql += ' AND o.created_at >= ? AND o.created_at < ?'; params.push(reporting.utcBoundary(date, zone), reporting.utcBoundary(addUtcDays(date, 1), zone)); }
   if (search) { sql += ' AND (lower(o.full_name) LIKE lower(?) OR lower(o.phone) LIKE lower(?) OR lower(o.email) LIKE lower(?) OR o.id = ?)';
     params.push(`%${search}%`, `%${search}%`, `%${search}%`, parseInt(search) || 0); }
   sql += ' ORDER BY o.id DESC LIMIT ? OFFSET ?';
@@ -614,7 +665,7 @@ router.get('/orders', orderAccess, async (req, res) => {
   if (status && status !== 'all') { countSql += ' AND orders.status = ?'; countParams.push(status); }
   if (payment_method && payment_method !== 'all') { countSql += ' AND orders.payment_method = ?'; countParams.push(payment_method); }
   if (joinPayments) { countSql += ' AND p.payment_status = ?'; countParams.push(payment_status); }
-  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) { countSql += ' AND orders.created_at >= ? AND orders.created_at < ?'; countParams.push(date, addUtcDays(date, 1)); }
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) { countSql += ' AND orders.created_at >= ? AND orders.created_at < ?'; countParams.push(reporting.utcBoundary(date, zone), reporting.utcBoundary(addUtcDays(date, 1), zone)); }
   if (search) { countSql += ' AND (lower(orders.full_name) LIKE lower(?) OR lower(orders.phone) LIKE lower(?) OR lower(orders.email) LIKE lower(?) OR orders.id = ?)';
     countParams.push(`%${search}%`, `%${search}%`, `%${search}%`, parseInt(search) || 0); }
   const total = (await db.get(countSql, ...countParams)).c;

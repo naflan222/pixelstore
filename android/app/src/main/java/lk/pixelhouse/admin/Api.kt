@@ -51,6 +51,7 @@ class ApiException(val status: Int, message: String): IOException(message)
 class AdminApi(val vault: SessionVault, networkClient: OkHttpClient? = null) {
     companion object { const val BASE = "https://pixelhouse.lk" }
     val signedIn = MutableStateFlow(false)
+    val capabilities = MutableStateFlow(JSONObject())
     private val client = networkClient ?: OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(40, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     private suspend fun execute(path: String, method: String, bytes: ByteArray?, mediaType: String): ByteArray = withContext(Dispatchers.IO) {
@@ -87,6 +88,7 @@ class AdminApi(val vault: SessionVault, networkClient: OkHttpClient? = null) {
             throw ApiException(503, "Deploy the Android admin server update before using this app.")
         }
         require(capabilities.optInt("native_admin_version") >= 1 && capabilities.optBoolean("csv_dry_run")) { "Update the PixelHouse server before using this app." }
+        this.capabilities.value = capabilities
         signedIn.value = true
     }
     suspend fun login(username: String, password: String) {

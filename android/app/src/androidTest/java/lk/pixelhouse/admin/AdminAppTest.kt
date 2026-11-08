@@ -30,10 +30,10 @@ class AdminAppTest {
             val path = request.url.encodedPath
             if (request.method != "GET" && path.startsWith("/api/admin/")) { val buffer = okio.Buffer(); request.body?.writeTo(buffer); adminBodies.add(org.json.JSONObject(buffer.readUtf8().ifBlank { "{}" })) }
             val body = when {
-                path == "/api/mobile/capabilities" -> """{"native_admin_version":1,"csv_dry_run":true,"push_configured":false}"""
+                path == "/api/mobile/capabilities" -> """{"native_admin_version":1,"csv_dry_run":true,"push_configured":false,"settings_patch":true}"""
                 path == "/api/auth/me" -> """{"user":{"id":1,"username":"test-owner","role":"$role"}}"""
                 path == "/api/admin/orders/301" -> """{"order":{"id":301,"full_name":"Test customer","total":1450,"status":"pending"},"payment":{"payment_status":"pending"},"items":[],"history":[]}"""
-                path == "/api/admin/settings" -> """{"settings":{"store_name":"PixelHouse","currency":"LKR","shipping_fee":250,"store_open":true}}"""
+                path == "/api/admin/settings" -> """{"settings":{"store_name":"PixelHouse","currency":"LKR","store_email":"","store_phone":"","shipping_fee":250,"store_open":true,"cash_enabled":true,"bank_enabled":true,"standard_delivery_enabled":true,"express_delivery_enabled":true,"order_notifications":true,"low_stock_notifications":true,"vendor_notifications":true}}"""
                 path == "/api/admin/products" -> """{"products":[{"id":42,"name":"Test GoPro grip","slug":"test-grip","price":1200,"image":"","stock":5,"status":"active","featured":0,"flash_sale":0,"rating":4.5,"reorder_threshold":10}]}"""
                 path == "/api/admin/homepage-sections" -> """{"sections":{"featured_gear":[]},"products":[]}"""
                 path.endsWith("stats") -> """{"orders":2,"revenue":2900}"""
@@ -75,6 +75,7 @@ class AdminAppTest {
         launch(order = 301)
         compose.waitUntil(30000) { app.api.signedIn.value }
         compose.waitUntil(30000) { compose.onAllNodesWithText("Order #301").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasScrollToIndexAction() and !hasTestTag("admin-menu")).performScrollToNode(hasText("Update order status"))
         compose.onNodeWithText("Update order status").assertExists()
         Assert.assertTrue(writes.isEmpty())
     }
@@ -94,6 +95,37 @@ class AdminAppTest {
         Assert.assertEquals(4.5, adminBodies.last().getDouble("rating"), 0.001)
         Assert.assertEquals(1200.0, adminBodies.last().getDouble("price"), 0.001)
         Assert.assertEquals(10, adminBodies.last().getInt("reorder_threshold"))
+    }
+    private fun openSection(title: String) {
+        compose.onNodeWithText("☰").performClick()
+        compose.onNodeWithTag("admin-menu").performScrollToNode(hasText(title, substring = false))
+        compose.onNode(hasText(title) and hasClickAction() and hasAnyAncestor(hasTestTag("admin-menu"))).performClick()
+        compose.waitForIdle()
+    }
+    @Test fun settingsSendsOnlyChangedFieldsAndWarnsBeforeLeaving() {
+        launch()
+        compose.waitUntil(30000) { app.api.signedIn.value }
+        openSection("Store settings")
+        compose.waitUntil(30000) { compose.onAllNodesWithTag("field-store_name").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("field-store_name").performTextReplacement("PixelHouse updated")
+        hideKeyboard()
+        openSection("Orders")
+        compose.onNodeWithText("Discard unsaved settings?").assertExists()
+        compose.onNodeWithText("Keep editing").performClick()
+        compose.onNodeWithText("Save changes").performClick()
+        compose.waitUntil(30000) { adminBodies.isNotEmpty() }
+        Assert.assertEquals(1, adminBodies.last().length())
+        Assert.assertEquals("PixelHouse updated", adminBodies.last().getString("store_name"))
+    }
+    @Test fun dashboardAndAnalyticsUseReadableSalesLabels() {
+        launch()
+        compose.waitUntil(30000) { app.api.signedIn.value }
+        compose.onNodeWithText("Your store at a glance").assertExists()
+        compose.onNodeWithText("View pending orders").performScrollTo().performClick()
+        compose.onNodeWithText("Search orders").assertExists()
+        openSection("Sales analytics")
+        compose.onNodeWithText("Order sales").assertExists()
+        compose.onNodeWithText("Custom dates").assertExists()
     }
     @Test fun nonOwnerCannotSignIn() {
         role = "customer"; launch(signedIn = false)

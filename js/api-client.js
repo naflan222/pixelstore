@@ -1346,30 +1346,70 @@
     })[character]);
   }
 
+  const monthlyAnchor = '2026-11-08T00:00:00Z';
   function homeProductCard(product, variant) {
     if (variant === 'featured_gear') {
-      const image = escapeHtml(product.image || 'img/product/1.webp');
-      const name = escapeHtml(product.name);
-      const href = 'single-product.html?product=' + encodeURIComponent(product.slug);
-      return '<div class="card flash-sale-card"><div class="card-body"><a href="' + href + '"><img src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"><span class="product-title">' + name + '</span><p class="sale-price">' + money(product.price) + (product.old_price ? '<span class="real-price">' + money(product.old_price) + '</span>' : '') + '</p></a></div></div>';
+      const stock = Math.max(0, Number(product.stock) || 0);
+      const percent = Math.min(100, stock);
+      return '<div class="card flash-sale-card"><div class="card-body"><a href="single-product.html?product=' + encodeURIComponent(product.slug) + '">' +
+        '<img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async">' +
+        '<span class="product-title">' + escapeHtml(product.name) + '</span><p class="sale-price">' + money(product.price) +
+        (product.old_price ? '<span class="real-price">' + money(product.old_price) + '</span>' : '') + '</p>' +
+        '<div class="progress"><div class="progress-bar bg-warning" role="progressbar" style="width:' + percent + '%" aria-valuenow="' + percent +
+        '" aria-valuemin="0" aria-valuemax="100" aria-label="Product availability" aria-valuetext="' + (stock > 0 ? 'In stock' : 'Out of stock') + '"></div></div></a></div></div>';
     }
-    return productCardHTML(product);
+    if (variant === 'weekly_best_sellers' || variant === 'featured_products') {
+      const featured = variant === 'featured_products';
+      const url = 'single-product.html?product=' + encodeURIComponent(product.slug);
+      const image = '<div class="product-thumbnail-side"><a class="product-thumbnail d-block" href="' + url + '"><img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async"></a></div>';
+      const description = '<div class="product-description"><a class="product-title d-block" href="' + url + '">' + escapeHtml(product.name) + '</a><p class="sale-price">' + money(product.price) + (product.old_price ? '<span>' + money(product.old_price) + '</span>' : '') + '</p></div>';
+      return '<div class="' + (featured ? 'col-4' : 'col-12') + '"><div class="card ' + (featured ? 'featured-product-card' : 'horizontal-product-card') + '"><div class="' + (featured ? 'card-body' : 'd-flex align-items-center') + '">' + (featured ? '<span class="badge badge-warning custom-badge"><i class="ti ti-star-filled"></i></span>' : '') + image + description + '</div></div></div>';
+    }
+    let markup = productCardHTML(product).replace(' catalog-product-card', '').replace('btn btn-success btn-sm', 'btn btn-primary btn-sm');
+    const badge = String(product.badge || '').toLowerCase();
+    markup = markup.replace('badge rounded-pill badge-warning', 'badge rounded-pill ' + (badge === 'new' ? 'badge-success' : /^-\d+%$/.test(badge) ? 'badge-danger' : 'badge-warning'));
+    if (Number(product.flash_sale) === 1) {
+      const countdown = '<ul class="offer-countdown-timer d-flex align-items-center shadow-sm" data-monthly-countdown="' + monthlyAnchor + '" title="Monthly refresh — renews automatically">' +
+        '<li><span class="days">0</span>d</li><li><span class="hours">0</span>h</li><li><span class="minutes">0</span>m</li><li><span class="seconds">0</span>s</li></ul>';
+      markup = markup.replace('</a>', countdown + '</a>');
+    }
+    return markup;
   }
 
+  let homeSectionsLoading = false;
+  const homeSectionSignatures = new Map();
   async function wireHomepageSections() {
-    if (page !== 'home.html') return;
+    if (!isHomepage || homeSectionsLoading) return;
+    homeSectionsLoading = true;
     try {
-      const { sections } = await get('/homepage-sections');
+      const { sections, configured_sections: configured = [] } = await get('/homepage-sections');
       Object.entries(sections || {}).forEach(([key, products]) => {
         const target = $('[data-home-products="' + key + '"]');
-        if (!target || !Array.isArray(products) || !products.length) return;
-        const markup = products.map((product) => homeProductCard(product, key)).join('');
-        if (key === 'featured_gear' && window.jQuery && window.jQuery(target).data('owl.carousel')) {
-          window.jQuery(target).trigger('replace.owl.carousel', [markup]).trigger('refresh.owl.carousel');
+        if (!target || !Array.isArray(products) || (!products.length && !configured.includes(key))) return;
+        const signature = JSON.stringify(products.map(p => [p.id, p.slug, p.name, p.price, p.old_price, p.image, p.stock, p.rating, p.rating_count, p.badge, p.flash_sale]));
+        if (homeSectionSignatures.get(key) === signature) return;
+        const markup = products.length ? products.map(product => homeProductCard(product, key)).join('')
+          : '<div class="col-12"><p class="text-muted py-3 mb-0" role="status">No products available in this section right now.</p></div>';
+        const carousel = key === 'featured_gear' && window.jQuery && window.jQuery(target).data('owl.carousel');
+        if (carousel) {
+          const current = carousel.relative(carousel.current()) || 0;
+          window.jQuery(target).trigger('replace.owl.carousel', [markup]).trigger('refresh.owl.carousel').trigger('to.owl.carousel', [Math.min(current, Math.max(0, products.length - 1)), 0]);
         } else target.innerHTML = markup;
         bindProductButtons(target);
+        homeSectionSignatures.set(key, signature);
       });
-    } catch (_) { /* Keep the existing homepage cards if the section API is unavailable. */ }
+      if (window.PixelHouseMonthlyCycle) window.PixelHouseMonthlyCycle.start(document);
+    } catch (_) { /* Retain the last successful display during an outage. */ }
+    finally { homeSectionsLoading = false; }
+  }
+
+  function startHomepageSectionSync() {
+    if (!isHomepage) return;
+    const refresh = () => { if (document.visibilityState !== 'hidden') wireHomepageSections(); };
+    refresh();
+    setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
   }
 
   function reviewDetails(review) {
@@ -1736,7 +1776,7 @@
     // Start catalog and product requests immediately instead of waiting for
     // the session check, so newly added products can render sooner.
     wireCategoryCatalog().catch(() => {});
-    wireProductDetail().catch(() => {});    wireHomepageSections().catch(() => {});
+    wireProductDetail().catch(() => {});    startHomepageSectionSync();
     await loadSession();
     if (wiring[page]) await wiring[page]();
     hideRemovedCatalogCards();

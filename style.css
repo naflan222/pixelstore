@@ -3315,6 +3315,55 @@ html.dynamic-product-loading .product-description::before {
 .single-user-review .user-thumbnail img {
   border-radius: 50%;
 }
+.review-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  border-radius: 50%;
+  background: rgba(98, 90, 250, .12);
+  color: #5148df;
+  font-size: .85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.single-user-review .user-thumbnail { margin-top: 0; }
+.single-user-review .rating-comment { min-width: 0; flex: 1; }
+.review-author-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .2rem .75rem;
+  min-width: 0;
+}
+.single-user-review .review-author { color: #020310; font-size: .9rem; overflow-wrap: anywhere; }
+.review-date { color: #65687a; font-size: .75rem; font-weight: 400; }
+.single-user-review .review-comment {
+  margin-top: .35rem;
+  color: #45495d;
+  font-size: .875rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[theme-color=dark] .single-user-review .review-author { color: #fff; }
+[theme-color=dark] .single-user-review .review-comment { color: #e1e3ed; }
+[theme-color=dark] .single-user-review .review-date { color: #b7bacb; }
+[theme-color=dark] .single-user-review .review-avatar { background: rgba(98,90,250,.22); color: #d8d5ff; }
+.review-identity { display: flex; align-items: center; gap: .65rem; min-width: 0; margin-bottom: .55rem; }
+.review-identity .review-author-row { flex: 1; }
+.site-footer .review-author-row { color: #fff; overflow-wrap: anywhere; }
+.site-footer .review-date { color: #b8bfd3; }
+.site-footer .review-avatar { background: rgba(166,160,255,.17); color: #e5e2ff; }
+.site-footer .review-source { display: block; color: #b8bfd3; font-size: .75rem; }
+.site-footer .review-product { display: block; color: #d0ccff; font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
+.site-footer .review-comment { white-space: pre-wrap; }
+.site-footer .review-load-more { margin-top: .9rem; }
+.site-footer .review-product[hidden], .site-footer .review-load-more[hidden] { display: none !important; }
+.site-footer-manual-review-controls button:disabled { opacity: .45; cursor: default; }
 .single-user-review .rating-comment .rating {
   font-size: 0.75rem;
   color: #ffaf00;
@@ -6157,7 +6206,6 @@ html.dynamic-product-loading .product-description::before {
   .site-footer-benefits > div { min-height: 72px; flex-direction: column; gap: .25rem; padding: .55rem .25rem; font-size: .72rem; }
   .site-footer-benefits i { font-size: 1.25rem; }
   .site-footer-review-list { grid-template-columns: 1fr; }
-  .site-footer-review:nth-child(n+4) { display: none; }
   .site-footer-main { grid-template-columns: 1fr 1fr; gap: 1.35rem 1rem; }
   .site-footer-about { grid-column: 1 / -1; }
   .site-footer-contact { grid-column: 1 / -1; }
@@ -6226,7 +6274,6 @@ footer.site-footer .site-footer-contact a { line-height: 1.45; }
   }
   footer.site-footer .site-footer-benefits i { font-size: 1.2rem; }
   footer.site-footer .site-footer-review-list { grid-template-columns: 1fr; }
-  footer.site-footer .site-footer-review:nth-child(n+4) { display: none; }
   footer.site-footer .site-footer-main { grid-template-columns: 1fr 1fr; gap: 1.25rem 1rem; }
   footer.site-footer .site-footer-about,
   footer.site-footer .site-footer-contact { grid-column: 1 / -1; }

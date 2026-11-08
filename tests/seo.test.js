@@ -247,14 +247,14 @@ test('storefront exposes the requested footer and admin-managed homepage section
   assert.match(apiClient, /24\/7 support/);
   assert.match(apiClient, /Genuine products/);
   assert.match(apiClient, /Customer reviews/);
-  assert.match(apiClient, /aria-label="Facebook customer reviews"/);
+  assert.match(apiClient, /aria-label="Customer reviews"/);
   assert.match(apiClient, /data-manual-review-text/);
   assert.match(apiClient, /data-manual-review-author/);
   assert.match(apiClient, /data-manual-review-position/);
   assert.match(apiClient, /data-manual-review-next/);
   assert.match(apiClient, /data-manual-review-prev/);
   assert.match(apiClient, /data-customer-reviews/);
-  assert.match(apiClient, /get\('\/reviews\/recent'\)/);
+  assert.match(apiClient, /get\('\/reviews\/recent\?page=/);
   assert.match(apiClient, /wa\.me\/94777466675/);
   stylesheetHref(read('profile.html'));
   assert.match(admin, /Homepage product sections/);

@@ -472,7 +472,7 @@ router.get('/cart', async (req, res) => {
 
 router.post('/cart', async (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};
-  const product = await db.get("SELECT id, stock FROM products WHERE id = ? AND status = 'active'", product_id);
+  const product = await db.get("SELECT id, slug, name, price, stock FROM products WHERE id = ? AND status = 'active'", product_id);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
@@ -484,7 +484,7 @@ router.post('/cart', async (req, res) => {
     await db.run('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)',
       req.user ? req.user.id : null, req.user ? null : req.guestId, product_id, qty);
   }
-  res.json({ ok: true });
+  res.json({ ok: true, product: { id: product.id, slug: product.slug, name: product.name, price: product.price } });
 });
 
 async function ownsCartItem(req, id) {
@@ -509,7 +509,7 @@ router.delete('/cart/:id', async (req, res) => {
 router.post('/cart/by-slug', async (req, res) => {
   const { slug, quantity = 1 } = req.body || {};
   if (!slug) return res.status(400).json({ error: 'Product slug is required.' });
-  const product = await db.get("SELECT id, stock FROM products WHERE slug = ? AND status = 'active'", slug);
+  const product = await db.get("SELECT id, slug, name, price, stock FROM products WHERE slug = ? AND status = 'active'", slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
   if (product.stock <= 0) return res.status(400).json({ error: 'This product is out of stock.' });
   const qty = Math.max(1, parseInt(quantity) || 1);
@@ -521,7 +521,7 @@ router.post('/cart/by-slug', async (req, res) => {
     await db.run('INSERT INTO carts (user_id, guest_id, product_id, quantity) VALUES (?, ?, ?, ?)',
       req.user ? req.user.id : null, req.user ? null : req.guestId, product.id, qty);
   }
-  res.json({ ok: true });
+  res.json({ ok: true, product: { id: product.id, slug: product.slug, name: product.name, price: product.price } });
 });
 
 /* ---------------- WISHLIST (guests too) ---------------- */
@@ -654,7 +654,7 @@ router.post('/orders', async (req, res) => {
       await tx.run(`DELETE FROM carts WHERE ${w.sql}`, w.param);
       if (req.user) await notify(req.user.id, `Order #${orderId} placed`, `Total Rs. ${total.toLocaleString()} via ${paymentMethod}.`, 'order', tx);
       await createAdminNotification({ type: 'order', title: `New order #${orderId}`, body: 'A new order has been placed.', entityType: 'order', entityId: orderId }, tx);
-      return { orderId, total, discountAmount };
+      return { orderId, total, discountAmount, shippingFee };
     });
 
     // Hand the customer the invoice number and download link up front, so the
@@ -666,6 +666,9 @@ router.post('/orders', async (req, res) => {
       order_id: order.orderId,
       total: order.total,
       discount_amount: order.discountAmount,
+      subtotal,
+      shipping_fee: order.shippingFee,
+      items: items.map(({ id, name, price, quantity }) => ({ id, name, price, quantity })),
       invoice_number: invoice.number,
       invoice_file: `PixelHouse-Invoice-${invoice.fileKey}.pdf`,
       invoice_url: `/api/orders/${order.orderId}/invoice`,

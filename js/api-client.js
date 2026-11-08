@@ -27,6 +27,54 @@
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
+  // Send product/order data to GA4; never send customers' billing details.
+  function ga4Item(product, quantity = 1) {
+    if (!product) return null;
+    const id = product.id ?? product.item_id ?? product.slug;
+    const name = product.name || product.item_name;
+    const price = Number(product.price);
+    if (id == null || !name || !Number.isFinite(price) || price < 0) return null;
+    return { item_id: String(id), item_name: String(name), price,
+      quantity: Math.max(1, Math.floor(Number(quantity) || 1)) };
+  }
+  function ga4SingleItemPayload(product, quantity = 1) {
+    const item = ga4Item(product, quantity);
+    return item ? { currency: 'LKR', value: Math.round(item.price * item.quantity * 100) / 100,
+      items: [item] } : null;
+  }
+  function ga4CartPayload(products, total) {
+    const items = Array.isArray(products)
+      ? products.map(product => ga4Item(product, product.quantity)).filter(Boolean) : [];
+    if (!items.length) return null;
+    const computed = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const amount = Number(total);
+    return { currency: 'LKR',
+      value: Math.round((Number.isFinite(amount) ? amount : computed) * 100) / 100, items };
+  }
+  function trackEcommerce(eventName, params) {
+    if (!params) return;
+    try {
+      if (typeof window.gtag === 'function') window.gtag('event', eventName, params);
+    } catch (_) { /* Analytics must never interrupt shopping or checkout. */ }
+  }
+  // Redirecting immediately can drop a tracking request; fire on the next page.
+  function queueEcommerceForNextPage(eventName, params) {
+    if (!params) return;
+    try {
+      sessionStorage.setItem('pixelhouse_ga4_pending_event', JSON.stringify({ eventName, params }));
+    } catch (_) { trackEcommerce(eventName, params); }
+  }
+  function flushPendingEcommerce() {
+    try {
+      const pending = sessionStorage.getItem('pixelhouse_ga4_pending_event');
+      if (!pending) return;
+      sessionStorage.removeItem('pixelhouse_ga4_pending_event');
+      const event = JSON.parse(pending);
+      if (event && ['add_to_cart', 'purchase'].includes(event.eventName))
+        trackEcommerce(event.eventName, event.params);
+    } catch (_) { /* Never block the page for tracking. */ }
+  }
+
   function updateStockProgress(container, product) {
     const progressBar = $('.progress-bar', container);
     const progressTitle = $('.progress-title, .mb-1', container);
@@ -156,10 +204,13 @@
   function bindProductButtons(root) {
     // Buttons with data-cart-id (numeric product ID — used on dynamically rendered grids)
     $$('[data-cart-id]', root).forEach((el) => {
+      if (el.dataset.cartBound) return;
+      el.dataset.cartBound = '1';
       el.addEventListener('click', async (e) => {
         e.preventDefault();
         try {
-          await post('/cart', { product_id: Number(el.dataset.cartId) });
+          const result = await post('/cart', { product_id: Number(el.dataset.cartId) });
+          trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
@@ -168,10 +219,13 @@
     });
     // Buttons with data-cart-slug (used on static product cards like home.html)
     $$('[data-cart-slug]', root).forEach((el) => {
+      if (el.dataset.cartBound) return;
+      el.dataset.cartBound = '1';
       el.addEventListener('click', async (e) => {
         e.preventDefault();
         try {
-          await post('/cart/by-slug', { slug: el.dataset.cartSlug });
+          const result = await post('/cart/by-slug', { slug: el.dataset.cartSlug });
+          trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
@@ -194,7 +248,8 @@
         const slug = href.replace(/\.html$/, '');
         if (!slug || slug === '#' || slug === 'single-product') return; // skip demo products
         try {
-          await post('/cart/by-slug', { slug });
+          const result = await post('/cart/by-slug', { slug });
+          trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
           el.innerHTML = '<i class="ti ti-check"></i>';
           setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
@@ -424,6 +479,12 @@
             ...billing,
             shipping_method: sessionStorage.getItem('shipping_method') || 'standard',
             payment_method: paymentMethod,
+          });
+          // Count a purchase only after the order API confirms it succeeded.
+          const purchase = ga4CartPayload(r.items, Math.max(0, Number(r.subtotal) - Number(r.discount_amount || 0)));
+          if (purchase && r.order_id) queueEcommerceForNextPage('purchase', {
+            ...purchase, transaction_id: 'PH-' + r.order_id,
+            shipping: Number(r.shipping_fee) || 0,
           });
           sessionStorage.setItem('last_order', JSON.stringify({
             order_id: r.order_id,
@@ -829,6 +890,8 @@
           shippingList.style.display = '';
         }
         checkoutReady = settings.store_open && deliveryOptions.length > 0;
+        if (checkoutReady && data.items.length)
+          trackEcommerce('begin_checkout', ga4CartPayload(data.items, data.subtotal));
         if (!checkoutReady) {
           const err = $('#billError');
           if (err) {
@@ -1164,6 +1227,7 @@
     try {
       const result = await get('/products/' + encodeURIComponent(slug));
       liveProduct = result.product;
+      if (liveProduct) trackEcommerce('view_item', ga4SingleItemPayload(liveProduct));
       if (isDynamicProduct && liveProduct) {
         const title = $('.p-title-price h5');
         const price = $('.p-title-price .sale-price');
@@ -1253,7 +1317,8 @@
         const quantity = qtyInput ? Math.max(1, parseInt(qtyInput.value) || 1) : 1;
         try {
           const { product } = await get('/products/' + encodeURIComponent(slug));
-          await post('/cart', { product_id: product.id, quantity });
+          const result = await post('/cart', { product_id: product.id, quantity });
+          queueEcommerceForNextPage('add_to_cart', ga4SingleItemPayload(result.product || product, quantity));
           location.href = 'cart.html';
         } catch (err) { alert(err.message); }
       });
@@ -1268,7 +1333,8 @@
       e.preventDefault();
       try {
         const { product } = await get('/products/' + slug);
-        await post('/cart', { product_id: product.id });
+        const result = await post('/cart', { product_id: product.id });
+        queueEcommerceForNextPage('add_to_cart', ga4SingleItemPayload(result.product || product));
         location.href = 'cart.html';
       } catch (err) { alert(err.message); }
     });
@@ -1664,6 +1730,7 @@
     if (pl) pl.style.display = 'none';
 
     ensureStoreFooter();
+    flushPendingEcommerce();
     startHomepageRatingSync();
 
     // Start catalog and product requests immediately instead of waiting for

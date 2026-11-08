@@ -6078,6 +6078,11 @@ html.dynamic-product-loading .product-description::before {
 }
 
 /* Storefront polish: crisp brand mark, consistent catalog cards, and shared footer. */
+.flash-sale-card .progress-title,
+.sales-volume > .mb-1 {
+  display: none !important;
+}
+
 .header-area .logo-wrapper img {
   display: block;
   width: min(160px, 42vw) !important;

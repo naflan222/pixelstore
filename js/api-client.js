@@ -5,6 +5,7 @@
   'use strict';
 
   const page = (location.pathname.split('/').pop() || 'index.html');
+  const isHomepage = page === 'home.html' || page === 'index.html';
   let currentUser = null;
 
   /* ---------- helpers ---------- */
@@ -70,6 +71,59 @@
     if (type === 'success') setTimeout(() => { box.style.display = 'none'; }, 4000);
   }
 
+  function productRatingHTML(product) {
+    const count = Math.max(0, Math.floor(Number(product.rating_count) || 0));
+    if (!count) return '<div class="product-rating text-muted">No reviews yet</div>';
+    const average = Math.max(0, Math.min(5, Number(product.rating) || 0)).toFixed(1);
+    const label = count + ' review' + (count === 1 ? '' : 's');
+    return '<div class="product-rating" aria-label="' + average + ' out of 5 stars, ' + label + '">' +
+      '<i class="ti ti-star-filled" aria-hidden="true"></i>' + average + ' <span class="ms-1">(' + label + ')</span></div>';
+  }
+
+  let homepageRatingsLoading = false;
+  let homepageRatingSignature = '';
+  async function refreshHomepageRatings() {
+    if (!isHomepage || homepageRatingsLoading) return;
+    homepageRatingsLoading = true;
+    try {
+      const { products } = await api('/products', { cache: 'no-store' });
+      if (!Array.isArray(products)) return;
+      const bySlug = new Map(products.map(product => [String(product.slug), product]));
+      $$('.product-card, .horizontal-product-card, .featured-product-card').forEach(card => {
+        const rating = $('.product-rating', card);
+        const link = $('.product-title[href], .product-thumbnail[href]', card);
+        if (!rating || !link) return;
+        try {
+          const url = new URL(link.getAttribute('href'), location.href);
+          const slug = url.searchParams.get('product') || url.pathname.split('/').pop().replace(/\.html$/, '');
+          const product = bySlug.get(slug);
+          if (product) rating.outerHTML = productRatingHTML(product);
+        } catch (_) { /* A malformed card link must not prevent other updates. */ }
+      });
+      const signature = products.map(product => [product.slug, product.rating, product.rating_count].join(':')).sort().join('|');
+      if (signature !== homepageRatingSignature) {
+        homepageRatingSignature = signature;
+        document.dispatchEvent(new CustomEvent('pixelhouse:reviews-refreshed'));
+      }
+    } catch (_) { /* Keep the last successfully displayed rating during an outage. */ }
+    finally { homepageRatingsLoading = false; }
+  }
+
+  function startHomepageRatingSync() {
+    if (!isHomepage) return;
+    refreshHomepageRatings();
+    const refreshVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshHomepageRatings();
+    };
+    setInterval(refreshVisible, 60 * 1000);
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
+    document.addEventListener('pixelhouse:review-published', refreshVisible);
+    window.addEventListener('storage', event => {
+      if (event.key === 'pixelhouse:reviews-updated') refreshVisible();
+    });
+  }
+
   function productCardHTML(p) {
     const name = escapeHtml(p.name);
     const slug = escapeHtml(p.slug);
@@ -79,10 +133,7 @@
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
     const outOfStock = p.stock != null && p.stock <= 0;
     const stockBadge = outOfStock ? '<span class="badge rounded-pill badge-danger" style="position:absolute;top:8px;left:8px;">Out of Stock</span>' : '';
-    const rating = Number(p.rating_count) > 0
-      ? '<div class="product-rating"><i class="ti ti-star-filled"></i>' + Number(p.rating).toFixed(1) +
-        ' <span class="ms-1">(' + Number(p.rating_count) + ')</span></div>'
-      : '<div class="product-rating text-muted">No reviews yet</div>';
+    const rating = productRatingHTML(p);
     const addBtn = outOfStock
       ? '<a class="btn btn-secondary btn-sm disabled" href="#" style="opacity:.5;pointer-events:none;cursor:not-allowed"><i class="ti ti-x"></i></a>'
       : '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>';
@@ -1329,6 +1380,7 @@
       showReview(1);
       loadReviews(1, true);
       document.addEventListener('pixelhouse:review-published', () => loadReviews(1, true));
+      document.addEventListener('pixelhouse:reviews-refreshed', () => loadReviews(1, true));
       return;
     }
     const list = $('[data-customer-reviews]', footer);
@@ -1410,6 +1462,7 @@
         form.reset();
         await renderReviews();
         document.dispatchEvent(new CustomEvent('pixelhouse:review-published'));
+        try { localStorage.setItem('pixelhouse:reviews-updated', String(Date.now())); } catch (_) {}
         alertBox(form, 'Your review is now live.', 'success');
       } catch (error) { alertBox(form, error.message, 'danger'); }
     });
@@ -1521,6 +1574,7 @@
     if (pl) pl.style.display = 'none';
 
     ensureStoreFooter();
+    startHomepageRatingSync();
 
     // Start catalog and product requests immediately instead of waiting for
     // the session check, so newly added products can render sooner.

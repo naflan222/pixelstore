@@ -1169,6 +1169,55 @@
     } catch (_) { /* Keep the existing homepage cards if the section API is unavailable. */ }
   }
 
+  function reviewDetails(review) {
+    const name = String(review.username || review.author || '').trim() || 'Customer';
+    const words = name.match(/[\p{L}\p{N}]+/gu) || ['Customer'];
+    const initials = (words.length > 1
+      ? Array.from(words[0])[0] + Array.from(words[words.length - 1])[0]
+      : Array.from(words[0]).slice(0, 2).join('')).toUpperCase();
+    const rating = Math.max(1, Math.min(5, Math.round(Number(review.rating) || 5)));
+    let timestamp = String(review.created_at || '').trim().replace(' ', 'T')
+      .replace(/(\.\d{3})\d+/, '$1').replace(/([+-]\d{2})$/, '$1:00');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) timestamp += 'T00:00:00Z';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(timestamp)) timestamp += 'Z';
+    const date = new Date(timestamp);
+    const validDate = !Number.isNaN(date.getTime());
+    return {
+      name, initials, rating,
+      comment: String(review.comment || review.text || '').trim() || 'Rated this product.',
+      date: validDate ? new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Colombo',
+      }).format(date) : '',
+      dateTime: validDate ? date.toISOString() : '',
+    };
+  }
+
+  function reviewAuthorHTML(details) {
+    return '<strong class="review-author">' + escapeHtml(details.name) + '</strong>' +
+      (details.date ? '<time class="review-date" datetime="' + details.dateTime + '">' + escapeHtml(details.date) + '</time>' : '');
+  }
+
+  function productReviewHTML(review) {
+    const details = reviewDetails(review);
+    return '<li class="single-user-review d-flex"><div class="user-thumbnail"><span class="review-avatar" aria-hidden="true">' +
+      escapeHtml(details.initials) + '</span></div><div class="rating-comment"><div class="review-author-row">' +
+      reviewAuthorHTML(details) + '</div><div class="rating" role="img" aria-label="' + details.rating + ' out of 5 stars">' +
+      '<i class="ti ti-star-filled" aria-hidden="true"></i>'.repeat(details.rating) +
+      '</div><p class="comment review-comment mb-0">' + escapeHtml(details.comment) + '</p></div></li>';
+  }
+
+  function footerReviewHTML(review) {
+    const details = reviewDetails(review);
+    const product = review.product_slug
+      ? '<a class="review-product" href="single-product.html?product=' + encodeURIComponent(review.product_slug) + '">' + escapeHtml(review.product_name) + '</a>'
+      : '<span class="review-product">' + escapeHtml(review.product_name || '') + '</span>';
+    return '<article class="site-footer-review"><div class="review-identity"><span class="review-avatar" aria-hidden="true">' +
+      escapeHtml(details.initials) + '</span><div class="review-author-row">' + reviewAuthorHTML(details) +
+      '</div></div><div class="site-footer-stars" role="img" aria-label="' + details.rating + ' out of 5 stars">' +
+      '★'.repeat(details.rating) + '☆'.repeat(5 - details.rating) + '</div><p class="review-comment">' +
+      escapeHtml(details.comment) + '</p>' + product + '</article>';
+  }
+
   function ensureStoreFooter() {
     if (page === 'admin' || page === 'admin.html' || $('.site-footer') || !$('#footerNav')) return;
     const footer = document.createElement('footer');
@@ -1177,17 +1226,18 @@
       '<div><i class="ti ti-truck-delivery" aria-hidden="true"></i><span>Quick delivery</span></div>' +
       '<div><i class="ti ti-headset" aria-hidden="true"></i><span>24/7 support</span></div>' +
       '<div><img class="site-footer-benefit-image" src="img/core-img/genuine-product.png" alt="" width="24" height="24" loading="lazy" decoding="async"><span>Genuine products</span></div></div>' +
-      '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2>' + ((page === 'home.html' || page === 'index.html') ? '<div class="site-footer-manual-reviews" aria-label="Facebook customer reviews">' +
+      '<section class="site-footer-reviews" aria-labelledby="footerReviewsTitle"><h2 id="footerReviewsTitle">Customer reviews</h2>' + ((page === 'home.html' || page === 'index.html') ? '<div class="site-footer-manual-reviews" aria-label="Customer reviews">' +
       '<article class="site-footer-manual-review-card" aria-live="polite">' +
-        '<div class="site-footer-stars" aria-label="5 out of 5 stars">★★★★★</div>' +
-        '<p data-manual-review-text></p>' +
-        '<div class="site-footer-manual-review-author"><strong data-manual-review-author></strong><span>Facebook · 5-star review</span></div>' +
+        '<div class="review-identity"><span class="review-avatar" data-review-avatar aria-hidden="true"></span><div class="site-footer-manual-review-author review-author-row"><strong data-manual-review-author></strong><time class="review-date" data-review-date></time></div></div>' +
+        '<div class="site-footer-stars" data-review-stars role="img" aria-label="5 out of 5 stars">★★★★★</div>' +
+        '<p class="review-comment" data-manual-review-text></p>' +
+        '<span class="review-source" data-review-source></span><a class="review-product" data-review-product hidden></a>' +
       '</article>' +
       '<div class="site-footer-manual-review-controls" aria-label="Review navigation">' +
         '<button type="button" data-manual-review-prev aria-label="Previous review">‹</button>' +
         '<span data-manual-review-position aria-live="polite">1 / 3</span>' +
         '<button type="button" data-manual-review-next aria-label="Next review">›</button>' +
-      '</div></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div>') + '</section>' +
+      '</div></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-review-more hidden>Show more reviews</button>') + '</section>' +
       '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
       '<a href="http://facebook.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +
       '<a href="https://www.instagram.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
@@ -1198,7 +1248,7 @@
       '<div class="site-footer-copyright">© ' + new Date().getFullYear() + ' PixelHouse. All rights reserved.</div></div>';
     $('#footerNav').before(footer);
     if (page === 'home.html' || page === 'index.html') {
-      const reviews = [
+      let reviews = [
         { author: 'Ruma Ruma', text: 'Bought my first camera from them. Excellent camera, thanks a lot.' },
         { author: 'Wimaladasa', text: 'Best online store. I bought a headstrap mount from them. Superb quality.' },
         { author: 'Sahan', text: 'I bought a chest strap mount from them. Top product. Thank you, brother. 100% recommended.' },
@@ -1207,53 +1257,126 @@
       const quote = $('[data-manual-review-text]', footer);
       const author = $('[data-manual-review-author]', footer);
       const position = $('[data-manual-review-position]', footer);
+      const avatar = $('[data-review-avatar]', footer);
+      const date = $('[data-review-date]', footer);
+      const stars = $('[data-review-stars]', footer);
+      const source = $('[data-review-source]', footer);
+      const product = $('[data-review-product]', footer);
+      const previous = $('[data-manual-review-prev]', footer);
+      const next = $('[data-manual-review-next]', footer);
       let activeReview = 0;
+      let pagination = { page: 0, pages: 0, total: reviews.length };
+      let busy = false;
+      let customerReviews = false;
+      const updateControls = () => {
+        previous.disabled = busy || activeReview === 0;
+        next.disabled = busy || activeReview >= pagination.total - 1;
+      };
       const showReview = (direction) => {
         const review = reviews[activeReview];
-        quote.textContent = '“' + review.text + '”';
-        author.textContent = review.author;
-        position.textContent = (activeReview + 1) + ' / ' + reviews.length;
+        const details = reviewDetails(review);
+        quote.textContent = '“' + details.comment + '”';
+        author.textContent = details.name;
+        avatar.textContent = details.initials;
+        date.textContent = details.date;
+        if (details.dateTime) date.setAttribute('datetime', details.dateTime);
+        else date.removeAttribute('datetime');
+        date.hidden = !details.date;
+        stars.textContent = '★'.repeat(details.rating) + '☆'.repeat(5 - details.rating);
+        stars.setAttribute('aria-label', details.rating + ' out of 5 stars');
+        source.textContent = customerReviews ? 'Customer review' : 'Facebook review';
+        product.hidden = !review.product_slug;
+        if (review.product_slug) {
+          product.textContent = review.product_name;
+          product.href = 'single-product.html?product=' + encodeURIComponent(review.product_slug);
+        }
+        position.textContent = (activeReview + 1) + ' / ' + pagination.total;
         card.classList.remove('review-enter-left', 'review-enter-right');
         void card.offsetWidth;
         card.classList.add(direction < 0 ? 'review-enter-left' : 'review-enter-right');
+        updateControls();
       };
-      $('[data-manual-review-prev]', footer).addEventListener('click', () => {
-        activeReview = (activeReview - 1 + reviews.length) % reviews.length;
+      const loadReviews = async (pageNumber, reset) => {
+        if (busy) return;
+        busy = true;
+        updateControls();
+        try {
+          const data = await get('/reviews/recent?page=' + pageNumber);
+          if (Array.isArray(data.reviews) && data.reviews.length) {
+            reviews = reset ? data.reviews : reviews.concat(data.reviews);
+            pagination = data.pagination || { page: pageNumber, pages: 1, total: reviews.length };
+            customerReviews = true;
+            activeReview = reset ? 0 : activeReview + 1;
+            showReview(1);
+          }
+        } catch (_) {
+          if (!reset) position.textContent = 'Could not load more. Try again.';
+        } finally {
+          busy = false;
+          updateControls();
+        }
+      };
+      previous.addEventListener('click', () => {
+        if (busy || activeReview === 0) return;
+        activeReview -= 1;
         showReview(-1);
       });
-      $('[data-manual-review-next]', footer).addEventListener('click', () => {
-        activeReview = (activeReview + 1) % reviews.length;
-        showReview(1);
+      next.addEventListener('click', () => {
+        if (busy) return;
+        if (activeReview < reviews.length - 1) {
+          activeReview += 1;
+          showReview(1);
+        } else if (customerReviews && pagination.page < pagination.pages) {
+          loadReviews(pagination.page + 1, false);
+        }
       });
       showReview(1);
+      loadReviews(1, true);
+      document.addEventListener('pixelhouse:review-published', () => loadReviews(1, true));
       return;
     }
-    get('/reviews/recent').then(({ reviews }) => {
-      const list = $('[data-customer-reviews]', footer);
-      if (!list) return;
-      list.innerHTML = reviews && reviews.length ? reviews.map((review) => {
-        const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
-        return '<article class="site-footer-review"><div class="site-footer-stars" aria-label="' + rating + ' out of 5 stars">' + '★'.repeat(rating) + '☆'.repeat(5 - rating) + '</div><p>“' + escapeHtml(review.comment) + '”</p><span>' + escapeHtml(review.username || 'Customer') + ' · ' + escapeHtml(review.product_name) + '</span></article>';
-      }).join('') : '<p class="site-footer-muted">No customer reviews have been published yet.</p>';
-    }).catch(() => {
-      const list = $('[data-customer-reviews]', footer);
-      if (list) list.innerHTML = '<p class="site-footer-muted">Customer reviews are temporarily unavailable.</p>';
-    });
+    const list = $('[data-customer-reviews]', footer);
+    const more = $('[data-review-more]', footer);
+    let currentPage = 0;
+    let loading = false;
+    const loadReviews = async (reset) => {
+      if (loading) return;
+      loading = true;
+      more.disabled = true;
+      let failed = false;
+      try {
+        const data = await get('/reviews/recent?page=' + (reset ? 1 : currentPage + 1));
+        const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+        const markup = reviews.map(footerReviewHTML).join('');
+        if (reset) list.innerHTML = markup || '<p class="site-footer-muted">No customer reviews have been published yet.</p>';
+        else list.insertAdjacentHTML('beforeend', markup);
+        const pagination = data.pagination || { page: 1, pages: 1 };
+        currentPage = pagination.page;
+        more.hidden = pagination.page >= pagination.pages;
+      } catch (_) {
+        failed = true;
+        if (reset) list.innerHTML = '<p class="site-footer-muted">Customer reviews are temporarily unavailable.</p>';
+        more.hidden = false;
+      } finally {
+        loading = false;
+        more.disabled = false;
+        more.textContent = failed ? 'Try again' : 'Show more reviews';
+      }
+    };
+    more.addEventListener('click', () => loadReviews(currentPage === 0));
+    document.addEventListener('pixelhouse:review-published', () => loadReviews(true));
+    loadReviews(true);
   }
 
   async function wireProductReviews() {
     const slug = new URLSearchParams(location.search).get('product') || page.replace('.html', '');
     const form = $('.ratings-submit-form form');
     const list = $('.rating-review-content ul');
-    if (!slug || !form || !list) return;
+    if (!slug || !list) return;
 
     const renderReviews = async () => {
       const { product, reviews } = await get('/products/' + slug);
-      list.innerHTML = reviews.map((review) => (
-        '<li class="single-user-review d-flex"><div class="user-thumbnail"><img src="img/bg-img/9.jpg" alt="Customer reviewer" loading="lazy" decoding="async"></div>' +
-        '<div class="rating-comment"><div class="rating">' + '<i class="ti ti-star-filled"></i>'.repeat(review.rating) +
-        '</div><p class="comment mb-0">' + escapeHtml(review.comment) + '</p><span class="name-date">' +
-        escapeHtml(review.username) + ' · ' + escapeHtml(review.created_at) + '</span></div></li>'      )).join('') || '<li class="single-user-review">No verified reviews yet.</li>';
+      list.innerHTML = reviews.map(productReviewHTML).join('') || '<li class="single-user-review">No customer reviews yet.</li>';
 
       const summary = $('#productRatingSummary') || $('.product-ratings');
       if (summary) {
@@ -1262,17 +1385,20 @@
           const average = Number(product.rating || (reviews.reduce((sum, review) => sum + Number(review.rating), 0) / count));
           summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
             '<div class="ratings">' + '<i class="ti ti-star-filled"></i>'.repeat(Math.round(average)) +
-            '<span class="ps-1">' + count + ' verified review' + (count === 1 ? '' : 's') + '</span></div>' +
-            '<div class="total-result-of-ratings"><span>' + average.toFixed(1) + '</span><span>Verified</span></div></div>';
+            '<span class="ps-1">' + count + ' customer review' + (count === 1 ? '' : 's') + '</span></div>' +
+            '<div class="total-result-of-ratings"><span>' + average.toFixed(1) + '</span><span>Customer rating</span></div></div>';
         } else {
           summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
-            '<div class="ratings"><span>No verified reviews yet</span></div>' +
+            '<div class="ratings"><span>No customer reviews yet</span></div>' +
             '<div class="total-result-of-ratings"><span>New</span></div></div>';
         }
       }
     };
 
-    try { await renderReviews(); } catch (_) {}
+    try { await renderReviews(); } catch (_) {
+      list.innerHTML = '<li class="single-user-review">Customer reviews are temporarily unavailable. Please refresh to try again.</li>';
+    }
+    if (!form) return;
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!requireLogin()) return;
@@ -1287,6 +1413,7 @@
         await post('/products/' + slug + '/reviews', { rating, comment });
         form.reset();
         await renderReviews();
+        document.dispatchEvent(new CustomEvent('pixelhouse:review-published'));
         alertBox(form, 'Your review is now live.', 'success');
       } catch (error) { alertBox(form, error.message, 'danger'); }
     });

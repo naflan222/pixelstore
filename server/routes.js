@@ -348,14 +348,26 @@ router.get('/homepage-sections', async (_req, res) => {
   res.json({ sections });
 });
 
-router.get('/reviews/recent', async (_req, res) => {
-  const reviews = await db.all(`SELECT r.rating, r.comment, r.created_at, u.username, p.name AS product_name
+router.get('/reviews/recent', async (req, res) => {
+  const page = Number(req.query.page || 1);
+  const limit = Number(req.query.limit || 6);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 24)
+    return res.status(400).json({ error: 'Invalid review pagination.' });
+  const count = await db.get(`SELECT COUNT(*) AS total FROM reviews r
+    JOIN products p ON p.id = r.product_id
+    WHERE r.is_visible = 1 AND p.status = 'active'`);
+  const total = Number(count.total);
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(page, pages);
+  const reviews = await db.all(`SELECT r.id, r.rating, r.comment, r.created_at, u.username,
+      p.name AS product_name, p.slug AS product_slug
     FROM reviews r
     JOIN users u ON u.id = r.user_id
     JOIN products p ON p.id = r.product_id
-    WHERE r.is_visible = 1 AND p.status = 'active' AND TRIM(COALESCE(r.comment, '')) <> ''
-    ORDER BY r.created_at DESC, r.id DESC LIMIT 6`);
-  res.json({ reviews });
+    WHERE r.is_visible = 1 AND p.status = 'active'
+    ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?`, limit, (currentPage - 1) * limit);
+  res.set('Cache-Control', 'no-store');
+  res.json({ reviews, pagination: { page: currentPage, pages, total, limit } });
 });
 
 router.get('/products', async (req, res) => {

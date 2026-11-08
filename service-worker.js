@@ -1,6 +1,6 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v13';
+const STATIC_CACHE = 'pixelhouse-static-v14';
 const APP_SHELL = [
   '/',
   '/home.html',

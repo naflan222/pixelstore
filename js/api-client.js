@@ -29,15 +29,16 @@
   function updateStockProgress(container, product) {
     const progressBar = $('.progress-bar', container);
     const progressTitle = $('.progress-title, .mb-1', container);
-    if (!progressBar || !progressTitle || product.stock == null) return;
+    if (!progressBar || product.stock == null) return;
     const stock = Math.max(0, Number(product.stock));
     const stockPercent = Math.min(100, stock);
-    progressTitle.textContent = stock + ' In Stock';
+    if (progressTitle) { progressTitle.textContent = ''; progressTitle.hidden = true; }
     progressBar.style.width = stockPercent + '%';
     progressBar.setAttribute('aria-valuenow', String(stockPercent));
-    progressBar.setAttribute('aria-label', stock + ' items in stock');
-    progressBar.classList.toggle('bg-danger', stock === 0);
-    progressBar.classList.toggle('bg-warning', stock > 0);
+    progressBar.setAttribute('aria-label', 'Product availability');
+    progressBar.setAttribute('aria-valuetext', stock > 0 ? 'In stock' : 'Out of stock');
+    progressBar.classList.remove('bg-danger');
+    progressBar.classList.add('bg-warning');
   }
 
   async function updateFlashSaleStockBars() {
@@ -1102,11 +1103,6 @@
             whatsApp.innerHTML = '<i class="ti ti-brand-whatsapp"></i> Ask when back in stock';
             whatsApp.setAttribute('aria-label', 'Ask PixelHouse when this product is back in stock');
           }
-        } else if (prod.stock != null && prod.stock < 10) {
-          const stockInfo = document.createElement('p');
-          stockInfo.style.cssText = 'color:#f59e0b;font-size:12px;font-weight:600;margin-bottom:8px';
-          stockInfo.innerHTML = '<i class="ti ti-alert-triangle"></i> Only ' + prod.stock + ' left in stock!';
-          cartForm.querySelector('.order-plus-minus').insertAdjacentElement('afterend', stockInfo);
         }
       } catch (_) {}
 

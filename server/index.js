@@ -28,6 +28,7 @@ const adminRoutes = require('./admin-routes');
 const db = require('./database');
 const { createHtmlHandler, createSitemapHandler, canonicalHomepageRedirect } = require('./seo');
 const { rateLimit, securityHeaders } = require('./security');
+const { hideAccidentalStoreReview } = require('./review-cleanup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -196,6 +197,13 @@ app.use((err, req, res, next) => {
 
 async function start(port = PORT) {
   await db.init();
+  try {
+    if (await hideAccidentalStoreReview(db)) console.log('[REVIEWS] Hid the owner-requested accidental store review #2.');
+  } catch (error) {
+    // A one-record cleanup must not take the storefront offline. The helper's
+    // transaction rolls back its writes if any part fails.
+    console.error('[REVIEW CLEANUP]', error.message);
+  }
   const server = await new Promise((resolve) => {
     const listener = app.listen(port, () => resolve(listener));
   });

@@ -69,6 +69,33 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /decoding="async"/);
 });
 
+test('priority product snippets remain distinct with live catalog data', () => {
+  const cases = [
+    { filename: 'hero13.html', title: 'GoPro HERO13 Black Camera in Sri Lanka | Pixel House', amount: 105000 },
+    { filename: '3mstick.html', title: '3M Selfie Stick in Sri Lanka | Price & Details | Pixel House', amount: 8000 },
+  ];
+
+  for (const { filename, title, amount } of cases) {
+    const result = enhanceHtml(read(filename), filename, {
+      slug: filename.replace('.html', ''),
+      name: 'Catalog product name',
+      description: 'Short generic catalog copy.',
+      price: amount,
+      stock: 2,
+      status: 'active',
+      image: 'img/product/hero13.png',
+    });
+    assert.ok(result.includes('<title>' + title.replace(/&/g, '&amp;') + '</title>'));
+    assert.match(result, /<meta name="description" content="Explore the/);
+    assert.doesNotMatch(result, /Short generic catalog copy/);
+    assert.ok(result.includes('"price":"' + amount + '"'));
+    assert.match(result, /"@type":"Product"/);
+    assert.match(result, /rel="canonical"/);
+  }
+  assert.match(read('home.html'), /href="hero13\.html">GoPro HERO13 Black camera/);
+  assert.match(read('catagory.html'), /href="3mstick\.html">3M selfie stick/);
+});
+
 test('product page receives Product and Offer schema without fake ratings', () => {
   const source = read('wpdcase.html');
   const product = extractProduct(source);

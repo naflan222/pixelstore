@@ -122,3 +122,33 @@ Set `MOBILE_PUSH_ENABLED=false` and redeploy to stop the worker immediately; web
 checkout and existing admin notifications continue. Tables are additive and can
 be retained when rolling server code back. No destructive production migration
 or live order is part of automated verification.
+
+## Verification of this implementation
+
+- Full Node suite: 152 tests, 150 passed, zero failed, two existing pg-mem
+  transaction/concurrency skips. The shared CSV test verifies that preview writes
+  nothing before a confirmed import.
+- Disposable real PostgreSQL 16: all 46 API tests passed, including transaction
+  rollback and the last-unit checkout race. The additional mobile delivery suite
+  passed against real PostgreSQL and SQLite, including late/out-of-order commits,
+  retries, token invalidation, role guards, logout revocation and no old-alert
+  replay after queue cleanup.
+- Seven Android JVM tests passed. All four instrumented Android 8 tests passed:
+  authenticated order deep links, non-owner rejection, native admin navigation,
+  and product editing that preserves the existing customer review rating.
+  Instrumented tests inject fixture HTTP responses; they never use live accounts.
+- Debug APK, instrumented-test APK, signed release APK and Android lint built
+  successfully. `apksigner verify` confirms the release signature. The private
+  signing key/password are outside the repository, not in artifacts or source.
+- No storefront HTML/CSS, checkout logic or existing database records were changed
+  by this feature or its tests. No live order, email or Firebase message was sent.
+- Still requires owner input: Firebase Android configuration, hosting secrets,
+  secure signing-key backup and a physical-phone delivery/permission test. The
+  current APK explicitly shows Firebase as unconfigured. Do not claim push delivery
+  is verified merely because a device can register.
+
+The current GitHub integration can push code/workflows but cannot manage Actions
+secrets (403); release asset upload also returned 401. No APK release was publicly
+published. The signed APK is retained as a shared session artifact. The included
+workflow can build a downloadable APK artifact; configuring repeatable signed CI
+releases requires the repository owner to add the signing secrets securely.

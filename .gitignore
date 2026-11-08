@@ -10,3 +10,4 @@ android/local.properties
 android/**/google-services.json
 *.jks
 *.keystore
+android/.kotlin/

@@ -75,7 +75,8 @@ class AdminAppTest {
         launch(order = 301)
         compose.waitUntil(30000) { app.api.signedIn.value }
         compose.waitUntil(30000) { compose.onAllNodesWithText("Order #301").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Update order status").performScrollTo().assertExists()
+        compose.onNode(hasScrollToIndexAction() and hasAnyDescendant(hasText("Order #301"))).performScrollToNode(hasText("Update order status"))
+        compose.onNodeWithText("Update order status").assertExists()
         Assert.assertTrue(writes.isEmpty())
     }
     @Test fun editingProductRetainsItsCustomerReviewRating() {

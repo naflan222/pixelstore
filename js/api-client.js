@@ -202,6 +202,66 @@
       });    });
   }
 
+  // Match only information stated in the catalog. A camera family is not a
+  // guarantee that an accessory fits every model; product details still apply.
+  function cameraFilterMatches(product, values) {
+    const text = [product.brand, product.name, product.description, product.category].join(' ').toLowerCase();
+    const brandText = text.replace(/insta\s+360/g, 'insta360');
+    const brands = { gopro: /\bgopro\b|\bhero\s*\d/, dji: /\bdji\b|\bosmo\b/, insta360: /insta360/ };
+    const compatibility = { hero: /\bgopro\b|\bhero\b/, action: /\bosmo\s+action\b|\bdji\b.*\baction\b|\baction\s*\d/, pocket: /\bpocket\b/, insta360: /insta360/ };
+    const types = { mount: /mount|strap/, stick: /stick|grip|handle|tripod/, power: /batter|charg|power/, case: /case|bag|housing|sleeve/, lens: /filter|lens|glass|protector|anti.fog/, kit: /\bkit\b|\bbundle\b|\d+\s*(?:in|[-–])\s*1/ };
+    return [['brand', brands], ['compatibility', compatibility], ['type', types]].every(([key, patterns]) =>
+      !values[key].length || values[key].some(value => patterns[value] && patterns[value].test(brandText))
+    ) && (values.min === '' || Number(product.price) >= Number(values.min))
+      && (values.max === '' || Number(product.price) <= Number(values.max));
+  }
+
+  function wireCameraFilters(onApply) {
+    const drawer = $('#suhaFilterOffcanvas');
+    if (!drawer || !$('[data-camera-apply]', drawer)) return products => products;
+    const params = new URLSearchParams(location.search);
+    let values = { brand: [], compatibility: [], type: [], min: '', max: '' };
+    for (const key of ['brand', 'compatibility', 'type']) {
+      $$('[data-camera-filter="' + key + '"]', drawer).forEach(input => {
+        input.checked = (params.get('camera_' + key) || '').split(',').includes(input.value);
+      });
+    }
+    for (const key of ['min', 'max']) $('#camera-' + key, drawer).value = params.get('camera_' + key) || '';
+    function read() {
+      const next = { min: $('#camera-min', drawer).value, max: $('#camera-max', drawer).value };
+      for (const key of ['brand', 'compatibility', 'type']) next[key] = $$('[data-camera-filter="' + key + '"]:checked', drawer).map(input => input.value);
+      return next;
+    }
+    values = read();
+    async function apply(reset) {
+      const next = read();
+      const error = $('#camera-filter-error', drawer);
+      const invalid = ['min', 'max'].some(key => next[key] !== '' && (!Number.isFinite(Number(next[key])) || Number(next[key]) < 0))
+        || (next.min !== '' && next.max !== '' && Number(next.min) > Number(next.max));
+      error.hidden = !invalid;
+      if (invalid) { error.textContent = 'Enter a valid price range with Min no higher than Max.'; return; }
+      values = next;
+      const url = new URL(location.href);
+      for (const key of Object.keys(values)) {
+        const value = Array.isArray(values[key]) ? values[key].join(',') : values[key];
+        if (value) url.searchParams.set('camera_' + key, value);
+        else url.searchParams.delete('camera_' + key);
+      }
+      if (page === 'gpproducts2.html') url.searchParams.set('page', '1');
+      else url.searchParams.delete('page');
+      history.replaceState(null, '', url.pathname + url.search);
+      const applied = await onApply();
+      if (applied === false) return;
+      if (!reset && window.bootstrap) bootstrap.Offcanvas.getInstance(drawer)?.hide();
+    }
+    $('[data-camera-apply]', drawer).addEventListener('click', () => apply(false));
+    $('[data-camera-reset]', drawer).addEventListener('click', () => {
+      $$('input', drawer).forEach(input => { input.checked = false; if (input.type === 'number') input.value = ''; });
+      apply(true);
+    });
+    return products => products.filter(product => cameraFilterMatches(product, values));
+  }
+
   async function wireCategoryCatalog() {
     const section = $('[data-catalog-category]');
     if (!section) return;
@@ -235,21 +295,22 @@
     try {
       const params = new URLSearchParams({
         category,
-        page: String(currentPage),
-        limit: String(perPage),
       });
-      const { products, pagination: pageInfo } = await get('/products?' + params.toString());
+      const hasSavedFilters = [...new URLSearchParams(location.search)].some(([key, value]) => key.startsWith('camera_') && value);
+      if (!hasSavedFilters) { params.set('page', String(currentPage)); params.set('limit', String(perPage)); }
+      let { products, pagination: pageInfo } = await get('/products?' + params.toString());
+      if (pageInfo) currentPage = Number(pageInfo.page) || currentPage;
       if (!Array.isArray(products)) {
         grid.innerHTML = fallbackHTML;
         return;
       }
-      currentPage = Number(pageInfo && pageInfo.page) || currentPage;
 
       function pageHref(targetPage) {
         if (category.toLowerCase() === 'gopro accessories') {
-          if (targetPage === 1) return 'catagory.html';
-          if (targetPage === 2) return 'gpproducts2.html';
-          return 'catagory.html?page=' + targetPage;
+          const params = new URLSearchParams(location.search);
+          if (targetPage < 3) params.delete('page');
+          else params.set('page', String(targetPage));
+          return (targetPage === 2 ? 'gpproducts2.html' : 'catagory.html') + (params.size ? '?' + params.toString() : '');
         }
         const params = new URLSearchParams(location.search);
         if (targetPage === 1) params.delete('page');
@@ -257,20 +318,41 @@
         return page + (params.size ? '?' + params.toString() : '');
       }
 
-      const pageCount = Math.max(1, Number(pageInfo && pageInfo.pages) || Math.ceil(products.length / perPage));
-      const visibleProducts = pageInfo ? products : products.slice((currentPage - 1) * perPage, currentPage * perPage);
-      grid.innerHTML = visibleProducts.length
-        ? visibleProducts.map(productCardHTML).join('')
-        : '<div class="col-12"><div class="catalog-empty-state">No products in this category yet. Please check back soon.</div></div>';
-      paginationNav.hidden = pageCount < 2;
-      paginationNav.style.display = pageCount < 2 ? 'none' : '';
-      pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
-        const targetPage = index + 1;
-        const active = targetPage === currentPage;
-        return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
-          pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
-      }).join('');
-      bindProductButtons(grid);
+      const filter = wireCameraFilters(async () => {
+        try {
+          if (pageInfo) {
+            const data = await get('/products?' + new URLSearchParams({ category }));
+            if (!Array.isArray(data.products)) throw new Error('Invalid catalog response');
+            products = data.products;
+            pageInfo = null;
+          }
+          currentPage = 1;
+          render();
+        } catch (_) {
+          const error = $('#camera-filter-error');
+          if (error) { error.hidden = false; error.textContent = 'Could not load filtered products. Please try again.'; }
+          return false;
+        }
+      });
+      function render() {
+        const matches = filter(products);
+        const pageCount = Math.max(1, pageInfo ? Number(pageInfo.pages) : Math.ceil(matches.length / perPage));
+        currentPage = Math.min(currentPage, pageCount);
+        const visibleProducts = pageInfo ? matches : matches.slice((currentPage - 1) * perPage, currentPage * perPage);
+        grid.innerHTML = visibleProducts.length
+          ? visibleProducts.map(productCardHTML).join('')
+          : '<div class="col-12"><div class="catalog-empty-state">No products match these filters. Try clearing filters or choosing another category.</div></div>';
+        paginationNav.hidden = pageCount < 2;
+        paginationNav.style.display = pageCount < 2 ? 'none' : '';
+        pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
+          const targetPage = index + 1;
+          const active = targetPage === currentPage;
+          return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
+            pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
+        }).join('');
+        bindProductButtons(grid);
+      }
+      render();
     } catch (_) {
       // Fall back to the page's existing cards if the catalog API is unavailable.
       grid.innerHTML = fallbackHTML;
@@ -949,6 +1031,8 @@
     'flash-sale.html': async function () { await renderProductGrid({ flash_sale: '1' }); },
 
     'shop-list.html': async function () { await renderProductGrid({}); },
+    'shop-grid.html': async function () { await renderProductGrid({}); },
+    'sub-catagory.html': async function () { await renderProductGrid({}); },
     'products.html': async function () { await wireAllProductsPage(); },
   };
 
@@ -959,9 +1043,15 @@
     try {
       const qs = new URLSearchParams(query).toString();
       const { products } = await get('/products?' + qs);
-      if (!products.length) return;
-      grid2.innerHTML = products.map(productCardHTML).join('');
-      bindProductButtons(grid2);
+      if (!Array.isArray(products)) return;
+      const filter = wireCameraFilters(render);
+      function render() {
+        const matches = filter(products);
+        grid2.innerHTML = matches.length ? matches.map(productCardHTML).join('')
+          : '<div class="col-12"><p role="status">No products match these filters. Try clearing filters.</p></div>';
+        bindProductButtons(grid2);
+      }
+      render();
     } catch (_) {}
   }
 

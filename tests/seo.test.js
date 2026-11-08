@@ -226,11 +226,13 @@ test('service worker installs current assets and refreshes CSS and JavaScript be
   }
 });
 
-test('homepage adventure banner uses the new photo and GoPro category pages omit the filter trigger', () => {
+test('homepage adventure banner uses the new photo and GoPro category pages expose the working camera filters', () => {
   assert.match(read('home.html'), /img\/core-img\/camera-adventure\.webp/);
   for (const filename of ['catagory.html', 'gpproducts2.html']) {
     const source = read(filename);
-    assert.doesNotMatch(source, /class="filter-option[^"]*"/);
+    assert.match(source, /aria-label="Filter products"/);
+    assert.match(source, /data-camera-apply/);
+    assert.doesNotMatch(source, /Zara|Gucci|Xtra Large/);
     assert.match(source, /data-catalog-category="GoPro Accessories"/);
   }
 });

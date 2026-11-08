@@ -34,7 +34,10 @@
       minutes: pad(Math.floor(seconds / 60) % 60), seconds: pad(seconds % 60) };
   }
 
+  const started = new WeakMap();
   function start(document, clock = () => Date.now(), schedule = setInterval) {
+    const existing = started.get(document);
+    if (existing) { existing.tick(); return existing.timer; }
     const selector = '[data-monthly-countdown]';
     if (!document.querySelector(selector)) return null;
     const tick = () => {
@@ -51,7 +54,9 @@
       });
     };
     tick();
-    return schedule(tick, 1000);
+    const timer = schedule(tick, 1000);
+    started.set(document, { tick, timer });
+    return timer;
   }
 
   return { nextDeadline, remainingParts, start };

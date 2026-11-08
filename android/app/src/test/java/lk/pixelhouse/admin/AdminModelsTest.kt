@@ -38,4 +38,23 @@ class AdminModelsTest {
         assertArrayEquals("abc".toByteArray(), readLimited("abc".byteInputStream(), 3))
         assertThrows(IllegalArgumentException::class.java) { readLimited("abcd".byteInputStream(), 3) }
     }
+    @Test fun `settings patch contains only fields that changed`() {
+        val fields = listOf(text("store_name", true), number("shipping_fee"), flag("store_open"))
+        val original = JSONObject().put("store_name", "PixelHouse").put("shipping_fee", 250).put("store_open", true)
+        val patch = settingsChanges(fields, mapOf("store_name" to "PixelHouse", "shipping_fee" to "450.50", "store_open" to "true"), original)
+        assertEquals(1, patch.length())
+        assertEquals(450.5, patch.getDouble("shipping_fee"), 0.001)
+        assertEquals(0, settingsChanges(fields, mapOf("store_name" to "PixelHouse", "shipping_fee" to "250.00", "store_open" to "true"), original).length())
+    }
+    @Test fun `timestamps are displayed in Sri Lanka for both database formats`() {
+        assertEquals(serverInstant("2026-11-08 18:30:00"), serverInstant("2026-11-08T18:30:00+00"))
+        assertEquals("9 Nov 2026, 12:00 AM", displayTime("2026-11-08 18:30:00"))
+        assertEquals("Not available", displayTime("bad"))
+    }
+    @Test fun `daily chart fills zero sales dates between actual sales`() {
+        val points = dailyPoints(org.json.JSONArray("[{\"date\":\"2026-11-02\",\"revenue\":1200,\"orders\":1}]"), "2026-11-01", "2026-11-03")
+        assertEquals(3, points.size)
+        assertEquals(0.0, points[0].sales, 0.0)
+        assertEquals(1200.0, points[1].sales, 0.0)
+    }
 }

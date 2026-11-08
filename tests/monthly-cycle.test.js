@@ -34,3 +34,18 @@ test('timer renders immediately and renews after a suspended tab crosses the dea
   assert.ok(Object.values(values).some(value => value.textContent !== '00'));
   assert.deepEqual(remainingParts(90061000, 0), { days: '01', hours: '01', minutes: '01', seconds: '01' });
 });
+
+test('replacing homepage cards refreshes countdowns without starting duplicate intervals', () => {
+  let schedules = 0, ticks = 0;
+  const element = { getAttribute: () => '2026-11-08T00:00:00Z', querySelector: () => ({ set textContent(_value) { ticks++; } }), setAttribute() {} };
+  let elements = [element];
+  const document = { querySelector: () => elements[0], querySelectorAll: () => elements };
+  const clock = () => Date.parse('2026-11-09T00:00:00Z');
+  const schedule = () => { schedules++; return 42; };
+  assert.equal(start(document, clock, schedule), 42);
+  elements = [element, element];
+  const before = ticks;
+  assert.equal(start(document, clock, schedule), 42);
+  assert.equal(schedules, 1);
+  assert.equal(ticks - before, 8);
+});

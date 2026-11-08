@@ -176,15 +176,25 @@ suspend fun shareDocument(context: android.content.Context, bytes: ByteArray, na
     val sections = data.optJSONObject("sections") ?: return
     val products = data.optJSONArray("products")?.objects().orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { sections.keys().forEach { key ->
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(label(key), style = MaterialTheme.typography.titleMedium); Text("${sections.optJSONArray(key)?.length() ?: 0} selected products"); TextButton(onClick = { editing = key }) { Text("Choose and order products") } } }
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(friendlyHomeSections[key] ?: label(key), style = MaterialTheme.typography.titleMedium); Text("${sections.optJSONArray(key)?.length() ?: 0} selected products"); TextButton(onClick = { editing = key }) { Text("Choose and order products") } } }
     } }
     editing?.let { key ->
+        var search by remember(key) { mutableStateOf("") }
+        val busy by vm.loading.collectAsStateWithLifecycle()
         val selected = remember(key) { mutableStateListOf<Long>().apply { val a = sections.optJSONArray(key) ?: JSONArray(); for (i in 0 until a.length()) add(a.optLong(i)) } }
-        AlertDialog(onDismissRequest = { editing = null }, title = { Text(label(key)) }, text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+        AlertDialog(onDismissRequest = { editing = null }, title = { Text(friendlyHomeSections[key] ?: label(key)) }, text = { Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("Selected order controls the website display. Choose 1–24 active products.")
-            selected.toList().forEachIndexed { index, id -> Row { Text("${index + 1}. ${products.firstOrNull { it.optLong("id") == id }?.display("name") ?: id}", Modifier.weight(1f)); TextButton(enabled = index > 0, onClick = { java.util.Collections.swap(selected, index, index - 1) }) { Text("↑") } } }
-            products.filter { it.display("status") == "active" }.forEach { product -> val id = product.optLong("id"); Row { Checkbox(id in selected, { checked -> if (checked && selected.size < 24) selected.add(id) else if (!checked) selected.remove(id) }); Text(product.display("name"), Modifier.padding(top = 12.dp)) } }
-        } }, confirmButton = { TextButton(enabled = selected.size in 1..24, onClick = { vm.mutate("/api/admin/homepage-sections/$key", "PUT", JSONObject().put("product_ids", JSONArray(selected.toList()))) { editing = null } }) { Text("Save selection") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } })
+            OutlinedTextField(search, { search = it }, label = { Text("Search products") }, modifier = Modifier.fillMaxWidth())
+            Text("${selected.size} of 24 selected", style = MaterialTheme.typography.titleSmall)
+            selected.toList().forEachIndexed { index, id ->
+                val product = products.firstOrNull { it.optLong("id") == id }
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { Column(Modifier.padding(8.dp)) {
+                    Row { ProductImage(product?.display("image").orEmpty(), Modifier.size(44.dp)); Text("${index + 1}. ${product?.display("name") ?: id}", Modifier.weight(1f).padding(start = 8.dp)) }
+                    Row { TextButton(enabled = !busy && index > 0, onClick = { java.util.Collections.swap(selected, index, index - 1) }) { Text("Up") }; TextButton(enabled = !busy && index < selected.lastIndex, onClick = { java.util.Collections.swap(selected, index, index + 1) }) { Text("Down") }; TextButton(enabled = !busy, onClick = { selected.remove(id) }) { Text("Remove") } }
+                } }
+            }
+            products.filter { it.display("status") == "active" && it.display("name").contains(search, true) }.forEach { product -> val id = product.optLong("id"); Row { Checkbox(id in selected, { checked -> if (checked && selected.size < 24) selected.add(id) else if (!checked) selected.remove(id) }); ProductImage(product.display("image"), Modifier.size(48.dp)); Text(product.display("name"), Modifier.padding(top = 12.dp)) } }
+        } }, confirmButton = { TextButton(enabled = !busy && selected.size in 1..24, onClick = { vm.saveHomeSection(key, selected.toList()) { editing = null } }) { Text("Save selection") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } })
     }
 }
 

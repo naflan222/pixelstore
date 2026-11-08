@@ -338,6 +338,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 const HOME_PRODUCT_SECTIONS = ['featured_gear', 'top_products', 'weekly_best_sellers', 'featured_products'];
 
 router.get('/homepage-sections', async (_req, res) => {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
   const rows = await db.all(`SELECT h.section_key, p.*
     FROM homepage_section_products h
     JOIN products p ON p.id = h.product_id
@@ -345,7 +346,8 @@ router.get('/homepage-sections', async (_req, res) => {
     ORDER BY h.section_key, h.sort_order, p.name`);
   const sections = Object.fromEntries(HOME_PRODUCT_SECTIONS.map((key) => [key, []]));
   rows.forEach((row) => { if (sections[row.section_key]) sections[row.section_key].push(row); });
-  res.json({ sections });
+  const configured = await db.all('SELECT DISTINCT section_key FROM homepage_section_products');
+  res.json({ sections, configured_sections: configured.map(row => row.section_key) });
 });
 
 router.get('/reviews/recent', async (req, res) => {

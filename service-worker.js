@@ -1,14 +1,14 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v16';
+const STATIC_CACHE = 'pixelhouse-static-v17';
 const APP_SHELL = [
   '/',
   '/home.html',
   '/products.html',
   '/offline.html',
   '/style.css?v=20261104.1',
-  '/js/api-client.js?v=20261108.2',
-  '/js/monthly-cycle.js?v=20261108.1',
+  '/js/api-client.js?v=20261109.1',
+  '/js/monthly-cycle.js?v=20261109.1',
   '/img/core-img/logo-mark-hd.png',
   '/img/core-img/pixelhouse-header-wordmark.png',
   '/img/core-img/pixelhouse-footer-logo.jpg',

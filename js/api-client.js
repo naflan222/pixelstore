@@ -1229,6 +1229,8 @@
       liveProduct = result.product;
       if (liveProduct) trackEcommerce('view_item', ga4SingleItemPayload(liveProduct));
       if (isDynamicProduct && liveProduct) {
+        const salePanel = $('.flash-sale-panel');
+        if (salePanel && !Number(liveProduct.flash_sale)) salePanel.hidden = true;
         const title = $('.p-title-price h5');
         const price = $('.p-title-price .sale-price');
         const description = $('.p-specification .container p');
@@ -1240,8 +1242,8 @@
           const carousel = window.jQuery ? window.jQuery(slides) : null;
           if (carousel && carousel.data('owl.carousel')) carousel.owlCarousel('destroy');
           const gallery = Array.from(new Set([
-            liveProduct.image,
-            ...(Array.isArray(liveProduct.images) ? liveProduct.images : []),
+            liveProduct.zoom_image || liveProduct.image,
+            ...(Array.isArray(liveProduct.images) ? liveProduct.images : []).filter(image => !liveProduct.zoom_image || image !== liveProduct.image),
           ].filter((image) => typeof image === 'string' && image.trim())));
           slides.innerHTML = gallery.map((image) =>
             '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" src="' +

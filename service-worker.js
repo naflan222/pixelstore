@@ -1,6 +1,6 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v18';
+const STATIC_CACHE = 'pixelhouse-static-v19';
 const APP_SHELL = [
   '/',
   '/home.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   '/style.css?v=20261104.1',
   '/js/api-client.js?v=20261109.2',
   '/js/monthly-cycle.js?v=20261109.2',
+  '/img/product/camping-20261109/manual-camping-tent-3-4-people.webp',
   '/img/core-img/logo-mark-hd.png',
   '/img/core-img/pixelhouse-header-wordmark.png',
   '/img/core-img/pixelhouse-footer-logo.jpg',

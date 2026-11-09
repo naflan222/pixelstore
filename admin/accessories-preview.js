@@ -1,6 +1,7 @@
 (function () {
   'use strict';
-  const endpoint = '/api/admin/catalog-batches/accessories-20261109';
+  const batch = document.body.dataset.catalogBatch || 'accessories-20261109';
+  const endpoint = '/api/admin/catalog-batches/' + encodeURIComponent(batch);
   const message = document.getElementById('message');
   const apply = document.getElementById('apply');
   const rollback = document.getElementById('rollback');

@@ -1143,6 +1143,7 @@ async function defineSuite(t, ctx) {
     await ctx.db.run("DELETE FROM categories WHERE slug = 'tx-keep'");
   });
   await require('./accessory-batch-suite').accessorySuite(t, ctx, owner, guest);
+  await require('./camping-batch-suite').campingSuite(t, ctx, owner, guest);
 }
 
 module.exports = { defineSuite };

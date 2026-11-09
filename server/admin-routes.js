@@ -481,19 +481,21 @@ router.delete('/categories/:id', catalogAccess, async (req, res) => {
   res.json({ ok: true, reassigned: count });
 });
 
-/* Approved, reviewable one-time accessory catalog batch. No startup writes. */
-router.get('/catalog-batches/accessories-20261109', ownerOnly, async (req, res) => {
-  const batch = require('./accessory-batch');
-  const previous = await batch.state(db);
-  res.set('Cache-Control', 'no-store');
-  res.json({ batch: batch.BATCH, products: batch.products, state: previous?.action || 'not_applied' });
-});
-for (const [action, method] of [['apply', 'apply'], ['rollback', 'rollback']]) {
-  router.post(`/catalog-batches/accessories-20261109/${action}`, ownerOnly, async (req, res) => {
-    if (req.body?.confirm !== true) return res.status(400).json({ error: 'Review the products and confirm this action.' });
-    try { res.json({ ok: true, ...await require('./accessory-batch')[method](db, req.user.id) }); }
-    catch (error) { if (error.status === 409) return res.status(409).json({ error: error.message }); throw error; }
+/* Approved, reviewable catalog batches. No startup writes. */
+for (const batch of [require('./accessory-batch'), require('./camping-batch')]) {
+  const endpoint = `/catalog-batches/${batch.BATCH}`;
+  router.get(endpoint, ownerOnly, async (req, res) => {
+    const previous = await batch.state(db);
+    res.set('Cache-Control', 'no-store');
+    res.json({ batch: batch.BATCH, products: batch.products, state: previous?.action || 'not_applied' });
   });
+  for (const action of ['apply', 'rollback']) {
+    router.post(`${endpoint}/${action}`, ownerOnly, async (req, res) => {
+      if (req.body?.confirm !== true) return res.status(400).json({ error: 'Review the products and confirm this action.' });
+      try { res.json({ ok: true, ...await batch[action](db, req.user.id) }); }
+      catch (error) { if (error.status === 409) return res.status(409).json({ error: error.message }); throw error; }
+    });
+  }
 }
 
 /* ---------------- SETTINGS ---------------- */

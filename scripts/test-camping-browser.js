@@ -1,0 +1,21 @@
+// Mobile Chromium regression. Uses a disposable local database and fixture owner.
+const assert=require('node:assert/strict');const {freshSqlitePath}=require('../tests/helpers');
+Object.assign(process.env,{DB_ENGINE:'sqlite',SQLITE_DB_PATH:freshSqlitePath(),NODE_ENV:'test',SEED_DEMO_DATA:'true'});delete process.env.DATABASE_URL;
+const {start}=require('../server');const db=require('../server/database');const batch=require('../server/camping-batch');
+(async()=>{const {server,port}=await start(0);const base=`http://127.0.0.1:${port}`;const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+try{const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await context.request.post(base+'/api/auth/login',{data:{username:'demo',password:'demo1234'}});
+ await page.goto(base+'/admin/camping-preview.html');await page.locator('.product').nth(12).waitFor();assert.equal(await page.locator('.product').count(),13);assert.equal(await page.locator('#apply').isDisabled(),true);
+ assert.ok(!(await page.locator('#products').innerText()).match(/naturehike/i));assert.equal((await db.all("SELECT id FROM products WHERE sku LIKE 'PH-CAMP-20261109-%'")).length,0);
+ await page.locator('#confirmed').check();await page.getByRole('button',{name:'Add 13 out-of-stock camping products'}).click();await page.getByText('Added. The products are available',{exact:false}).waitFor();
+ await page.goto(base+'/');const category=page.locator('.catagory-card a').filter({hasText:'Camping Accessories'});assert.equal(await category.count(),1);await category.click();
+ await page.waitForFunction(()=>document.querySelector('#allProductsCount')?.textContent==='13 products');
+ assert.ok((await page.locator('#allProductsGrid').innerText()).includes('Out of Stock'));assert.equal(await page.locator('#allProductsGrid [data-cart-id]').count(),0);
+ const last=page.getByRole('button',{name:'Page 2',exact:true});await last.click();await page.locator('#allProductsGrid .product-title').filter({hasText:'Headlamp'}).waitFor();
+ await page.goto(base+'/');const search=page.locator('.search-form input[type="search"]').first();await search.fill('headlamp');await page.locator('.search-suggestions a').filter({hasText:'Headlamp'}).click();
+ await page.locator('.p-title-price h5').filter({hasText:'Rechargeable LED Headlamp'}).waitFor();assert.match(await page.locator('.p-title-price .sale-price').innerText(),/4,500/);
+ assert.equal(await page.locator('.cart-form button[type="submit"]').innerText(),'Out of Stock');assert.equal(await page.locator('.flash-sale-panel').isVisible(),false);assert.ok((await page.locator('.dynamic-product-image').first().getAttribute('src')).endsWith('-large.webp'));
+ const p=batch.products[0];const row=await db.get('SELECT id FROM products WHERE sku = ?',p.sku);assert.equal((await context.request.post(base+'/api/cart',{data:{product_id:row.id,quantity:1}})).status(),400);
+ const records=await (await context.request.get(base+'/api/admin/products?search=Headlamp')).json();assert.ok(records.products.some(p=>p.sku==='PH-CAMP-20261109-01'));
+ assert.deepEqual(errors,[]);console.log('PASS: owner review, 13 approved generic products, camping navigation/filter/pagination, search suggestions, prices, zoom, zero-stock purchase blocking, normal admin visibility.');
+}finally{await browser.close();await new Promise(r=>server.close(r));await db.close();}})().catch(e=>{console.error(e);process.exitCode=1});

@@ -419,6 +419,9 @@ router.get('/products/:slug', async (req, res) => {
   const images = await db.all(`SELECT image_data FROM product_images
     WHERE product_id = ? AND image_data IS NOT NULL AND image_data <> ''
     ORDER BY is_primary DESC, sort_order, id LIMIT 8`, product.id);
+  const large = product.image?.replace(/\.webp$/, '-large.webp');
+  const zoom = large && large !== product.image && images.find(image => image.image_data === large);
+  if (zoom) product.zoom_image = zoom.image_data;
   product.images = [...new Set([
     product.image,
     ...images.map((image) => image.image_data),

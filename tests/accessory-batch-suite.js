@@ -19,6 +19,8 @@ async function accessorySuite(t, ctx, owner, guest) {
     assert.deepEqual(Object.fromEntries(preview.data.products.map(p => [p.number,p.price])), approved);
     assert.ok(preview.data.products.every(p => p.stock === 0 && p.brand === '' && !/telesin/i.test(p.name+p.description)));
     assert.equal((await ctx.db.all('SELECT * FROM products')).length, original.length);
+    const legacy = original.find(p => p.status === 'active' && !p.image.endsWith('.webp'));
+    if (legacy) assert.equal((await guest.get('/api/products/'+legacy.slug)).data.product.zoom_image, undefined);
   });
   await t.test('accessory import refuses collisions without partial writes', async () => {
     const last = batch.products.at(-1);

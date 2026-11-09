@@ -207,6 +207,10 @@ app.use((err, req, res, next) => {
 async function start(port = PORT) {
   await db.init();
   try {
+    const updated = await require('./product-presentation').cleanStoredDescriptions(db);
+    if (updated) console.log(`[CATALOG] Cleaned product descriptions: ${updated}.`);
+  } catch (error) { console.error('[CATALOG COPY] Cleanup unavailable; storefront continues:', error.message); }
+  try {
     if (await hideAccidentalStoreReview(db)) console.log('[REVIEWS] Hid the owner-requested accidental store review #2.');
   } catch (error) {
     // A one-record cleanup must not take the storefront offline. The helper's

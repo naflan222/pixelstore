@@ -1144,6 +1144,7 @@ async function defineSuite(t, ctx) {
   });
   await require('./accessory-batch-suite').accessorySuite(t, ctx, owner, guest);
   await require('./camping-batch-suite').campingSuite(t, ctx, owner, guest);
+  await require('./product-presentation-suite').presentationSuite(t, ctx);
 }
 
 module.exports = { defineSuite };

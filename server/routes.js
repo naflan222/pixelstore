@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const db = require('./database');
+const { withImageSources } = require('./product-presentation');
 const { createSession, destroySession, requireAuth } = require('./auth');
 const { emailEnabled, describeConfig, sendOtpEmail, sendOrderConfirmationEmail } = require('./mailer');
 const { createAdminNotification } = require('./admin-notifications');
@@ -345,7 +346,7 @@ router.get('/homepage-sections', async (_req, res) => {
     WHERE p.status = 'active'
     ORDER BY h.section_key, h.sort_order, p.name`);
   const sections = Object.fromEntries(HOME_PRODUCT_SECTIONS.map((key) => [key, []]));
-  rows.forEach((row) => { if (sections[row.section_key]) sections[row.section_key].push(row); });
+  rows.forEach((row) => { if (sections[row.section_key]) sections[row.section_key].push(withImageSources(row)); });
   const configured = await db.all('SELECT DISTINCT section_key FROM homepage_section_products');
   res.json({ sections, configured_sections: configured.map(row => row.section_key) });
 });
@@ -407,21 +408,23 @@ router.get('/products', async (req, res) => {
     const page = Math.min(requestedPage, pages);
     sql += ' LIMIT ? OFFSET ?';
     const products = await db.all(sql, ...params, limit, (page - 1) * limit);
-    return res.json({ products, pagination: { page, limit, total, pages } });
+    return res.json({ products: products.map(withImageSources), pagination: { page, limit, total, pages } });
   }
 
-  res.json({ products: await db.all(sql, ...params) });
+  res.json({ products: (await db.all(sql, ...params)).map(withImageSources) });
 });
 
 router.get('/products/:slug', async (req, res) => {
   const product = await db.get("SELECT * FROM products WHERE slug = ? AND status = 'active'", req.params.slug);
   if (!product) return res.status(404).json({ error: 'Product not found' });
+  withImageSources(product);
   const images = await db.all(`SELECT image_data FROM product_images
     WHERE product_id = ? AND image_data IS NOT NULL AND image_data <> ''
     ORDER BY is_primary DESC, sort_order, id LIMIT 8`, product.id);
   const large = product.image?.replace(/\.webp$/, '-large.webp');
   const zoom = large && large !== product.image && images.find(image => image.image_data === large);
   if (zoom) product.zoom_image = zoom.image_data;
+  else if (product.image_sources?.length) product.zoom_image = product.image_sources.at(-1).src;
   product.images = [...new Set([
     product.image,
     ...images.map((image) => image.image_data),
@@ -432,7 +435,7 @@ router.get('/products/:slug', async (req, res) => {
     SELECT r.rating, r.comment, r.created_at, u.username
     FROM reviews r JOIN users u ON u.id = r.user_id
     WHERE r.product_id = ? AND r.is_visible = 1 ORDER BY r.id DESC`, product.id);
-  res.json({ product, related, reviews });
+  res.json({ product, related: related.map(withImageSources), reviews });
 });
 
 /* ---------------- PROMOTIONS / COUPONS ---------------- */

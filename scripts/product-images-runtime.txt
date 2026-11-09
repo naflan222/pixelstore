@@ -1,0 +1,35 @@
+function localPath(value) {
+  try { const url=new URL(value,root.location.href); return url.origin===root.location.origin?url.pathname.replace(/^\//,''):''; } catch (_) { return ''; }
+}
+function sources(value) { return variants[localPath(value)] || []; }
+function updateImage(img) {
+  const list=sources(img.getAttribute('src')||'');
+  if(!list.length)return;
+  const set=list.map(item=>item.src+' '+item.width+'w').join(', ');
+  if(img.getAttribute('srcset')!==set)img.setAttribute('srcset',set);
+  const width=Math.ceil(img.getBoundingClientRect().width);
+  // Actual rendered width avoids changing layout and selects an appropriate DPR source.
+  const sizes=width>0?width+'px':'(max-width: 600px) 50vw, 300px';
+  if(img.getAttribute('sizes')!==sizes)img.setAttribute('sizes',sizes);
+}
+function scan(node) {
+  if(!node||node.nodeType!==1&&node.nodeType!==9)return;
+  if(node.matches?.('img'))updateImage(node);
+  node.querySelectorAll?.('img').forEach(updateImage);
+  const slides=[];
+  if(node.matches?.('.product-slides .single-product-slide'))slides.push(node);
+  node.querySelectorAll?.('.product-slides .single-product-slide').forEach(el=>slides.push(el));
+  slides.forEach(slide=>{
+    const raw=slide.style.backgroundImage;const match=raw&&raw.match(/url\(["']?([^"')]+)["']?\)/);const list=match&&sources(match[1]);
+    if(list?.length)slide.style.backgroundImage='url("'+list.at(-1).src+'")';
+  });
+}
+function start() {
+ scan(root.document);
+ let pending=false;
+ const schedule=()=>{if(pending)return;pending=true;root.requestAnimationFrame(()=>{pending=false;scan(root.document);});};
+ new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')scan(record.target);else record.addedNodes.forEach(scan);}}).observe(root.document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+ root.addEventListener('resize',schedule);root.addEventListener('load',schedule,{once:true});
+}
+root.PixelHouseProductImages={sources,scan};
+if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start);else start();

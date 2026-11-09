@@ -20,7 +20,7 @@ async function accessorySuite(t, ctx, owner, guest) {
     assert.ok(preview.data.products.every(p => p.stock === 0 && p.brand === '' && !/telesin/i.test(p.name+p.description)));
     assert.equal((await ctx.db.all('SELECT * FROM products')).length, original.length);
     const legacy = original.find(p => p.status === 'active' && !p.image.endsWith('.webp'));
-    if (legacy) assert.equal((await guest.get('/api/products/'+legacy.slug)).data.product.zoom_image, undefined);
+    if (legacy) { const detail=(await guest.get('/api/products/'+legacy.slug)).data.product; assert.equal(detail.image,legacy.image); assert.ok(detail.zoom_image.endsWith('-1024.webp')); }
   });
   await t.test('accessory import refuses collisions without partial writes', async () => {
     const last = batch.products.at(-1);

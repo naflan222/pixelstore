@@ -9,19 +9,19 @@ const DEFAULT_IMAGE = `${SITE_URL}/img/icons/icon-512x512.png`;
 
 const PAGE_META = {
   'home.html': {
-    title: 'PixelHouse | GoPro, DJI & Insta360 Cameras in Sri Lanka',
-    description: 'Shop GoPro, DJI Osmo and Insta360 cameras and accessories at PixelHouse, Dikwella. Check current prices, mounts, batteries and cases, or explore GoPro rentals.',
-    heading: 'Action Cameras and Accessories in Sri Lanka',
+    title: 'Cameras in Sri Lanka | GoPro, DJI & Insta360 | PixelHouse',
+    description: 'Shop GoPro, DJI Osmo and Insta360 cameras in Sri Lanka at PixelHouse. Browse action cameras, prices and compatible accessories with nationwide delivery.',
+    heading: 'Cameras and GoPro Accessories in Sri Lanka',
   },
   'products.html': {
-    title: 'Camera & Action Camera Accessories | Pixel House',
-    description: 'Browse action cameras, mounts, batteries, protective cases, selfie sticks and camera accessories available from Pixel House Sri Lanka.',
-    heading: 'All Camera and Action Camera Products',
+    title: 'Cameras & Accessories in Sri Lanka | PixelHouse',
+    description: 'Shop cameras, GoPro accessories, selfie sticks, mounts, batteries and camping essentials at PixelHouse Sri Lanka. Browse current prices and stock online.',
+    heading: 'Cameras, Accessories and Camping Gear in Sri Lanka',
   },
   'catagory.html': {
-    title: 'GoPro Accessories in Sri Lanka | Pixel House',
-    description: 'Shop GoPro mounts, cases, batteries, chargers, selfie sticks and underwater accessories from Pixel House Sri Lanka.',
-    heading: 'GoPro Accessories',
+    title: 'GoPro Accessories Sri Lanka | PixelHouse',
+    description: 'Find GoPro accessories in Sri Lanka: selfie sticks, camera mounts, waterproof cases and charging gear. Check prices and availability at PixelHouse.',
+    heading: 'GoPro Accessories in Sri Lanka',
   },
   'gpproducts2.html': {
     title: 'More GoPro Accessories | Pixel House Sri Lanka',
@@ -29,9 +29,9 @@ const PAGE_META = {
     heading: 'More GoPro Accessories',
   },
   'actioncamera.html': {
-    title: 'Action Cameras in Sri Lanka | Pixel House',
-    description: 'Browse GoPro and other action cameras available from Pixel House with delivery and support in Sri Lanka.',
-    heading: 'Action Cameras in Sri Lanka',
+    title: 'GoPro & Action Cameras in Sri Lanka | PixelHouse',
+    description: 'Compare GoPro and other action cameras online at PixelHouse Sri Lanka. View current prices, product details and availability before ordering.',
+    heading: 'GoPro and Action Cameras in Sri Lanka',
   },
   'insta360-camera.html': {
     title: 'Insta360 Cameras in Sri Lanka | Pixel House',

@@ -57,9 +57,9 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   const source = read('home.html');
   const result = enhanceHtml(source, 'home.html');
 
-  assert.match(result, /<title>PixelHouse \| GoPro, DJI &amp; Insta360 Cameras in Sri Lanka<\/title>/);
+  assert.match(result, /<title>Cameras in Sri Lanka \| GoPro, DJI &amp; Insta360 \| PixelHouse<\/title>/);
   assert.match(result, /<link rel="canonical" href="https:\/\/pixelhouse\.lk\/">/);
-  assert.match(result, /<h1 class="visually-hidden">Action Cameras and Accessories in Sri Lanka<\/h1>/);
+  assert.match(result, /<h1 class="visually-hidden">Cameras and GoPro Accessories in Sri Lanka<\/h1>/);
   assert.match(result, /"@type":"ElectronicsStore"/);
   assert.match(result, /"@type":"WebSite"/);
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
@@ -67,6 +67,22 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.equal(stylesheetHref(result), stylesheetHref(source), 'SEO must preserve the page stylesheet, including its cache version');
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
+});
+
+test('keyword targets stay focused on relevant camera and accessory pages', () => {
+  const cases = [
+    ['products.html', 'Cameras &amp; Accessories in Sri Lanka | PixelHouse', 'Shop cameras, GoPro accessories, selfie sticks'],
+    ['catagory.html', 'GoPro Accessories Sri Lanka | PixelHouse', 'Find GoPro accessories in Sri Lanka'],
+    ['actioncamera.html', 'GoPro &amp; Action Cameras in Sri Lanka | PixelHouse', 'Compare GoPro and other action cameras'],
+  ];
+
+  for (const [filename, title, description] of cases) {
+    const result = enhanceHtml(read(filename), filename);
+    assert.ok(result.includes('<title>' + title + '</title>'), filename + ': correct SEO title');
+    assert.ok(result.includes('content="' + description), filename + ': focused description');
+    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk/' + filename + '"'), filename + ': canonical');
+    assert.doesNotMatch(result, /Canon cameras|Action Pro cameras/i, filename + ': must not claim unverified inventory');
+  }
 });
 
 test('priority product snippets remain distinct with live catalog data', () => {

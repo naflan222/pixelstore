@@ -87,14 +87,17 @@ test('keyword targets stay focused on relevant camera and accessory pages', () =
 
 test('GoPro and DJI accessory categories explain the products and keep crawlable links', () => {
   const cases = [
-    ['gpproducts2.html', 'GoPro Mounts, Chargers &amp; Accessories Sri Lanka | PixelHouse', 'More GoPro Accessories in Sri Lanka', 'catagory.html', 'domeport.html'],
-    ['osmocat.html', 'DJI Osmo Action Accessories Sri Lanka | PixelHouse', 'DJI Osmo Action Accessories in Sri Lanka', 'dji-osmo-camera.html', 'osmocap.html'],
+    ['catagory.html', 'GoPro Accessories Sri Lanka | PixelHouse', 'GoPro Accessories in Sri Lanka', 'products.html?category=GoPro%20Accessories', 'helmetstrap.html'],
+    ['gpproducts2.html', 'GoPro Mounts, Chargers &amp; Accessories Sri Lanka | PixelHouse', 'GoPro Accessories in Sri Lanka', 'products.html?category=GoPro%20Accessories', 'domeport.html'],
+    ['osmocat.html', 'DJI Osmo Action Accessories Sri Lanka | PixelHouse', 'DJI Osmo Action Accessories in Sri Lanka', 'products.html?category=Osmo%20Accessories', 'osmocap.html'],
   ];
   for (const [filename, title, heading, related, product] of cases) {
     const source = read(filename);
     const result = enhanceHtml(source, filename);
     assert.ok(result.includes('<title>' + title + '</title>'), filename + ': SEO title');
-    assert.ok(result.includes('<h1 class="h5 mb-2">' + heading + '</h1>'), filename + ': visible category heading');
+    assert.ok(result.includes('<h1 class="h5 mb-2" id="accessory-guide-title">' + heading + '</h1>'), filename + ': visible category heading');
+    assert.ok(source.indexOf('data-category-guide') > source.indexOf('</nav>'), filename + ': guide follows product pagination');
+    assert.doesNotMatch(source, /Need a camera instead|Looking for other options|More GoPro Accessories in Sri Lanka/);
     assert.equal((result.match(/<h1\b/g) || []).length, 1, filename + ': one main heading');
     assert.ok(result.includes('href="' + related + '"'), filename + ': related category');
     assert.ok(result.includes('href="' + product + '"'), filename + ': product link');

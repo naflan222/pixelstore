@@ -169,6 +169,65 @@ test('dynamic catalog product pages receive their own canonical and metadata', a
   }
 });
 
+test('all-products HTML contains crawlable catalog cards before client JavaScript runs', async () => {
+  const catalog = Array.from({ length: 13 }, (_, index) => ({
+    id: index + 1,
+    slug: 'gopro-mount-' + (index + 1),
+    name: 'GoPro Mount ' + (index + 1),
+    description: 'Adjustable GoPro camera mount',
+    category: 'GoPro Accessories',
+    price: 1400 + index,
+    stock: index === 0 ? 0 : 4,
+    image: 'img/product/1.webp',
+  }));
+  catalog.push({
+    id: 14,
+    slug: 'camping-lantern',
+    name: 'Camping <Lantern>',
+    description: 'Rechargeable LED light for camping',
+    category: 'Camping Accessories',
+    price: 2200,
+    stock: 2,
+    image: 'javascript:alert(1)',
+  });
+
+  const app = express();
+  app.get('/products.html', createHtmlHandler({
+    rootDir: root,
+    catalogList: async () => catalog,
+  }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(base + '/products.html');
+    const html = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(html, /<title>Cameras &amp; Accessories in Sri Lanka \| PixelHouse<\/title>/);
+    assert.match(html, /id="allProductsCount"[^>]*>14 products<\/span>/);
+    assert.match(html, /href="single-product\.html\?product=gopro-mount-1"/);
+    assert.match(html, /GoPro Mount 1/);
+    assert.match(html, /Rs\. 1,400\.00/);
+    assert.match(html, /Out of Stock/);
+    assert.equal((html.match(/class="product-title"/g) || []).length, 12);
+    assert.match(html, /href="products\.html\?page=2"/);
+    assert.match(html, /js\/api-client\.js/);
+
+    const nextPage = await (await fetch(base + '/products.html?page=2')).text();
+    assert.match(nextPage, /GoPro Mount 13/);
+    assert.match(nextPage, /Camping &lt;Lantern&gt;/);
+    assert.doesNotMatch(nextPage, /src="javascript:/);
+
+    const filtered = await (await fetch(base + '/products.html?category=Camping%20Accessories')).text();
+    assert.match(filtered, /Camping &lt;Lantern&gt;/);
+    assert.doesNotMatch(filtered, /class="product-title"[^>]*>GoPro Mount/);
+    assert.match(filtered, /id="allProductsCount"[^>]*>1 product<\/span>/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test('legacy dynamic URLs for products with static pages redirect to the clean canonical URL', async () => {
   const app = express();
   app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, createHtmlHandler({

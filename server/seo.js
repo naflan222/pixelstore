@@ -476,7 +476,96 @@ function staticProductFilenameForSlug(rootDir, slug) {
   return filename;
 }
 
-function createHtmlHandler({ rootDir, productLookup = null }) {
+// Render a useful first catalog page in the HTML response. The browser-side
+// catalog script still hydrates search, filters, pagination and cart controls.
+// This ensures crawlers (and customers without JavaScript) see real products.
+function catalogPageHref(page, category, search) {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (search) params.set('q', search);
+  if (page > 1) params.set('page', String(page));
+  const suffix = params.toString();
+  return 'products.html' + (suffix ? '?' + suffix : '');
+}
+
+function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
+  if (!Array.isArray(catalogProducts)) return html;
+  const products = catalogProducts.filter((product) =>
+    product && typeof product.slug === 'string' && product.slug && product.name);
+  const category = typeof query.category === 'string' ? query.category : '';
+  const search = typeof query.q === 'string' ? query.q.trim() : '';
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = products.filter((product) =>
+    (!category || product.category === category) &&
+    words.every((word) => (String(product.name) + ' ' + String(product.description || '')).toLowerCase().includes(word)));
+
+  const perPage = 12;
+  const pageCount = Math.max(1, Math.ceil(matches.length / perPage));
+  const requested = Number(query.page);
+  const page = Number.isSafeInteger(requested) && requested > 0
+    ? Math.min(requested, pageCount) : 1;
+  const visible = matches.slice((page - 1) * perPage, page * perPage);
+
+  const cards = visible.map((product) => {
+    const staticFilename = staticProductFilenameForSlug(rootDir, product.slug);
+    const href = escapeHtml(staticFilename || ('single-product.html?product=' + encodeURIComponent(product.slug)));
+    const name = escapeHtml(product.name);
+    const image = String(product.image || '');
+    // Never inline large database image data (or unsupported URL schemes).
+    const safeImage = /^(?:\/?img\/|https?:\/\/)/i.test(image) && image.length < 1024
+      ? image : 'img/icons/icon-512x512.png';
+    const numericPrice = Number(product.price);
+    const price = product.price != null && Number.isFinite(numericPrice)
+      ? 'Rs. ' + numericPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : 'Contact for price';
+    const outOfStock = product.stock != null && Number(product.stock) <= 0;
+    const stockBadge = outOfStock
+      ? '<span class="badge rounded-pill badge-danger" style="position:absolute;top:8px;left:8px;">Out of Stock</span>'
+      : '';
+    return '<div class="col-6 col-md-4">' +
+      '<div class="card product-card catalog-product-card" style="position:relative"><div class="card-body">' +
+        stockBadge +
+        '<a class="product-thumbnail d-block" href="' + href + '"><img class="mb-2" src="' + escapeHtml(safeImage) +
+          '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
+        '<a class="product-title" href="' + href + '">' + name + '</a>' +
+        '<p class="sale-price">' + price + '</p>' +
+      '</div></div></div>';
+  }).join('');
+
+  const categories = [...new Set(products.map((product) => product.category).filter(Boolean))].sort();
+  const categoryLinks = ['<a class="btn btn-sm ' + (!category ? 'btn-primary' : 'btn-outline-primary') +
+    '" href="' + escapeHtml(catalogPageHref(1, '', search)) + '">All</a>'];
+  for (const name of categories) {
+    categoryLinks.push('<a class="btn btn-sm ' + (category === name ? 'btn-primary' : 'btn-outline-primary') +
+      '" href="' + escapeHtml(catalogPageHref(1, name, search)) + '">' + escapeHtml(name) + '</a>');
+  }
+  const pageLinks = [];
+  if (pageCount > 1) {
+    for (let number = 1; number <= pageCount; number += 1) {
+      pageLinks.push('<li class="page-item ' + (number === page ? 'active' : '') + '">' +
+        '<a class="page-link" href="' + escapeHtml(catalogPageHref(number, category, search)) +
+        '" aria-label="Page ' + number + '"' + (number === page ? ' aria-current="page"' : '') +
+        '>' + number + '</a></li>');
+    }
+  }
+
+  return html
+    .replace('<div class="row g-2" id="allProductsGrid"></div>',
+      '<div class="row g-2" id="allProductsGrid">' + cards + '</div>')
+    .replace('<span class="text-muted small" id="allProductsCount" aria-live="polite"></span>',
+      '<span class="text-muted small" id="allProductsCount" aria-live="polite">' + matches.length +
+        ' product' + (matches.length === 1 ? '' : 's') + '</span>')
+    .replace('<div class="d-flex flex-wrap gap-2 mb-3" id="allProductsCategories" aria-label="Product categories"></div>',
+      '<div class="d-flex flex-wrap gap-2 mb-3" id="allProductsCategories" aria-label="Product categories">' +
+        categoryLinks.join('') + '</div>')
+    .replace('<ul class="pagination pagination-sm mb-0" id="allProductsPagination"></ul>',
+      '<ul class="pagination pagination-sm mb-0" id="allProductsPagination">' + pageLinks.join('') + '</ul>')
+    .replace('<p class="text-center text-muted py-4 mb-0 d-none" id="allProductsEmpty">',
+      '<p class="text-center text-muted py-4 mb-0' + (matches.length ? ' d-none' : '') +
+        '" id="allProductsEmpty">');
+}
+
+function createHtmlHandler({ rootDir, productLookup = null, catalogList = null }) {
   return async function serveSeoHtml(req, res, next) {
     const filename = req.path === '/' ? 'home.html' : path.basename(req.path);
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(filename)) return next();
@@ -503,8 +592,13 @@ function createHtmlHandler({ rootDir, productLookup = null }) {
       const canonicalOverride = dynamicSlug && catalogProduct
         ? `${SITE_URL}/single-product.html?product=${encodeURIComponent(dynamicSlug)}`
         : null;
+      // Product cards must be present before client JavaScript runs. The
+      // interactive catalog script replaces this snapshot after its API call.
+      const pageHtml = filename === 'products.html' && catalogList
+        ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir)
+        : html;
       res.set('Cache-Control', 'public, max-age=0, must-revalidate');
-      res.type('html').send(enhanceHtml(html, filename, catalogProduct, canonicalOverride));
+      res.type('html').send(enhanceHtml(pageHtml, filename, catalogProduct, canonicalOverride));
     } catch (error) {
       next(error);
     }

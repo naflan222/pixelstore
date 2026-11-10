@@ -168,6 +168,11 @@ const publicRoot = path.join(__dirname, '..');
 const seoHtmlHandler = createHtmlHandler({
   rootDir: publicRoot,
   productLookup: (slug) => db.get("SELECT name, description, price, image, stock, status, sku, brand, mpn, gtin, slug FROM products WHERE slug = ? AND status = 'active'", slug),
+  // A lightweight catalog snapshot renders in the first HTML response, while
+  // the client script continues handling interactive filters and checkout.
+  catalogList: () => db.all(`SELECT id, slug, name, description, category, price, old_price, stock,
+    CASE WHEN length(image) < 1024 THEN image ELSE NULL END AS image
+    FROM products WHERE status = 'active' ORDER BY id DESC`),
 });
 const legacyStorefrontRedirects = new Map([
   ['/featured-products.html', '/products.html'],

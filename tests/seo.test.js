@@ -85,6 +85,26 @@ test('keyword targets stay focused on relevant camera and accessory pages', () =
   }
 });
 
+test('GoPro and DJI accessory categories explain the products and keep crawlable links', () => {
+  const cases = [
+    ['gpproducts2.html', 'GoPro Mounts, Chargers &amp; Accessories Sri Lanka | PixelHouse', 'More GoPro Accessories in Sri Lanka', 'catagory.html', 'domeport.html'],
+    ['osmocat.html', 'DJI Osmo Action Accessories Sri Lanka | PixelHouse', 'DJI Osmo Action Accessories in Sri Lanka', 'dji-osmo-camera.html', 'osmocap.html'],
+  ];
+  for (const [filename, title, heading, related, product] of cases) {
+    const source = read(filename);
+    const result = enhanceHtml(source, filename);
+    assert.ok(result.includes('<title>' + title + '</title>'), filename + ': SEO title');
+    assert.ok(result.includes('<h1 class="h5 mb-2">' + heading + '</h1>'), filename + ': visible category heading');
+    assert.equal((result.match(/<h1\b/g) || []).length, 1, filename + ': one main heading');
+    assert.ok(result.includes('href="' + related + '"'), filename + ': related category');
+    assert.ok(result.includes('href="' + product + '"'), filename + ': product link');
+    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk/' + filename + '"'), filename + ': canonical');
+    assert.ok(result.includes('data-catalog-category='), filename + ': existing catalog remains functional');
+    assert.equal(stylesheetHref(result), stylesheetHref(source), filename + ': design stylesheet unchanged');
+  }
+  assert.match(read('osmocat.html'), /href="osmocat\.html" aria-current="page">1<\/a>/);
+});
+
 test('priority product snippets remain distinct with live catalog data', () => {
   const cases = [
     { filename: 'hero13.html', title: 'GoPro HERO13 Black Camera in Sri Lanka | Pixel House', amount: 105000 },

@@ -24,9 +24,9 @@ const PAGE_META = {
     heading: 'GoPro Accessories in Sri Lanka',
   },
   'gpproducts2.html': {
-    title: 'More GoPro Accessories | Pixel House Sri Lanka',
-    description: 'Discover more GoPro accessories, mounts and protective equipment available from Pixel House Sri Lanka.',
-    heading: 'More GoPro Accessories',
+    title: 'GoPro Mounts, Chargers & Accessories Sri Lanka | PixelHouse',
+    description: 'Find more GoPro accessories in Sri Lanka, including chargers, mounts, selfie sticks, protective glass and anti-fog inserts. Shop at PixelHouse.',
+    heading: 'More GoPro Accessories in Sri Lanka',
   },
   'actioncamera.html': {
     title: 'GoPro & Action Cameras in Sri Lanka | PixelHouse',
@@ -49,9 +49,9 @@ const PAGE_META = {
     heading: 'Insta360 Accessories',
   },
   'osmocat.html': {
-    title: 'DJI Osmo Accessories in Sri Lanka | Pixel House',
-    description: 'Shop cases, caps, mounts and accessories for DJI Osmo cameras from Pixel House Sri Lanka.',
-    heading: 'DJI Osmo Accessories',
+    title: 'DJI Osmo Action Accessories Sri Lanka | PixelHouse',
+    description: 'Shop DJI Osmo Action accessories in Sri Lanka at PixelHouse. Browse lens covers and storage bags, with model compatibility, current prices and availability.',
+    heading: 'DJI Osmo Action Accessories in Sri Lanka',
   },
   'rental-services.html': {
     title: 'GoPro Camera Rental in Dikwella | Pixel House',

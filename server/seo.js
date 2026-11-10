@@ -26,7 +26,7 @@ const PAGE_META = {
   'gpproducts2.html': {
     title: 'GoPro Mounts, Chargers & Accessories Sri Lanka | PixelHouse',
     description: 'Find more GoPro accessories in Sri Lanka, including chargers, mounts, selfie sticks, protective glass and anti-fog inserts. Shop at PixelHouse.',
-    heading: 'More GoPro Accessories in Sri Lanka',
+    heading: 'GoPro Accessories in Sri Lanka',
   },
   'actioncamera.html': {
     title: 'GoPro & Action Cameras in Sri Lanka | PixelHouse',

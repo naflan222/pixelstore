@@ -1482,7 +1482,7 @@
         '<button type="button" data-manual-review-prev aria-label="Previous review">‹</button>' +
         '<span data-manual-review-position aria-live="polite">1 / 3</span>' +
         '<button type="button" data-manual-review-next aria-label="Next review">›</button>' +
-      '</div></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-review-more hidden>Show more reviews</button>') + '</section>' +
+      '</div></div><div class="site-footer-desktop-reviews"><div class="site-footer-desktop-review-list"></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-desktop-review-more hidden>Show more reviews</button></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-review-more hidden>Show more reviews</button>') + '</section>' +
       '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
       '<a href="http://facebook.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +
       '<a href="https://www.instagram.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
@@ -1509,6 +1509,9 @@
       const product = $('[data-review-product]', footer);
       const previous = $('[data-manual-review-prev]', footer);
       const next = $('[data-manual-review-next]', footer);
+      const desktopList = $('.site-footer-desktop-review-list', footer);
+      const desktopMore = $('[data-desktop-review-more]', footer);
+      let desktopFailed = false;
       let activeReview = 0;
       let pagination = { page: 0, pages: 0, total: reviews.length };
       let busy = false;
@@ -1516,6 +1519,7 @@
       const updateControls = () => {
         previous.disabled = busy || activeReview === 0;
         next.disabled = busy || activeReview >= pagination.total - 1;
+        if (desktopMore) { desktopMore.disabled = busy; desktopMore.hidden = !customerReviews || pagination.page >= pagination.pages; desktopMore.textContent = busy ? 'Loading reviews…' : desktopFailed ? 'Retry loading reviews' : 'Show more reviews'; }
       };
       const showReview = (direction) => {
         const review = reviews[activeReview];
@@ -1539,10 +1543,12 @@
         card.classList.remove('review-enter-left', 'review-enter-right');
         void card.offsetWidth;
         card.classList.add(direction < 0 ? 'review-enter-left' : 'review-enter-right');
+        if (desktopList) desktopList.innerHTML = reviews.map(review => footerReviewHTML(review).replace('</article>', '<span class="review-source">' + (customerReviews ? 'Customer review' : 'Facebook review') + '</span></article>')).join('');
         updateControls();
       };
-      const loadReviews = async (pageNumber, reset) => {
+      const loadReviews = async (pageNumber, reset, advance = true) => {
         if (busy) return;
+        desktopFailed = false;
         busy = true;
         updateControls();
         try {
@@ -1551,11 +1557,11 @@
             reviews = reset ? data.reviews : reviews.concat(data.reviews);
             pagination = data.pagination || { page: pageNumber, pages: 1, total: reviews.length };
             customerReviews = true;
-            activeReview = reset ? 0 : activeReview + 1;
+            activeReview = reset ? 0 : advance ? activeReview + 1 : activeReview;
             showReview(1);
           }
         } catch (_) {
-          if (!reset) position.textContent = 'Could not load more. Try again.';
+          if (!reset) { position.textContent = 'Could not load more. Try again.'; desktopFailed = true; }
         } finally {
           busy = false;
           updateControls();
@@ -1574,6 +1580,9 @@
         } else if (customerReviews && pagination.page < pagination.pages) {
           loadReviews(pagination.page + 1, false);
         }
+      });
+      if (desktopMore) desktopMore.addEventListener('click', () => {
+        if (!busy && pagination.page < pagination.pages) loadReviews(pagination.page + 1, false, false);
       });
       showReview(1);
       loadReviews(1, true);

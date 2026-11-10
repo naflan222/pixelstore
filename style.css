@@ -6329,3 +6329,49 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
 @media (prefers-reduced-motion: reduce) {
   .site-footer-manual-review-card.review-enter-left, .site-footer-manual-review-card.review-enter-right { animation: none; }
 }
+
+/* Responsive desktop storefront. Mobile layout rules above remain unchanged. */
+.site-footer-desktop-reviews { display: none; }
+@media (min-width: 768px) {
+  .storefront-layout .container {
+    width: calc(100% - 32px);
+    max-width: 1120px;
+  }
+  .storefront-layout .catagory-card { height: 100%; }
+  .storefront-layout .catagory-card .card-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 116px;
+  }
+  .storefront-layout .catagory-card a { width: 100%; }
+  .storefront-layout .catagory-card img {
+    width: 48px;
+    height: 48px;
+    max-height: 48px;
+    object-fit: contain;
+  }
+  .storefront-layout .catagory-card span { min-height: 2.4em; }
+  .storefront-layout .product-card { height: 100%; }
+  .storefront-layout .product-slide-wrapper {
+    width: calc(100% - 32px);
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+  .storefront-layout .product-slides { margin-bottom: 0; }
+  .storefront-layout .dynamic-product-slide {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .storefront-layout .dynamic-product-image { min-width: 0; min-height: 0; }
+  .storefront-layout .product-title-meta-data::after { display: none; }
+  footer.site-footer-home .site-footer-manual-reviews { display: none; }
+  footer.site-footer-home .site-footer-desktop-reviews { display: block; }
+  .site-footer-desktop-review-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: .75rem;
+  }
+  .site-footer-desktop-review-list .site-footer-review { height: 100%; }
+}

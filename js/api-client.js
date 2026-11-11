@@ -121,7 +121,7 @@
 
   function productRatingHTML(product) {
     const count = Math.max(0, Math.floor(Number(product.rating_count) || 0));
-    if (!count) return '<div class="product-rating text-muted">No reviews yet</div>';
+    if (!count) return '<div class="product-rating" hidden></div>';
     const average = Math.max(0, Math.min(5, Number(product.rating) || 0)).toFixed(1);
     const label = count + ' review' + (count === 1 ? '' : 's');
     return '<div class="product-rating" aria-label="' + average + ' out of 5 stars, ' + label + '">' +
@@ -183,13 +183,13 @@
     const stockBadge = outOfStock ? '<span class="badge rounded-pill badge-danger" style="position:absolute;top:8px;left:8px;">Out of Stock</span>' : '';
     const rating = productRatingHTML(p);
     const addBtn = outOfStock
-      ? '<a class="btn btn-secondary btn-sm disabled" href="#" style="opacity:.5;pointer-events:none;cursor:not-allowed"><i class="ti ti-x"></i></a>'
-      : '<a class="btn btn-success btn-sm" href="#" data-cart-id="' + p.id + '"><i class="ti ti-plus"></i></a>';
+      ? '<button class="btn btn-secondary btn-sm product-cart-button" type="button" disabled>Out of Stock</button>'
+      : '<button class="btn btn-success btn-sm product-cart-button" type="button" data-cart-id="' + p.id + '">Add to Cart</button>';
     return (
       '<div class="col-6 col-md-4">' +
         '<div class="card product-card catalog-product-card" style="position:relative">' +
           '<div class="card-body">' +
-            badge + stockBadge +
+            (outOfStock ? stockBadge : badge) +
             '<a class="product-thumbnail d-block" href="' + productUrl + '"><img class="mb-2" src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
             '<a class="product-title" href="' + productUrl + '">' + name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
@@ -211,8 +211,8 @@
         try {
           const result = await post('/cart', { product_id: Number(el.dataset.cartId) });
           trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
-          el.innerHTML = '<i class="ti ti-check"></i>';
-          setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          el.innerHTML = el.classList.contains('product-cart-button') ? 'Added to Cart' : '<i class="ti ti-check"></i>';
+          setTimeout(() => { el.innerHTML = el.classList.contains('product-cart-button') ? 'Add to Cart' : '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
         } catch (err) { alert(err.message); }
       });
@@ -226,8 +226,8 @@
         try {
           const result = await post('/cart/by-slug', { slug: el.dataset.cartSlug });
           trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
-          el.innerHTML = '<i class="ti ti-check"></i>';
-          setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          el.innerHTML = el.classList.contains('product-cart-button') ? 'Added to Cart' : '<i class="ti ti-check"></i>';
+          setTimeout(() => { el.innerHTML = el.classList.contains('product-cart-button') ? 'Add to Cart' : '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
         } catch (err) { alert(err.message); }
       });
@@ -237,7 +237,9 @@
     // Only match buttons that contain a ti-plus icon to avoid catching other btn-primary buttons.
     $$('.product-card .btn-primary:not([data-cart-id]):not([data-cart-slug])', root).forEach((el) => {
       if (el.dataset.cartBound) return;
-      if (!el.querySelector('.ti-plus')) return; // only "+" buttons
+      if (!el.querySelector('.ti-plus')) return; // only cart buttons
+      el.classList.add('product-cart-button');
+      el.textContent = 'Add to Cart';
       el.dataset.cartBound = '1';
       el.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -250,8 +252,8 @@
         try {
           const result = await post('/cart/by-slug', { slug });
           trackEcommerce('add_to_cart', ga4SingleItemPayload(result.product));
-          el.innerHTML = '<i class="ti ti-check"></i>';
-          setTimeout(() => { el.innerHTML = '<i class="ti ti-plus"></i>'; }, 1500);
+          el.innerHTML = el.classList.contains('product-cart-button') ? 'Added to Cart' : '<i class="ti ti-check"></i>';
+          setTimeout(() => { el.innerHTML = el.classList.contains('product-cart-button') ? 'Add to Cart' : '<i class="ti ti-plus"></i>'; }, 1500);
           refreshCartBadge();
         } catch (err) { alert(err.message); }
       });    });
@@ -1367,7 +1369,7 @@
       const description = '<div class="product-description"><a class="product-title d-block" href="' + url + '">' + escapeHtml(product.name) + '</a><p class="sale-price">' + money(product.price) + (product.old_price ? '<span>' + money(product.old_price) + '</span>' : '') + '</p></div>';
       return '<div class="' + (featured ? 'col-4' : 'col-12') + '"><div class="card ' + (featured ? 'featured-product-card' : 'horizontal-product-card') + '"><div class="' + (featured ? 'card-body' : 'd-flex align-items-center') + '">' + (featured ? '<span class="badge badge-warning custom-badge"><i class="ti ti-star-filled"></i></span>' : '') + image + description + '</div></div></div>';
     }
-    let markup = productCardHTML(product).replace(' catalog-product-card', '').replace('btn btn-success btn-sm', 'btn btn-primary btn-sm');
+    let markup = productCardHTML(product).replace(' catalog-product-card', '');
     const badge = String(product.badge || '').toLowerCase();
     markup = markup.replace('badge rounded-pill badge-warning', 'badge rounded-pill ' + (badge === 'new' ? 'badge-success' : /^-\d+%$/.test(badge) ? 'badge-danger' : 'badge-warning'));
     if (Number(product.flash_sale) === 1) {
@@ -1631,11 +1633,14 @@
 
     const renderReviews = async () => {
       const { product, reviews } = await get('/products/' + slug);
-      list.innerHTML = reviews.map(productReviewHTML).join('') || '<li class="single-user-review">No customer reviews yet.</li>';
+      list.innerHTML = reviews.map(productReviewHTML).join('');
+      const reviewSection = $('.rating-and-review-wrapper');
+      if (reviewSection) reviewSection.hidden = reviews.length === 0;
 
       const summary = $('#productRatingSummary') || $('.product-ratings');
       if (summary) {
         const count = reviews.length;
+        summary.hidden = count === 0;
         if (count) {
           const average = Number(product.rating || (reviews.reduce((sum, review) => sum + Number(review.rating), 0) / count));
           summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
@@ -1643,9 +1648,7 @@
             '<span class="ps-1">' + count + ' customer review' + (count === 1 ? '' : 's') + '</span></div>' +
             '<div class="total-result-of-ratings"><span>' + average.toFixed(1) + '</span><span>Customer rating</span></div></div>';
         } else {
-          summary.innerHTML = '<div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">' +
-            '<div class="ratings"><span>No customer reviews yet</span></div>' +
-            '<div class="total-result-of-ratings"><span>New</span></div></div>';
+          summary.innerHTML = '';
         }
       }
     };

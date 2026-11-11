@@ -68,11 +68,12 @@ test('periodic/focus/tab notifications refresh counts while failed requests pres
   assert.equal(h.rating.outerHTML, previous);
 });
 
-test('zero reviews remain honest and non-home pages do not start polling', async () => {
+test('zero reviews are hidden and non-home pages do not start polling', async () => {
   const h = harness('/products.html');
   h.api.startHomepageRatingSync();
   await h.api.refreshHomepageRatings();
   assert.equal(h.requests.length, 0);
-  assert.match(h.api.productRatingHTML({ rating: 5, rating_count: 0 }), /No reviews yet/);
+  assert.match(h.api.productRatingHTML({ rating: 5, rating_count: 0 }), /hidden/);
+  assert.doesNotMatch(h.api.productRatingHTML({ rating: 5, rating_count: 0 }), /No reviews|star-filled/);
   assert.match(h.api.productRatingHTML({ rating: 5, rating_count: 12 }), /12 reviews/);
 });

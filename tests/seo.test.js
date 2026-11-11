@@ -162,7 +162,8 @@ test('product page receives Product and Offer schema without fake ratings', () =
   assert.doesNotMatch(result, /aggregateRating/);
   assert.doesNotMatch(source, /Very good product\.|4 ratings|100% Good Reviews/);
   assert.doesNotMatch(result, /Very good product\.|4 ratings|Flash sale end in/);
-  assert.match(result, /No verified reviews yet/);
+  assert.match(result, /id="productRatingSummary" hidden/);
+  assert.doesNotMatch(result, /No verified reviews yet/);
 });
 
 test('dynamic catalog product pages receive their own canonical and metadata', async () => {

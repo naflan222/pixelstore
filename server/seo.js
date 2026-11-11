@@ -436,18 +436,13 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     output = output.replace(
       /<!-- Ratings-->[\s\S]*?<!-- Flash Sale Panel-->/i,
       `<!-- Ratings-->
-          <div class="product-ratings" id="productRatingSummary">
-            <div class="container d-flex align-items-center justify-content-between rtl-flex-d-row-r">
-              <div class="ratings"><span>No verified reviews yet</span></div>
-              <div class="total-result-of-ratings"><span>New</span></div>
-            </div>
-          </div>
+          <div class="product-ratings" id="productRatingSummary" hidden></div>
         </div>
         <!-- Flash Sale Panel-->`
     );
     output = output.replace(
       /(<div class="rating-review-content">\s*<ul[^>]*>)[\s\S]*?(<\/ul>)/i,
-      '$1<li class="single-user-review">No verified reviews yet.</li>$2'
+      '$1$2'
     );
     output = output.replace(
       /<div class="sales-end">[\s\S]*?<\/div>\s*<!-- Sales Volume-->/i,

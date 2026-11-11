@@ -6410,3 +6410,15 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
   border-color: #008a45;
 }
 .product-card .product-cart-button:not(:disabled):hover { background-color: #006f38; border-color: #006f38; }
+
+/* Homepage cards share each row's height, including cards with customer ratings. */
+[data-home-products="top_products"] > [class*="col-"] { display: flex; }
+[data-home-products="top_products"] .product-card { width: 100%; height: 100%; }
+[data-home-products="top_products"] .product-card .card-body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+[data-home-products="top_products"] .product-cart-button { margin-top: auto; }
+[data-home-products="top_products"] .sale-price,
+[data-home-products="top_products"] .product-rating:not([hidden]) { margin-bottom: .75rem; }

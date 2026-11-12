@@ -1,0 +1,10 @@
+/* Guide-only readability; existing storefront layouts are unaffected. */
+.buying-guide p, .buying-guide li { color: #454545; }
+.buying-guide .table { color: #454545; }
+[theme-color=dark] .buying-guide p,
+[theme-color=dark] .buying-guide li,
+[theme-color=dark] .buying-guide .table { color: #deddea; }
+.buying-guide .table { table-layout: fixed; width: 100%; font-size: .875rem; }
+.buying-guide .table th:first-child { width: 28%; }
+.buying-guide th, .buying-guide td { vertical-align: top; }
+.buying-guide .table th, .buying-guide .table td { color: inherit; }

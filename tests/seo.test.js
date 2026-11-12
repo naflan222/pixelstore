@@ -58,7 +58,7 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   const source = read('home.html');
   const result = enhanceHtml(source, 'home.html');
 
-  assert.match(result, /<title>Cameras in Sri Lanka \| GoPro, DJI &amp; Insta360 \| PixelHouse<\/title>/);
+  assert.match(result, /<title>GoPro Cameras, Accessories &amp; Camping Gear Sri Lanka \| PixelHouse<\/title>/);
   assert.match(result, /<link rel="canonical" href="https:\/\/pixelhouse\.lk\/">/);
   assert.match(result, /<h1 class="visually-hidden">Cameras and GoPro Accessories in Sri Lanka<\/h1>/);
   assert.match(result, /"@type":"ElectronicsStore"/);
@@ -73,8 +73,8 @@ test('homepage receives SEO metadata without removing storefront content', () =>
 test('keyword targets stay focused on relevant camera and accessory pages', () => {
   const cases = [
     ['products.html', 'Cameras &amp; Accessories in Sri Lanka | PixelHouse', 'Shop cameras, GoPro accessories, selfie sticks'],
-    ['catagory.html', 'GoPro Accessories Sri Lanka | PixelHouse', 'Find GoPro accessories in Sri Lanka'],
-    ['actioncamera.html', 'GoPro &amp; Action Cameras in Sri Lanka | PixelHouse', 'Compare GoPro and other action cameras'],
+    ['catagory.html', 'GoPro Accessories in Sri Lanka | PixelHouse', 'Browse GoPro-compatible mounts'],
+    ['actioncamera.html', 'GoPro Cameras in Sri Lanka | Price &amp; Details | PixelHouse', 'Explore GoPro cameras at PixelHouse'],
   ];
 
   for (const [filename, title, description] of cases) {
@@ -88,7 +88,7 @@ test('keyword targets stay focused on relevant camera and accessory pages', () =
 
 test('GoPro and DJI accessory categories explain the products and keep crawlable links', () => {
   const cases = [
-    ['catagory.html', 'GoPro Accessories Sri Lanka | PixelHouse', 'GoPro Accessories in Sri Lanka', 'products.html?category=GoPro%20Accessories', 'helmetstrap.html'],
+    ['catagory.html', 'GoPro Accessories in Sri Lanka | PixelHouse', 'GoPro Accessories in Sri Lanka', 'products.html?category=GoPro%20Accessories', 'helmetstrap.html'],
     ['gpproducts2.html', 'GoPro Mounts, Chargers &amp; Accessories Sri Lanka | PixelHouse', 'GoPro Accessories in Sri Lanka', 'products.html?category=GoPro%20Accessories', 'domeport.html'],
     ['osmocat.html', 'DJI Osmo Action Accessories Sri Lanka | PixelHouse', 'DJI Osmo Action Accessories in Sri Lanka', 'products.html?category=Osmo%20Accessories', 'osmocap.html'],
   ];
@@ -111,7 +111,7 @@ test('GoPro and DJI accessory categories explain the products and keep crawlable
 
 test('priority product snippets remain distinct with live catalog data', () => {
   const cases = [
-    { filename: 'hero13.html', title: 'GoPro HERO13 Black Camera in Sri Lanka | Pixel House', amount: 105000 },
+    { filename: 'hero13.html', title: 'GoPro HERO13 Black Sri Lanka | Price & Package | PixelHouse', amount: 105000 },
     { filename: '3mstick.html', title: '3M Selfie Stick in Sri Lanka | Price & Details | Pixel House', amount: 8000 },
   ];
 
@@ -126,8 +126,8 @@ test('priority product snippets remain distinct with live catalog data', () => {
       image: 'img/product/hero13.png',
     });
     assert.ok(result.includes('<title>' + title.replace(/&/g, '&amp;') + '</title>'));
-    assert.match(result, /<meta name="description" content="Explore the/);
-    assert.doesNotMatch(result, /Short generic catalog copy/);
+    assert.match(result, /<meta name="description" content="(?:Explore the|View the)/);
+    assert.match(result, /<p data-catalog-description>Short generic catalog copy/);
     assert.ok(result.includes('"price":"' + amount + '"'));
     assert.match(result, /"@type":"Product"/);
     assert.match(result, /rel="canonical"/);

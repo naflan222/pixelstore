@@ -81,6 +81,7 @@
   "admin/camping-preview.html": "/admin/camping-preview",
   "admin/accessories-preview.html": "/admin/accessories-preview"
 };
+  Object.assign(FILE_PATHS, {"guide-choosing-action-camera-sri-lanka.html": "/guides/choosing-action-camera-sri-lanka", "guide-selfie-stick-comparison.html": "/guides/selfie-stick-comparison", "guide-rent-or-buy-gopro.html": "/guides/rent-or-buy-gopro", "guide-gopro-mounts.html": "/guides/gopro-mounts", "guide-gopro-water-accessories.html": "/guides/gopro-water-accessories", "guides.html": "/guides"});
   const ROUTE_FILES={};for(const [file,url]of Object.entries(FILE_PATHS)){if(!url.includes('?')&&(!ROUTE_FILES[url]||['home.html','products.html'].includes(file)))ROUTE_FILES[url]=file;}
   function cleanHref(value,productPaths={},origin='https://pixelhouse.lk',current='/'){
     if(typeof value!=='string'||!value)return value;

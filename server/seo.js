@@ -6,14 +6,17 @@ const { FILE_PATHS, ROUTE_FILES } = require('./storefront-urls');
 const { cleanHref } = require('../js/storefront-routes');
 const { productPath } = require('./product-urls');
 
+const GUIDE_PAGES = require('./guide-pages.json');
+const { applyBuyingCopy } = require('./buying-copy');
+
 const SITE_URL = 'https://pixelhouse.lk';
 const GA4_MEASUREMENT_ID = 'G-JJWCEW1DGE';
 const DEFAULT_IMAGE = `${SITE_URL}/img/icons/icon-512x512.png`;
 
 const PAGE_META = {
   'home.html': {
-    title: 'Cameras in Sri Lanka | GoPro, DJI & Insta360 | PixelHouse',
-    description: 'Shop GoPro, DJI Osmo and Insta360 cameras in Sri Lanka at PixelHouse. Browse action cameras, prices and compatible accessories with nationwide delivery.',
+    title: "GoPro Cameras, Accessories & Camping Gear Sri Lanka | PixelHouse",
+    description: "Browse GoPro cameras, compatible mounts, selfie sticks and camping accessories at PixelHouse Sri Lanka. Check current prices, availability and GoPro rental options.",
     heading: 'Cameras and GoPro Accessories in Sri Lanka',
   },
   'products.html': {
@@ -22,8 +25,8 @@ const PAGE_META = {
     heading: 'Cameras, Accessories and Camping Gear in Sri Lanka',
   },
   'catagory.html': {
-    title: 'GoPro Accessories Sri Lanka | PixelHouse',
-    description: 'Find GoPro accessories in Sri Lanka: selfie sticks, camera mounts, waterproof cases and charging gear. Check prices and availability at PixelHouse.',
+    title: "GoPro Accessories in Sri Lanka | PixelHouse",
+    description: "Browse GoPro-compatible mounts, selfie sticks, cases and charging accessories. Check each item's camera compatibility, current price and stock at PixelHouse.",
     heading: 'GoPro Accessories in Sri Lanka',
   },
   'gpproducts2.html': {
@@ -32,8 +35,8 @@ const PAGE_META = {
     heading: 'GoPro Accessories in Sri Lanka',
   },
   'actioncamera.html': {
-    title: 'GoPro & Action Cameras in Sri Lanka | PixelHouse',
-    description: 'Compare GoPro and other action cameras online at PixelHouse Sri Lanka. View current prices, product details and availability before ordering.',
+    title: "GoPro Cameras in Sri Lanka | Price & Details | PixelHouse",
+    description: "Explore GoPro cameras at PixelHouse Sri Lanka. View current prices, package details and availability, with practical advice for choosing compatible accessories.",
     heading: 'GoPro and Action Cameras in Sri Lanka',
   },
   'insta360-camera.html': {
@@ -52,13 +55,13 @@ const PAGE_META = {
     heading: 'Insta360 Accessories',
   },
   'osmocat.html': {
-    title: 'DJI Osmo Action Accessories Sri Lanka | PixelHouse',
-    description: 'Shop DJI Osmo Action accessories in Sri Lanka at PixelHouse. Browse lens covers and storage bags, with model compatibility, current prices and availability.',
+    title: "DJI Osmo Action Accessories Sri Lanka | PixelHouse",
+    description: "Explore compatible DJI Osmo Action accessories at PixelHouse. Check supported camera models, current prices and availability before ordering.",
     heading: 'DJI Osmo Action Accessories in Sri Lanka',
   },
   'rental-services.html': {
-    title: 'GoPro Camera Rental in Dikwella | Pixel House',
-    description: 'Rent GoPro Hero 9, 10, 11, 12 or 13 cameras from Pixel House in Dikwella. Daily rentals include essential equipment.',
+    title: "GoPro Camera Rental in Dikwella | PixelHouse",
+    description: "Compare GoPro HERO9 to HERO13 rental options in Dikwella. Check daily rates, included equipment and pickup requirements, then contact PixelHouse to confirm dates.",
     heading: 'GoPro Camera Rental in Dikwella',
   },
   'camera-trade.html': {
@@ -102,8 +105,8 @@ const PAGE_META = {
 // continue using catalog descriptions and names from the database.
 const FEATURED_PRODUCT_META = {
   'hero13.html': {
-    title: 'GoPro HERO13 Black Camera in Sri Lanka | Pixel House',
-    description: 'Explore the GoPro HERO13 Black at Pixel House Sri Lanka. Check the camera price, package contents, available accessories and ordering options.',
+    title: "GoPro HERO13 Black Sri Lanka | Price & Package | PixelHouse",
+    description: "View the GoPro HERO13 Black at PixelHouse Sri Lanka. Check the current price, availability, listed package contents and compatible accessory options.",
   },
   '3mstick.html': {
     title: '3M Selfie Stick in Sri Lanka | Price & Details | Pixel House',
@@ -119,7 +122,10 @@ const PRODUCT_PAGES = [
   'osmobag.html', 'osmocap.html', 'wpdcase.html', 'x4case1.html',
 ];
 
+Object.assign(PAGE_META, GUIDE_PAGES);
+
 const INDEXABLE_PAGES = [
+  ...Object.keys(GUIDE_PAGES),
   'home.html', 'products.html',
   'catagory.html', 'gpproducts2.html', 'actioncamera.html', 'insta360-camera.html',
   'dji-osmo-camera.html', '360accesories.html', 'osmocat.html',
@@ -336,6 +342,7 @@ function buildSchema(meta, canonical, filename, catalogProduct = null) {
     graph.push(productSchema);
   }
 
+  if (GUIDE_PAGES[filename] && filename !== 'guides.html') graph.push({ '@type': 'Article', headline: meta.heading, mainEntityOfPage: canonical, inLanguage: 'en', publisher: { '@id': SITE_URL + '/#store' } });
   return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
     .replace(/</g, '\\u003c');
 }
@@ -404,7 +411,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
     : 'noindex,nofollow';
 
-  let output = html
+  let output = applyBuyingCopy(html, filename, catalogProduct)
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')
@@ -430,6 +437,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
+  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261112.5');
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
 
   // Old template pages contained invented review counts and comments. Product

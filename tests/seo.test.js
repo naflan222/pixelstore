@@ -246,6 +246,10 @@ test('all-products HTML contains crawlable catalog cards before client JavaScrip
 
     const filtered = await (await fetch(base + '/products.html?category=Camping%20Accessories')).text();
     assert.match(filtered, /Camping &lt;Lantern&gt;/);
+    assert.match(filtered, /id="campingCategoryBanner" role="img"/);
+    assert.match(filtered, /id="allProductsSearch" hidden/);
+    assert.match(html, /id="campingCategoryBanner" hidden/);
+    assert.doesNotMatch(html, /id="allProductsSearch" hidden/);
     assert.doesNotMatch(filtered, /class="product-title"[^>]*>GoPro Mount/);
     assert.match(filtered, /id="allProductsCount"[^>]*>1 product<\/span>/);
   } finally {

@@ -563,6 +563,8 @@ function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
         '" id="allProductsEmpty">');
   if (category === 'Camping Accessories') {
     result = result.replace('id="campingCategoryNavigation" hidden', 'id="campingCategoryNavigation"')
+      .replace('id="campingCategoryBanner" hidden', 'id="campingCategoryBanner"')
+      .replace('id="allProductsSearch"', 'id="allProductsSearch" hidden')
       .replace('class="d-flex flex-wrap gap-2 mb-3" id="allProductsCategories"', 'class="flex-wrap gap-2 mb-3" id="allProductsCategories" hidden')
       .replace('<h6 class="mb-0">All Products</h6>', '<h6 class="mb-0">Camping Accessories</h6>')
       .replace('id="allProductsCategoryHeading">Product Categories</h6>', 'id="allProductsCategoryHeading">Products</h6>');

@@ -20,6 +20,8 @@ const db = require('../server/database'); const { start } = require('../server')
     const noJs = await browser.newContext({ javaScriptEnabled: false });
     const fallback = await noJs.newPage(); await fallback.goto(base + '/products?category=Camping%20Accessories');
     assert.equal(await fallback.locator('#campingCategoryNavigation').isVisible(), true);
+    assert.equal(await fallback.locator('#campingCategoryBanner').isVisible(), true);
+    assert.equal(await fallback.locator('#allProductsSearch').isVisible(), false);
     assert.equal(await fallback.locator('#allProductsCategories').isVisible(), false);
     assert.equal(await fallback.locator('#campingCategoryNavigation .catagory-card').count(), 8);
     await noJs.close(); await setup.close();
@@ -50,8 +52,10 @@ const db = require('../server/database'); const { start } = require('../server')
           await next.click(); await page.waitForFunction(() => new URL(location.href).searchParams.get('page') === '2');
           assert.equal(await page.locator('#allProductsGrid .product-card').count(), 1);
           assert.equal(await page.locator('#campingCategoryNavigation').isVisible(), true);
-          await page.locator('#allProductsSearchInput').fill('Tent'); await page.locator('#allProductsSearch').evaluate(form => form.requestSubmit());
-          await page.waitForFunction(() => new URL(location.href).searchParams.get('q') === 'Tent');
+          assert.equal(await page.locator('#allProductsSearch').isVisible(), false);
+          assert.equal(await page.locator('#campingCategoryBanner').isVisible(), true);
+          await page.goto(base + '/products?category=Camping%20Accessories&q=Tent');
+          await page.waitForFunction(() => document.querySelector('#allProductsGrid .product-cart-button'));
           assert.equal(new URL(page.url()).searchParams.get('category'), 'Camping Accessories');
           assert.equal(await page.locator('#campingCategoryNavigation').isVisible(), true);
           await page.locator('#campingCategoryNavigation a[href="/gopro-accessories"]').click();
@@ -67,8 +71,12 @@ const db = require('../server/database'); const { start } = require('../server')
       await page.goto(base + '/products'); await page.locator('#allProductsCategories button[data-category="Camping Accessories"]').waitFor();
       assert.equal(await page.locator('#campingCategoryNavigation').isVisible(), false);
       assert.equal(await page.locator('#allProductsCategories').isVisible(), true);
+      assert.equal(await page.locator('#allProductsSearch').isVisible(), true);
+      assert.equal(await page.locator('#campingCategoryBanner').isVisible(), false);
       await page.locator('#allProductsCategories button[data-category="Camping Accessories"]').click();
       assert.equal(await page.locator('#campingCategoryNavigation').isVisible(), true);
+      assert.equal(await page.locator('#campingCategoryBanner').isVisible(), true);
+      assert.equal(await page.locator('#allProductsSearch').isVisible(), false);
       assert.equal(await page.locator('#allProductsCategories').isVisible(), false);
       await page.getByRole('link', { name: 'View all products', exact: true }).click();
       await page.waitForURL(base + '/products');

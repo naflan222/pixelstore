@@ -1149,6 +1149,7 @@
     const searchForm = $('#allProductsSearch');
     const searchInput = $('#allProductsSearchInput');
     const campingNavigation = $('#campingCategoryNavigation');
+    const campingBanner = $('#campingCategoryBanner');
     const categoryHeading = $('#allProductsCategoryHeading');
     const pageHeading = $('.page-heading h6');
     const pagination = $('#allProductsPagination');
@@ -1182,6 +1183,8 @@
     function renderCategories() {
       const camping = category === 'Camping Accessories';
       if (campingNavigation) campingNavigation.hidden = !camping;
+      if (campingBanner) campingBanner.hidden = !camping;
+      searchForm.hidden = camping;
       categoryWrap.hidden = camping;
       categoryWrap.classList.toggle('d-flex', !camping);
       if (categoryHeading) categoryHeading.textContent = camping ? 'Products' : 'Product Categories';

@@ -547,7 +547,7 @@ function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
     }
   }
 
-  return html
+  let result = html
     .replace('<div class="row g-2" id="allProductsGrid"></div>',
       '<div class="row g-2" id="allProductsGrid">' + cards + '</div>')
     .replace('<span class="text-muted small" id="allProductsCount" aria-live="polite"></span>',
@@ -561,6 +561,13 @@ function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
     .replace('<p class="text-center text-muted py-4 mb-0 d-none" id="allProductsEmpty">',
       '<p class="text-center text-muted py-4 mb-0' + (matches.length ? ' d-none' : '') +
         '" id="allProductsEmpty">');
+  if (category === 'Camping Accessories') {
+    result = result.replace('id="campingCategoryNavigation" hidden', 'id="campingCategoryNavigation"')
+      .replace('class="d-flex flex-wrap gap-2 mb-3" id="allProductsCategories"', 'class="flex-wrap gap-2 mb-3" id="allProductsCategories" hidden')
+      .replace('<h6 class="mb-0">All Products</h6>', '<h6 class="mb-0">Camping Accessories</h6>')
+      .replace('id="allProductsCategoryHeading">Product Categories</h6>', 'id="allProductsCategoryHeading">Products</h6>');
+  }
+  return result;
 }
 
 function routeHtml(html, filename, product, products, current) {

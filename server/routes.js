@@ -363,14 +363,14 @@ router.get('/reviews/recent', async (req, res) => {
   const pages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.min(page, pages);
   const reviews = await db.all(`SELECT r.id, r.rating, r.comment, r.created_at, u.username,
-      p.name AS product_name, p.slug AS product_slug
+      p.name AS product_name, p.slug AS product_slug, p.url_slug AS product_url_slug
     FROM reviews r
     JOIN users u ON u.id = r.user_id
     JOIN products p ON p.id = r.product_id
     WHERE r.is_visible = 1 AND p.status = 'active'
     ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?`, limit, (currentPage - 1) * limit);
   res.set('Cache-Control', 'no-store');
-  res.json({ reviews, pagination: { page: currentPage, pages, total, limit } });
+  res.json({ reviews: reviews.map(review => ({ ...review, product_url_path: review.product_url_slug ? '/product/' + review.product_url_slug : null })), pagination: { page: currentPage, pages, total, limit } });
 });
 
 router.get('/products', async (req, res) => {
@@ -472,11 +472,11 @@ function cartWhere(req) {
 router.get('/cart', async (req, res) => {
   const w = cartWhere(req);
   const items = await db.all(`
-    SELECT c.id AS cart_id, c.quantity, p.id, p.slug, p.name, p.price, p.old_price, p.image
+    SELECT c.id AS cart_id, c.quantity, p.id, p.slug, p.url_slug, p.name, p.price, p.old_price, p.image
     FROM carts c JOIN products p ON p.id = c.product_id
     WHERE ${w.sql}`, w.param);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  res.json({ items, subtotal });});
+  res.json({ items: items.map(item => ({ ...item, url_path: item.url_slug ? '/product/' + item.url_slug : null })), subtotal });});
 
 router.post('/cart', async (req, res) => {
   const { product_id, quantity = 1 } = req.body || {};

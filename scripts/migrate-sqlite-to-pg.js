@@ -59,7 +59,7 @@ const TABLES_IN_FK_ORDER = [
 const TABLE_COLUMNS = {
   users: ['id', 'username', 'email', 'password_hash', 'full_name', 'phone', 'address', 'avatar', 'balance', 'role', 'is_active', 'created_at'],
   categories: ['id', 'name', 'slug', 'description', 'image', 'is_active', 'created_at'],
-  products: ['id', 'slug', 'name', 'description', 'price', 'old_price', 'image', 'category', 'badge', 'stock', 'rating', 'rating_count', 'featured', 'flash_sale', 'reorder_threshold', 'category_id', 'sku', 'status', 'brand', 'created_at'],
+  products: ['id', 'slug', 'url_slug', 'name', 'description', 'price', 'old_price', 'image', 'category', 'badge', 'stock', 'rating', 'rating_count', 'featured', 'flash_sale', 'reorder_threshold', 'category_id', 'sku', 'status', 'brand', 'created_at'],
   product_images: ['id', 'product_id', 'image_data', 'mime_type', 'file_name', 'sort_order', 'is_primary', 'created_at'],
   sessions: ['token', 'user_id', 'created_at', 'expires_at'],
   carts: ['id', 'user_id', 'guest_id', 'product_id', 'quantity', 'created_at'],
@@ -128,11 +128,17 @@ function openSourceReadOnly(sourcePath) {
   return source;
 }
 
+function sourceSelectColumns(source, table) {
+  const available = new Set(source.prepare('PRAGMA table_info("' + table + '")').all().map(column => column.name));
+  return TABLE_COLUMNS[table].map(column => table === 'products' && column === 'url_slug' && !available.has(column) ? 'NULL AS "url_slug"' : '"' + column + '"').join(', ');
+}
+
 function verifySourceColumns(source) {
   for (const table of TABLES_IN_FK_ORDER) {
     const row = source.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
     if (!row) throw new Error(`Source backup is missing table "${table}". Aborting.`);
     for (const column of TABLE_COLUMNS[table]) {
+      if (table === 'products' && column === 'url_slug') continue;
       if (!String(row.sql).includes(column)) {
         throw new Error(`Source table "${table}" is missing column "${column}". Aborting (schema drift).`);
       }
@@ -202,7 +208,7 @@ async function migrate({ sourcePath, pool, options }) {
         const nowMs = Date.now();
         for (const table of TABLES_IN_FK_ORDER) {
           const columns = TABLE_COLUMNS[table];
-          let rows = source.prepare(`SELECT ${columns.map((c) => `"${c}"`).join(', ')} FROM "${table}" ${orderBy(table)}`).all();
+          let rows = source.prepare(`SELECT ${sourceSelectColumns(source, table)} FROM "${table}" ${orderBy(table)}`).all();
           if (table === 'password_resets' && !options.includeExpiredResets) {
             const before = rows.length;
             rows = rows.filter((row) => isResetStillValid(row, nowMs));
@@ -313,4 +319,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { migrate, TABLES_IN_FK_ORDER, TABLE_COLUMNS };
+module.exports = { migrate, TABLES_IN_FK_ORDER, TABLE_COLUMNS, sourceSelectColumns };

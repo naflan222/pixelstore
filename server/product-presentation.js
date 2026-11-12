@@ -34,6 +34,7 @@ async function cleanStoredDescriptions(db) {
 // Responsive sources leave the stored primary image and all product data intact.
 const variants = require('../catalog/product-image-variants.json');
 function withImageSources(product) {
+  if (product && product.url_slug) product.url_path = '/product/' + product.url_slug;
   const list = variants[product.image];
   if (list) product.image_sources = list;
   return product;

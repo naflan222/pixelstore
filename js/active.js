@@ -104,8 +104,8 @@
     }
 
     // :: Products Slides
-    var dynamicProductPage = (location.pathname.split('/').pop() === 'single-product.html') &&
-        new URLSearchParams(location.search).has('product');
+    var dynamicProductPage = ((document.body.dataset.storefrontPage || location.pathname.split('/').pop()) === 'single-product.html') &&
+        (document.body.dataset.productSlug || new URLSearchParams(location.search).has('product'));
     if ($.fn.owlCarousel && !dynamicProductPage) {
         var productslides = $('.product-slides');
         productslides.owlCarousel({

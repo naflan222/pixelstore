@@ -4,7 +4,8 @@
 (function () {
   'use strict';
 
-  const page = (location.pathname.split('/').pop() || 'index.html');
+  const cleanPages = { '/gopro-accessories': 'catagory.html', '/osmo-accessories': 'osmocat.html', '/products': 'products.html' };
+  const page = globalThis.PixelHouseRoutes?.data?.page || document.body?.dataset?.storefrontPage || cleanPages[location.pathname] || (location.pathname.split('/').pop() || 'index.html');
   const isHomepage = page === 'home.html' || page === 'index.html';
   let currentUser = null;
 
@@ -24,8 +25,21 @@
   const del = (p) => api(p, { method: 'DELETE' });
 
   const money = (n) => 'Rs. ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const $ = (sel, root) => (root || document).querySelector(sel);
-  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const legacySelector = sel => sel.replace(/\[href=/g, '[data-legacy-href=');
+  const $ = (sel, root) => (root || document).querySelector(sel) || (sel.includes('[href=') ? (root || document).querySelector(legacySelector(sel)) : null);
+  const $$ = (sel, root) => {
+    const nodes = Array.from((root || document).querySelectorAll(sel));
+    if (sel.includes('[href=')) nodes.push(...Array.from((root || document).querySelectorAll(legacySelector(sel)) || []));
+    return Array.from(new Set(nodes));
+  };
+  const routeHref = value => globalThis.PixelHouseRoutes?.href ? globalThis.PixelHouseRoutes.href(value) : value;
+  const productUrlFor = product => product.url_path || routeHref('single-product.html?product=' + encodeURIComponent(product.slug));
+  function slugFromLink(value) {
+    const mapped = globalThis.PixelHouseRoutes?.productSlug?.(value);
+    if (mapped) return mapped;
+    try { const url = new URL(value, location.href); return url.searchParams.get('product') || url.pathname.split('/').pop().replace(/\.html$/, ''); }
+    catch (_) { return ''; }
+  }
 
   // Send product/order data to GA4; never send customers' billing details.
   function ga4Item(product, quantity = 1) {
@@ -98,7 +112,7 @@
       const productsBySlug = new Map(products.map((product) => [product.slug, product]));
       cards.forEach((card) => {
         const link = $('a[href$=".html"]', card);
-        const slug = link && link.getAttribute('href').replace(/\.html$/, '');
+        const slug = link && slugFromLink(link.getAttribute('href'));
         const product = productsBySlug.get(slug);
         if (product) updateStockProgress(card, product);
       });
@@ -143,7 +157,7 @@
         if (!rating || !link) return;
         try {
           const url = new URL(link.getAttribute('href'), location.href);
-          const slug = url.searchParams.get('product') || url.pathname.split('/').pop().replace(/\.html$/, '');
+          const slug = slugFromLink(link.getAttribute('href'));
           const product = bySlug.get(slug);
           if (product) rating.outerHTML = productRatingHTML(product);
         } catch (_) { /* A malformed card link must not prevent other updates. */ }
@@ -176,7 +190,7 @@
     const name = escapeHtml(p.name);
     const slug = escapeHtml(p.slug);
     const image = escapeHtml(p.image);
-    const productUrl = 'single-product.html?product=' + encodeURIComponent(p.slug);
+    const productUrl = productUrlFor(p);
     const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + escapeHtml(p.badge) + '</span>' : '';
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
     const outOfStock = p.stock != null && p.stock <= 0;
@@ -247,7 +261,7 @@
         const titleLink = card && $('.product-title', card);
         if (!titleLink) return;
         const href = titleLink.getAttribute('href') || '';
-        const slug = href.replace(/\.html$/, '');
+        const slug = slugFromLink(href);
         if (!slug || slug === '#' || slug === 'single-product') return; // skip demo products
         try {
           const result = await post('/cart/by-slug', { slug });
@@ -365,14 +379,14 @@
       function pageHref(targetPage) {
         if (category.toLowerCase() === 'gopro accessories') {
           const params = new URLSearchParams(location.search);
-          if (targetPage < 3) params.delete('page');
+          if (targetPage === 1) params.delete('page');
           else params.set('page', String(targetPage));
-          return (targetPage === 2 ? 'gpproducts2.html' : 'catagory.html') + (params.size ? '?' + params.toString() : '');
+          return '/gopro-accessories' + (params.size ? '?' + params.toString() : '');
         }
         const params = new URLSearchParams(location.search);
         if (targetPage === 1) params.delete('page');
         else params.set('page', String(targetPage));
-        return page + (params.size ? '?' + params.toString() : '');
+        return (Object.keys(cleanPages).find(path => cleanPages[path] === page) || page) + (params.size ? '?' + params.toString() : '');
       }
 
       const filter = wireCameraFilters(async () => {
@@ -431,7 +445,7 @@
         let slug = '';
         try {
           const target = new URL(href, location.href);
-          slug = target.searchParams.get('product') || target.pathname.split('/').pop().replace(/\.html$/i, '');
+          slug = slugFromLink(href);
         } catch (_) { return; }
         if (!slug || slug === 'single-product' || slug === 'products' || activeSlugs.has(slug)) return;
         const column = card.parentElement && /\bcol(?:-|\s)/.test(card.parentElement.className) ? card.parentElement : null;
@@ -444,7 +458,7 @@
 
   function requireLogin() {
     if (!currentUser) {
-      location.href = 'login.html';
+      location.href = routeHref('login.html');
       return false;
     }
     return true;
@@ -471,7 +485,7 @@
         }
         if (!billing || !billing.phone || !billing.address || !billing.full_name) {
           alert('Please fill in your billing information first.');
-          location.href = 'checkout.html';
+          location.href = routeHref('checkout.html');
           return;
         }
         btn.classList.add('disabled');
@@ -496,7 +510,7 @@
             invoice_file: r.invoice_file || '',            invoice_url: r.invoice_url || ('/api/orders/' + r.order_id + '/invoice'),
           }));
           sessionStorage.removeItem('guest_billing');
-          location.href = r.redirect || 'payment-success.html';
+          location.href = routeHref(r.redirect || 'payment-success.html');
         } catch (err) {
           btn.classList.remove('disabled');
           btn.textContent = 'Try Again';
@@ -540,7 +554,7 @@
           a.addEventListener('click', async (e) => {
             e.preventDefault();
             await post('/auth/logout');
-            location.href = 'home.html';
+            location.href = routeHref('home.html');
           });
         }
       });
@@ -580,7 +594,7 @@
             username: $('#username').value.trim(),
             password: $('#password').value,
           });
-          location.href = r.redirect || 'home.html';
+          location.href = routeHref(r.redirect || 'home.html');
         } catch (err) { alertBox(form, err.message); }
       });
     },
@@ -636,7 +650,7 @@
           sessionStorage.setItem('reset_email', email);
           sessionStorage.removeItem('reset_code');
           alertBox(form, r.message + (r.dev_code ? ' Code: ' + r.dev_code : ''), 'success');
-          setTimeout(() => { location.href = 'otp-confirm.html'; }, 2500);
+          setTimeout(() => { location.href = routeHref('otp-confirm.html'); }, 2500);
         } catch (err) {
           alertBox(form, err.message);
           if (btn) { btn.disabled = false; btn.textContent = 'Reset Password'; }
@@ -659,7 +673,7 @@
         const email = sessionStorage.getItem('reset_email');
         if (!email) {
           alertBox(form, 'No email on file. Please request a new code first.');
-          setTimeout(() => { location.href = 'forget-password.html'; }, 1500);
+          setTimeout(() => { location.href = routeHref('forget-password.html'); }, 1500);
           return;
         }
         if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
@@ -668,7 +682,7 @@
           // before the user types a new password.
           await post('/auth/verify-code', { email, code });
           sessionStorage.setItem('reset_code', code);
-          location.href = 'change-password.html';
+          location.href = routeHref('change-password.html');
         } catch (err) {
           alertBox(form, err.message);
           if (btn) { btn.disabled = false; btn.textContent = 'Verify & Proceed'; }
@@ -721,7 +735,7 @@
             const r = await post('/auth/reset-password', { email, code, password: newPwd });
             sessionStorage.removeItem('reset_email');
             sessionStorage.removeItem('reset_code');
-            location.href = r.redirect || 'forget-password-success.html';
+            location.href = routeHref(r.redirect || 'forget-password-success.html');
           } catch (err) {
             alertBox(form, err.message);
             if (/invalid or expired|too many attempts/i.test(err.message)) {
@@ -796,7 +810,7 @@
             '<tr>' +
               '<th scope="row"><a class="remove-product" href="#" data-remove="' + i.cart_id + '"><i class="ti ti-x"></i></a></th>' +
               '<td><img class="rounded" src="' + escapeHtml(i.image) + '" alt="' + escapeHtml(i.name) + '"></td>' +
-              '<td><a class="product-title" href="' + escapeHtml(i.slug) + '.html">' + escapeHtml(i.name) +
+              '<td><a class="product-title" href="' + escapeHtml(i.url_path || routeHref(i.slug + '.html')) + '">' + escapeHtml(i.name) +
                 '<span class="mt-1">' + money(i.price) + ' × ' + i.quantity + '</span></a></td>' +
               '<td><div class="quantity"><input class="qty-text" type="number" min="1" max="99" value="' + i.quantity +
                 '" data-qty="' + i.cart_id + '"></div></td>' +
@@ -935,7 +949,7 @@
           if (!b) return; // missing name / phone / address → block
           sessionStorage.setItem('guest_billing', JSON.stringify(b));
           sessionStorage.setItem('shipping_method', selectedShipping().method);
-          location.href = 'checkout-payment.html';
+          location.href = routeHref('checkout-payment.html');
         });
       });
     },
@@ -1141,7 +1155,7 @@
       if (category) params.set('category', category);
       if (search) params.set('q', search);
       if (currentPage > 1) params.set('page', currentPage);
-      history.replaceState(null, '', 'products.html' + (params.size ? '?' + params.toString() : ''));
+      history.replaceState(null, '', '/products' + (params.size ? '?' + params.toString() : ''));
     }
 
     function filteredProducts() {
@@ -1219,7 +1233,7 @@
 
   /* ---------- product detail pages: wire "Add to Cart" ---------- */
   async function wireProductDetail() {
-    const queryProduct = new URLSearchParams(location.search).get('product');
+    const queryProduct = globalThis.PixelHouseRoutes?.data?.productSlug || document.body?.dataset?.productSlug || new URLSearchParams(location.search).get('product');
     const slug = queryProduct || page.replace('.html', '');
     const isDynamicProduct = page === 'single-product.html' && Boolean(queryProduct);
     // Only run on actual product detail pages (not home, index, cart, etc.)
@@ -1285,7 +1299,7 @@
         if (pageContent) pageContent.innerHTML = '<div class="container py-5"><div class="catalog-empty-state"><h5>' +
           (notFound ? 'Product unavailable' : 'Product could not be loaded') +
           '</h5><p>' + (notFound ? 'This product may have been removed or is not currently available.' : 'Please check your connection and try again.') +
-          '</p><a class="btn btn-primary" href="products.html">Browse products</a></div></div>';
+          '</p><a class="btn btn-primary" href="/products">Browse products</a></div></div>';
         document.documentElement.classList.remove('dynamic-product-loading');
         return;
       }
@@ -1323,7 +1337,7 @@
           const { product } = await get('/products/' + encodeURIComponent(slug));
           const result = await post('/cart', { product_id: product.id, quantity });
           queueEcommerceForNextPage('add_to_cart', ga4SingleItemPayload(result.product || product, quantity));
-          location.href = 'cart.html';
+          location.href = routeHref('cart.html');
         } catch (err) { alert(err.message); }
       });
       return;
@@ -1339,7 +1353,7 @@
         const { product } = await get('/products/' + slug);
         const result = await post('/cart', { product_id: product.id });
         queueEcommerceForNextPage('add_to_cart', ga4SingleItemPayload(result.product || product));
-        location.href = 'cart.html';
+        location.href = routeHref('cart.html');
       } catch (err) { alert(err.message); }
     });
   }
@@ -1355,7 +1369,7 @@
     if (variant === 'featured_gear') {
       const stock = Math.max(0, Number(product.stock) || 0);
       const percent = Math.min(100, stock);
-      return '<div class="card flash-sale-card"><div class="card-body"><a href="single-product.html?product=' + encodeURIComponent(product.slug) + '">' +
+      return '<div class="card flash-sale-card"><div class="card-body"><a href="' + escapeHtml(productUrlFor(product)) + '">' +
         '<img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async">' +
         '<span class="product-title">' + escapeHtml(product.name) + '</span><p class="sale-price">' + money(product.price) +
         (product.old_price ? '<span class="real-price">' + money(product.old_price) + '</span>' : '') + '</p>' +
@@ -1364,7 +1378,7 @@
     }
     if (variant === 'weekly_best_sellers' || variant === 'featured_products') {
       const featured = variant === 'featured_products';
-      const url = 'single-product.html?product=' + encodeURIComponent(product.slug);
+      const url = productUrlFor(product);
       const image = '<div class="product-thumbnail-side"><a class="product-thumbnail d-block" href="' + url + '"><img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async"></a></div>';
       const description = '<div class="product-description"><a class="product-title d-block" href="' + url + '">' + escapeHtml(product.name) + '</a><p class="sale-price">' + money(product.price) + (product.old_price ? '<span>' + money(product.old_price) + '</span>' : '') + '</p></div>';
       return '<div class="' + (featured ? 'col-4' : 'col-12') + '"><div class="card ' + (featured ? 'featured-product-card' : 'horizontal-product-card') + '"><div class="' + (featured ? 'card-body' : 'd-flex align-items-center') + '">' + (featured ? '<span class="badge badge-warning custom-badge"><i class="ti ti-star-filled"></i></span>' : '') + image + description + '</div></div></div>';
@@ -1456,7 +1470,7 @@
   function footerReviewHTML(review) {
     const details = reviewDetails(review);
     const product = review.product_slug
-      ? '<a class="review-product" href="single-product.html?product=' + encodeURIComponent(review.product_slug) + '">' + escapeHtml(review.product_name) + '</a>'
+      ? '<a class="review-product" href="' + escapeHtml(review.product_url_path || routeHref('single-product.html?product=' + encodeURIComponent(review.product_slug))) + '">' + escapeHtml(review.product_name) + '</a>'
       : '<span class="review-product">' + escapeHtml(review.product_name || '') + '</span>';
     return '<article class="site-footer-review"><div class="review-identity"><span class="review-avatar" aria-hidden="true">' +
       escapeHtml(details.initials) + '</span><div class="review-author-row">' + reviewAuthorHTML(details) +
@@ -1539,7 +1553,7 @@
         product.hidden = !review.product_slug;
         if (review.product_slug) {
           product.textContent = review.product_name;
-          product.href = 'single-product.html?product=' + encodeURIComponent(review.product_slug);
+          product.href = review.product_url_path || routeHref('single-product.html?product=' + encodeURIComponent(review.product_slug));
         }
         position.textContent = (activeReview + 1) + ' / ' + pagination.total;
         card.classList.remove('review-enter-left', 'review-enter-right');
@@ -1626,7 +1640,7 @@
   }
 
   async function wireProductReviews() {
-    const slug = new URLSearchParams(location.search).get('product') || page.replace('.html', '');
+    const slug = globalThis.PixelHouseRoutes?.data?.productSlug || document.body?.dataset?.productSlug || new URLSearchParams(location.search).get('product') || page.replace('.html', '');
     const form = $('.ratings-submit-form form');
     const list = $('.rating-review-content ul');
     if (!slug || !list) return;
@@ -1736,7 +1750,7 @@
           box.innerHTML = '<div class="ss-empty">No products found. Try "stick", "case", "kit"...</div>';
         } else {
           box.innerHTML = matches.map((p) =>
-            `<a href="single-product.html?product=${encodeURIComponent(p.slug)}" data-slug="${escapeHtml(p.slug)}">` +
+            `<a href="${escapeHtml(productUrlFor(p))}" data-slug="${escapeHtml(p.slug)}">` +
               `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">` +
               `<span class="ss-name">${escapeHtml(p.name)}</span>` +
               `<span class="ss-price">${money(p.price)}</span>` +
@@ -1767,7 +1781,7 @@
         const words = q.split(/\s+/).filter(Boolean);
         const match = list.find((p) => words.every((w) => p.name.toLowerCase().includes(w)))
                    || list.find((p) => words.some((w) => p.name.toLowerCase().includes(w)));
-        if (match) location.href = 'single-product.html?product=' + encodeURIComponent(match.slug);
+        if (match) location.href = routeHref(productUrlFor(match));
         else { input.value = ''; input.placeholder = 'No product found — try again'; }
       });
 

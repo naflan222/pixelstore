@@ -6442,3 +6442,13 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
   color: #6c757d;
   background-color: #e9ecef;
 }
+
+/* Category labels reserve two lines so Rental Services matches adjacent tiles. */
+.catagory-card { height: 100%; }
+.catagory-card span { min-height: 2.4em; }
+@media (min-width: 768px) {
+  .rental-services-page .catagory-single-img {
+    height: clamp(180px, 22vw, 260px);
+    background-position: center 60%;
+  }
+}

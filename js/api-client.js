@@ -349,16 +349,18 @@
     if (!paginationNav) {
       paginationNav = document.createElement('nav');
       paginationNav.setAttribute('aria-label', 'Page navigation');
-      paginationNav.innerHTML = '<ul class="pagination justify-content-center flex-wrap"></ul>';
+      paginationNav.innerHTML = '<ul class="pagination pagination-sm justify-content-center flex-wrap mb-0"></ul>';
     }
     if (paginationNav.parentElement === grid) grid.after(paginationNav);
     if (!paginationNav.isConnected) grid.after(paginationNav);
+    paginationNav.classList.add('mt-4');
     let pagination = $('.pagination', paginationNav);
     if (!pagination) {
       pagination = document.createElement('ul');
-      pagination.className = 'pagination justify-content-center flex-wrap';
+      pagination.className = 'pagination pagination-sm justify-content-center flex-wrap mb-0';
       paginationNav.appendChild(pagination);
     }
+    pagination.classList.add('pagination-sm', 'mb-0');
 
     // Remove template products immediately so stale sample cards do not look
     // like the live catalog while its first page is loading.
@@ -415,12 +417,20 @@
           : '<div class="col-12"><div class="catalog-empty-state">No products match these filters. Try clearing filters or choosing another category.</div></div>';
         paginationNav.hidden = pageCount < 2;
         paginationNav.style.display = pageCount < 2 ? 'none' : '';
-        pagination.innerHTML = pageCount < 2 ? '' : Array.from({ length: pageCount }, (_, index) => {
-          const targetPage = index + 1;
-          const active = targetPage === currentPage;
-          return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
-            pageHref(targetPage) + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
-        }).join('');
+        if (pageCount < 2) pagination.innerHTML = '';
+        else {
+          const arrow = (label, icon, target, disabled) => '<li class="page-item' + (disabled ? ' disabled' : '') + '">' +
+            (disabled ? '<span class="page-link" aria-label="' + label + '" aria-disabled="true">' : '<a class="page-link" href="' + pageHref(target) + '" aria-label="' + label + '">') +
+            '<i class="ti ti-chevron-' + icon + '" aria-hidden="true"></i>' + (disabled ? '</span>' : '</a>') + '</li>';
+          const numbers = Array.from({ length: pageCount }, (_, index) => {
+            const targetPage = index + 1;
+            const active = targetPage === currentPage;
+            return '<li class="page-item' + (active ? ' active' : '') + '"><a class="page-link" href="' +
+              pageHref(targetPage) + '" aria-label="Page ' + targetPage + '"' + (active ? ' aria-current="page"' : '') + '>' + targetPage + '</a></li>';
+          }).join('');
+          pagination.innerHTML = arrow('Previous page', 'left', currentPage - 1, currentPage === 1) + numbers +
+            arrow('Next page', 'right', currentPage + 1, currentPage === pageCount);
+        }
         bindProductButtons(grid);
       }
       render();

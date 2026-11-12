@@ -6422,3 +6422,23 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
 [data-home-products="top_products"] .product-cart-button { margin-top: auto; }
 [data-home-products="top_products"] .sale-price,
 [data-home-products="top_products"] .product-rating:not([hidden]) { margin-bottom: .75rem; }
+
+/* Catalog pagination matches All Products/Camping, including readable dark-mode links. */
+[data-catalog-category] .pagination .page-link {
+  color: #0d6efd;
+  background-color: #fff;
+  border-color: #dee2e6;
+}
+[data-catalog-category] .pagination .page-link:hover {
+  color: #0a58ca;
+  background-color: #e9ecef;
+}
+[data-catalog-category] .pagination .active .page-link {
+  color: #fff;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+[data-catalog-category] .pagination .disabled .page-link {
+  color: #6c757d;
+  background-color: #e9ecef;
+}

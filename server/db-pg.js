@@ -146,6 +146,8 @@ function clientHandle(client) {
 const shared = clientHandle(pool);
 
 async function ensureStoreSettings(executor) {
+  await executor.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS url_slug TEXT');
+  await executor.query('CREATE UNIQUE INDEX IF NOT EXISTS products_url_slug_unique ON products(url_slug)');
   // Idempotent production upgrades for databases created before these fields
   // and Sri Lankan currency defaults were introduced.
   await executor.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS mpn TEXT DEFAULT ''");

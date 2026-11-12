@@ -1,5 +1,5 @@
 function localPath(value) {
-  try { const url=new URL(value,root.location.href); return url.origin===root.location.origin?url.pathname.replace(/^\//,''):''; } catch (_) { return ''; }
+  try { const url=new URL(value,root.document?.baseURI||root.location.href); return url.origin===root.location.origin?url.pathname.replace(/^\//,''):''; } catch (_) { return ''; }
 }
 function sources(value) { return variants[localPath(value)] || []; }
 function updateImage(img) {

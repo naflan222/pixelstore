@@ -393,6 +393,8 @@ CREATE TABLE IF NOT EXISTS read_messages (
   addColumn('products', 'brand', "brand TEXT DEFAULT ''");
   addColumn('products', 'mpn', "mpn TEXT DEFAULT ''");
   addColumn('products', 'gtin', "gtin TEXT DEFAULT ''");
+  addColumn('products', 'url_slug', 'url_slug TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS products_url_slug_unique ON products(url_slug)');
   addColumn('reviews', 'is_visible', 'is_visible INTEGER NOT NULL DEFAULT 1');
   addColumn('users', 'is_active', 'is_active INTEGER NOT NULL DEFAULT 1');
   addColumn('password_resets', 'attempts', 'attempts INTEGER DEFAULT 0');

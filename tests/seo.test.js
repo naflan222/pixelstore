@@ -15,6 +15,7 @@ const {
   canonicalHomepageRedirect,
 } = require('../server/seo');
 
+const { FILE_PATHS, ROUTE_FILES } = require('../js/storefront-routes');
 const root = path.join(__dirname, '..');
 
 function read(filename) {
@@ -80,7 +81,7 @@ test('keyword targets stay focused on relevant camera and accessory pages', () =
     const result = enhanceHtml(read(filename), filename);
     assert.ok(result.includes('<title>' + title + '</title>'), filename + ': correct SEO title');
     assert.ok(result.includes('content="' + description), filename + ': focused description');
-    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk/' + filename + '"'), filename + ': canonical');
+    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk' + (FILE_PATHS[filename] || '/' + filename) + '"'), filename + ': canonical');
     assert.doesNotMatch(result, /Canon cameras|Action Pro cameras/i, filename + ': must not claim unverified inventory');
   }
 });
@@ -101,7 +102,7 @@ test('GoPro and DJI accessory categories explain the products and keep crawlable
     assert.equal((result.match(/<h1\b/g) || []).length, 1, filename + ': one main heading');
     assert.ok(result.includes('href="' + related + '"'), filename + ': related category');
     assert.ok(result.includes('href="' + product + '"'), filename + ': product link');
-    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk/' + filename + '"'), filename + ': canonical');
+    assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk' + (FILE_PATHS[filename] || '/' + filename) + '"'), filename + ': canonical');
     assert.ok(result.includes('data-catalog-category='), filename + ': existing catalog remains functional');
     assert.equal(stylesheetHref(result), stylesheetHref(source), filename + ': design stylesheet unchanged');
   }
@@ -235,7 +236,7 @@ test('all-products HTML contains crawlable catalog cards before client JavaScrip
     assert.match(html, /Rs\. 1,400\.00/);
     assert.match(html, /Out of Stock/);
     assert.equal((html.match(/class="product-title"/g) || []).length, 12);
-    assert.match(html, /href="products\.html\?page=2"/);
+    assert.match(html, /href="\/products\?page=2"/);
     assert.match(html, /js\/api-client\.js/);
 
     const nextPage = await (await fetch(base + '/products.html?page=2')).text();
@@ -256,9 +257,8 @@ test('legacy dynamic URLs for products with static pages redirect to the clean c
   const app = express();
   app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, createHtmlHandler({
     rootDir: root,
-    productLookup: async () => {
-      throw new Error('Static duplicate should redirect before the database lookup');
-    },
+    productUrlLookup: async () => null,
+    productLookup: async () => ({ slug: '3mstick', url_slug: '3m-selfie-stick' }),
   }));
 
   const server = await new Promise((resolve) => {
@@ -268,7 +268,7 @@ test('legacy dynamic URLs for products with static pages redirect to the clean c
     const base = `http://127.0.0.1:${server.address().port}`;
     const response = await fetch(`${base}/single-product.html?product=3mstick`, { redirect: 'manual' });
     assert.equal(response.status, 301);
-    assert.equal(response.headers.get('location'), '/3mstick.html');
+    assert.equal(response.headers.get('location'), '/product/3m-selfie-stick');
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
@@ -324,7 +324,7 @@ test('service worker installs current assets and refreshes CSS and JavaScript be
   assert.ok(installedAssets.includes(stylesheet), 'Offline shell must use the homepage stylesheet version');
   assert.ok(installedAssets.includes('/' + client[1]), 'Offline shell must use the homepage client version');
   for (const asset of installedAssets) {
-    if (asset !== '/') assert.ok(fs.existsSync(path.join(root, asset.split('?')[0])), `Missing offline asset: ${asset}`);
+    if (asset !== '/') assert.ok(fs.existsSync(path.join(root, ROUTE_FILES[asset.split('?')[0]] || asset.split('?')[0])), `Missing offline asset: ${asset}`);
   }
 
   for (const destination of ['style', 'script']) {

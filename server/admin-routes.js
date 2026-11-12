@@ -1,3 +1,4 @@
+const { assignProductUrl } = require('./product-urls');
 // Admin API routes for the Pixels store
 const express = require('express');
 const reporting = require('./reporting-time');
@@ -1181,6 +1182,7 @@ router.post('/products/import', catalogAccess, async (req, res) => {
             product.featured, product.flashSale, product.reorderThreshold, product.sku, product.status, product.brand, product.mpn, product.gtin);
           id = inserted.id;
         }
+        await assignProductUrl(tx, id);
         await tx.run('INSERT INTO product_images (product_id, image_data, mime_type, file_name, sort_order, is_primary) VALUES (?, ?, ?, ?, 0, 1)',
           id, product.image, 'image/*', path.basename(product.image));
         if (product.stock) await tx.run('INSERT INTO inventory_movements (product_id, change, reason, note, changed_by) VALUES (?, ?, ?, ?, ?)',
@@ -1219,6 +1221,7 @@ router.post('/products', catalogAccess, async (req, res) => {
       String(image || DEFAULT_PRODUCT_IMAGE).trim(), category ? category.name : 'GoPro Accessories', category && category.id, badge || null,
       Math.max(0, Number.parseInt(stock, 10) || 0), featured ? 1 : 0, flash_sale ? 1 : 0, cleanSku, String(status || 'active'), cleanBrand, cleanMpn, cleanGtin);
     const newId = Number(result.id);
+    await assignProductUrl(tx, newId);
     await tx.run(`INSERT INTO product_images (product_id, image_data, mime_type, file_name, is_primary)
       VALUES (?, ?, ?, ?, 1)`, newId, String(image || DEFAULT_PRODUCT_IMAGE).trim(), 'image/*', 'legacy-image');
     return newId;

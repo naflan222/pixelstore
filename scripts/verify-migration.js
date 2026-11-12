@@ -16,7 +16,7 @@
 // Exit code: 0 when every check passes, 1 otherwise.
 const crypto = require('crypto');
 const path = require('path');
-const { TABLES_IN_FK_ORDER, TABLE_COLUMNS } = require('./migrate-sqlite-to-pg');
+const { TABLES_IN_FK_ORDER, TABLE_COLUMNS, sourceSelectColumns } = require('./migrate-sqlite-to-pg');
 
 const PRIMARY_KEY = { sessions: 'token', read_messages: 'contact_message_id' };
 const TIMESTAMP_COLUMNS = new Set(['created_at', 'updated_at', 'expires_at', 'starts_at', 'ends_at', 'paid_at']);
@@ -120,7 +120,7 @@ async function verify({ sourcePath, pool, options = {} }) {
       for (const table of TABLES_IN_FK_ORDER) {
         const pk = PRIMARY_KEY[table] || 'id';
         const columns = TABLE_COLUMNS[table];
-        const sourceRows = source.prepare(`SELECT ${columns.map((c) => `"${c}"`).join(', ')} FROM "${table}"`).all();
+        const sourceRows = source.prepare(`SELECT ${sourceSelectColumns(source, table)} FROM "${table}"`).all();
         const destResult = await client.query(`SELECT ${columns.map((c) => `"${c}"`).join(', ')} FROM "${table}"`);
         const destRows = destResult.rows;
 

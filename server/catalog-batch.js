@@ -1,3 +1,4 @@
+const { assignProductUrl } = require('./product-urls');
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -46,6 +47,7 @@ async function apply(db, actor) {
       const inserted = await tx.insert(`INSERT INTO products (slug, name, description, price, old_price, image, category, category_id, stock, status, brand, sku, featured, flash_sale, rating, rating_count)
         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 0, 'active', '', ?, 0, 0, 0, 0)`,
       product.slug, product.name, product.description, product.price, product.image, product.category, category.id, product.sku);
+      await assignProductUrl(tx, inserted.id);
       await tx.run(`INSERT INTO product_images (product_id, image_data, mime_type, file_name, sort_order, is_primary) VALUES (?, ?, 'image/webp', ?, 0, 0)`, inserted.id, product.zoom_image, path.basename(product.zoom_image));
       created.push({ id: Number(inserted.id), sku: product.sku });
     }

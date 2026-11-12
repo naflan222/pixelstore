@@ -228,11 +228,11 @@ async function defineSuite(t, ctx) {
   await t.test('legacy demo storefront pages redirect to real products', async () => {
     const response = await fetch(ctx.base + '/featured-products.html', { redirect: 'manual' });
     assert.equal(response.status, 301);
-    assert.equal(response.headers.get('location'), '/products.html');
+    assert.equal(response.headers.get('location'), '/products');
     for (const paymentPage of ['checkout-credit-card.html', 'checkout-paypal.html']) {
       const paymentResponse = await fetch(`${ctx.base}/${paymentPage}`, { redirect: 'manual' });
       assert.equal(paymentResponse.status, 301);
-      assert.equal(paymentResponse.headers.get('location'), '/checkout-payment.html');
+      assert.equal(paymentResponse.headers.get('location'), '/checkout-payment');
     }
   });
 

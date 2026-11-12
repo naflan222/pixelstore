@@ -2,6 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { FILE_PATHS, ROUTE_FILES } = require('./storefront-urls');
+const { cleanHref } = require('../js/storefront-routes');
+const { productPath } = require('./product-urls');
 
 const SITE_URL = 'https://pixelhouse.lk';
 const GA4_MEASUREMENT_ID = 'G-JJWCEW1DGE';
@@ -217,7 +220,7 @@ function extractProduct(html) {
 
 function canonicalFor(filename, override = null) {
   if (override) return override;
-  return filename === 'home.html' ? `${SITE_URL}/` : `${SITE_URL}/${filename}`;
+  return filename === 'home.html' ? `${SITE_URL}/` : `${SITE_URL}${FILE_PATHS[filename] || '/' + filename}`;
 }
 
 function metaFor(filename, html) {
@@ -560,43 +563,76 @@ function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
         '" id="allProductsEmpty">');
 }
 
-function createHtmlHandler({ rootDir, productLookup = null, catalogList = null }) {
+function routeHtml(html, filename, product, products, current) {
+  const productPaths = {}, productSlugs = {};
+  for (const row of products || []) if (productPath(row)) {
+    productPaths[row.slug + '.html'] = productPath(row);
+    productSlugs[productPath(row)] = row.slug;
+  }
+  const data = JSON.stringify({ page: filename, productSlug: product?.slug || '', productPaths, productSlugs }).replace(/</g, '\\u003c');
+  const base = filename.startsWith('admin/') ? '/admin/' : '/';
+  let result = html.replace(/<head>/i, '<head>\n    <base href="' + base + '">\n    <script type="application/json" id="storefront-route-data">' + data + '</script>\n    <script src="/js/storefront-routes.js?v=20261112.1"></script>');
+  result = result.replace(/<body([^>]*)>/i, '<body$1 data-storefront-page="' + escapeHtml(filename) + '" data-product-slug="' + escapeHtml(product?.slug || '') + '">');
+  return result.replace(/<(?:a|form)\b[^>]*>/gi, tag => tag.replace(/\b(href|action)="([^"]*)"/g, (attribute, name, value) => {
+    const decoded = value.replace(/&amp;/g, '&');
+    const clean = cleanHref(decoded, productPaths, SITE_URL, current);
+    if (clean === decoded) return attribute;
+    return (name === 'href' ? 'data-legacy-href="' + escapeHtml(decoded) + '" ' : '') + name + '="' + escapeHtml(clean) + '"';
+  }));
+}
+
+function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = null, productRoutes = null, catalogList = null }) {
   return async function serveSeoHtml(req, res, next) {
-    const filename = req.path === '/' ? 'home.html' : path.basename(req.path);
-    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(filename)) return next();
-
-    const filePath = path.join(rootDir, filename);
-    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return next();
-
     try {
-      const dynamicSlug = filename === 'single-product.html' ? String(req.query.product || '') : '';
-      if (dynamicSlug) {
-        const staticProductFilename = staticProductFilenameForSlug(rootDir, dynamicSlug);
-        if (staticProductFilename) return res.redirect(301, `/${staticProductFilename}`);
+      // Old cached cart/search code can link imported products as /slug.html
+      // even when no static template exists. Resolve those aliases as well.
+      const legacySlug = req.path.match(/^\/([a-z0-9]+(?:-[a-z0-9]+)*)\.html$/)?.[1];
+      if (legacySlug && legacySlug !== 'single-product' && !FILE_PATHS[legacySlug + '.html'] && productUrlLookup && productLookup) {
+        const legacyProduct = await productLookup(legacySlug);
+        if (productPath(legacyProduct)) {
+          const query = new URL(req.originalUrl || req.url, SITE_URL).search;
+          return res.redirect(301, productPath(legacyProduct) + query);
+        }
       }
-
+      const readableSlug = req.path.startsWith('/product/') ? req.path.slice('/product/'.length) : '';
+      let catalogProduct = readableSlug && productUrlLookup ? await productUrlLookup(readableSlug) : null;
+      if (readableSlug && !catalogProduct) return res.status(404).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product unavailable | PixelHouse</title><h1>Product unavailable</h1><a href="/products">Browse products</a></html>');
+      const filename = readableSlug ? (staticProductFilenameForSlug(rootDir, catalogProduct.slug) || 'single-product.html')
+        : req.path === '/' ? 'home.html'
+        : req.path === '/gopro-accessories' && Number(req.query.page) === 2 ? 'gpproducts2.html'
+        : ROUTE_FILES[req.path] || path.basename(req.path);
+      if (!/^(?:admin\/)?[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(filename)) return next();
+      const filePath = path.join(rootDir, filename);
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return next();
       const html = fs.readFileSync(filePath, 'utf8');
+      const dynamicSlug = filename === 'single-product.html' ? String(req.query.product || '') : '';
       const isProductPage = Boolean(extractProduct(html));
-      const shouldResolveProduct = filename !== 'single-product.html' || Boolean(dynamicSlug);
-      const catalogProduct = productLookup && isProductPage && shouldResolveProduct
-        ? await productLookup(dynamicSlug || path.basename(filename, '.html'))
-        : null;
-      if (productLookup && isProductPage && shouldResolveProduct && !catalogProduct) {
-        return res.status(404).type('html').send('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product unavailable | Pixel House</title><body><main><h1>Product unavailable</h1><p>This product may have been removed or is no longer available.</p><a href="/products.html">Browse products</a></main></body></html>');
+      const shouldResolveProduct = filename !== 'single-product.html' || Boolean(dynamicSlug) || Boolean(readableSlug);
+      if (!catalogProduct && productLookup && isProductPage && shouldResolveProduct) {
+        catalogProduct = await productLookup(dynamicSlug || path.basename(filename, '.html'));
       }
-      const canonicalOverride = dynamicSlug && catalogProduct
-        ? `${SITE_URL}/single-product.html?product=${encodeURIComponent(dynamicSlug)}`
-        : null;
-      // Product cards must be present before client JavaScript runs. The
-      // interactive catalog script replaces this snapshot after its API call.
-      const pageHtml = filename === 'products.html' && catalogList
-        ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir)
-        : html;
-      res.set('Cache-Control', 'public, max-age=0, must-revalidate');
-      res.type('html').send(enhanceHtml(pageHtml, filename, catalogProduct, canonicalOverride));
-    } catch (error) {
-      next(error);
-    }
+      // The generic legacy product page is itself a real catalog item.
+      if (!catalogProduct && filename === 'single-product.html' && !dynamicSlug && productLookup) catalogProduct = await productLookup('single-product');
+      if (catalogProduct && productPath(catalogProduct) && !readableSlug) {
+        const query = new URL(req.originalUrl || req.url, SITE_URL).searchParams; query.delete('product');
+        return res.redirect(301, productPath(catalogProduct) + (query.size ? '?' + query : ''));
+      }
+      if (dynamicSlug && !productUrlLookup) {
+        const staticFilename = staticProductFilenameForSlug(rootDir, dynamicSlug);
+        if (staticFilename) return res.redirect(301, '/' + staticFilename);
+      }
+      if (productLookup && isProductPage && shouldResolveProduct && !catalogProduct) {
+        return res.status(404).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product unavailable | PixelHouse</title><h1>Product unavailable</h1><a href="/products">Browse products</a></html>');
+      }
+      const routeCanonical = ROUTE_FILES[req.path]
+        ? SITE_URL + req.path + (['/products','/gopro-accessories','/osmo-accessories','/insta360-accessories'].includes(req.path) && Number.isSafeInteger(Number(req.query.page)) && Number(req.query.page) > 1 ? '?page=' + Number(req.query.page) : '') : null;
+      const canonicalOverride = productPath(catalogProduct) ? SITE_URL + productPath(catalogProduct) : routeCanonical || (dynamicSlug && catalogProduct ? SITE_URL + '/single-product.html?product=' + encodeURIComponent(dynamicSlug) : null);
+      const pageHtml = filename === 'products.html' && catalogList ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir) : html;
+      const enriched = enhanceHtml(pageHtml, filename, catalogProduct, canonicalOverride);
+      // Customer pages are never cached; public catalog HTML must revalidate.
+      res.set('Cache-Control', INDEXABLE_SET.has(filename) ? 'public, max-age=0, must-revalidate' : 'private, no-store');
+      res.type('html').send(routeHtml(enriched, filename, catalogProduct, productRoutes ? await productRoutes() : [], req.originalUrl || req.path));
+    } catch (error) { next(error); }
   };
 }
 
@@ -620,8 +656,9 @@ function xmlEscape(value) {
 
 function createSitemapHandler({ rootDir, productList = null }) {
   return async function serveSitemap(req, res) {
+    const products = productList ? await productList() : null;
     const urls = INDEXABLE_PAGES
-      .filter((filename) => fs.existsSync(path.join(rootDir, filename)))
+      .filter((filename) => fs.existsSync(path.join(rootDir, filename)) && !(products && PRODUCT_PAGES.includes(filename)))
       .map((filename) => {
         const stat = fs.statSync(path.join(rootDir, filename));
         const lastmod = stat.mtime.toISOString().slice(0, 10);
@@ -629,10 +666,13 @@ function createSitemapHandler({ rootDir, productList = null }) {
       });
 
     if (productList) {
-      const products = await productList();
       for (const product of products) {
-        if (staticProductFilenameForSlug(rootDir, product.slug)) continue;
-        const url = `${SITE_URL}/single-product.html?product=${encodeURIComponent(product.slug)}`;
+        if (!product.url_slug && staticProductFilenameForSlug(rootDir, product.slug)) {
+          const filename = staticProductFilenameForSlug(rootDir, product.slug);
+          urls.push('  <url><loc>' + xmlEscape(canonicalFor(filename)) + '</loc></url>');
+          continue;
+        }
+        const url = product.url_slug ? SITE_URL + productPath(product) : `${SITE_URL}/single-product.html?product=${encodeURIComponent(product.slug)}`;
         urls.push(`  <url>\n    <loc>${xmlEscape(url)}</loc>\n    <lastmod>${xmlEscape(String(product.updated_at || product.created_at || '').slice(0, 10))}</lastmod>\n  </url>`);
       }
     }

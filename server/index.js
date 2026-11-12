@@ -26,6 +26,8 @@ const { maintenanceMode } = require('./maintenance');
 const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./database');
+const { ensureProductUrls } = require('./product-urls');
+const { ROUTE_FILES, cleanStorefrontRedirect } = require('./storefront-urls');
 const { createHtmlHandler, createSitemapHandler, canonicalHomepageRedirect } = require('./seo');
 const { rateLimit, securityHeaders } = require('./security');
 const { hideAccidentalStoreReview } = require('./review-cleanup');
@@ -37,6 +39,7 @@ if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(securityHeaders);
 app.use(canonicalHomepageRedirect);
+app.use(cleanStorefrontRedirect);
 
 app.use(express.json({ limit: '7mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -167,32 +170,36 @@ app.use('/api/mobile', mobilePush.router);
 const publicRoot = path.join(__dirname, '..');
 const seoHtmlHandler = createHtmlHandler({
   rootDir: publicRoot,
-  productLookup: (slug) => db.get("SELECT name, description, price, image, stock, status, sku, brand, mpn, gtin, slug FROM products WHERE slug = ? AND status = 'active'", slug),
+  productUrlLookup: (slug) => db.get("SELECT * FROM products WHERE url_slug = ? AND status = 'active'", slug),
+  productRoutes: () => db.all("SELECT id, slug, url_slug FROM products WHERE status = 'active' ORDER BY id"),
+  productLookup: (slug) => db.get("SELECT id, name, description, price, image, stock, status, sku, brand, mpn, gtin, slug, url_slug FROM products WHERE slug = ? AND status = 'active'", slug),
   // A lightweight catalog snapshot renders in the first HTML response, while
   // the client script continues handling interactive filters and checkout.
-  catalogList: () => db.all(`SELECT id, slug, name, description, category, price, old_price, stock,
+  catalogList: () => db.all(`SELECT id, slug, url_slug, name, description, category, price, old_price, stock,
     CASE WHEN length(image) < 1024 THEN image ELSE NULL END AS image
     FROM products WHERE status = 'active' ORDER BY id DESC`),
 });
 const legacyStorefrontRedirects = new Map([
-  ['/featured-products.html', '/products.html'],
-  ['/flash-sale.html', '/products.html'],
-  ['/shop-grid.html', '/products.html'],
-  ['/shop-list.html', '/products.html'],
+  ['/featured-products.html', '/products'],
+  ['/flash-sale.html', '/products'],
+  ['/shop-grid.html', '/products'],
+  ['/shop-list.html', '/products'],
   ['/blog-grid.html', '/'],
   ['/blog-details.html', '/'],
-  ['/vendor-shop.html', '/products.html'],
-  ['/checkout-credit-card.html', '/checkout-payment.html'],
-  ['/checkout-paypal.html', '/checkout-payment.html'],
+  ['/vendor-shop.html', '/products'],
+  ['/checkout-credit-card.html', '/checkout-payment'],
+  ['/checkout-paypal.html', '/checkout-payment'],
 ]);
 app.get([...legacyStorefrontRedirects.keys()], (req, res) => {
   res.redirect(301, legacyStorefrontRedirects.get(req.path));
 });
 app.get('/', seoHtmlHandler);
+app.get(Object.keys(ROUTE_FILES).filter(route => !['/', '/admin/'].includes(route)), seoHtmlHandler);
+app.get(/^\/product\/[a-z0-9][a-z0-9-]*$/, seoHtmlHandler);
 app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, seoHtmlHandler);
 app.get('/sitemap.xml', createSitemapHandler({
   rootDir: publicRoot,
-  productList: () => db.all("SELECT slug, created_at FROM products WHERE status = 'active' ORDER BY id"),
+  productList: () => db.all("SELECT slug, url_slug, created_at FROM products WHERE status = 'active' ORDER BY id"),
 }));
 
 // Serve only storefront assets. The project root also contains application
@@ -211,6 +218,7 @@ app.use((err, req, res, next) => {
 
 async function start(port = PORT) {
   await db.init();
+  await ensureProductUrls(db);
   try {
     const updated = await require('./product-presentation').cleanStoredDescriptions(db);
     if (updated) console.log(`[CATALOG] Cleaned product descriptions: ${updated}.`);

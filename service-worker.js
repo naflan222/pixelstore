@@ -1,14 +1,16 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v23';
+const STATIC_CACHE = 'pixelhouse-static-v24';
 const APP_SHELL = [
   '/',
-  '/home.html',
-  '/products.html',
-  '/offline.html',
+  '/products',
+  '/js/storefront-routes.js?v=20261112.1',
+  '/gopro-accessories',
+  '/osmo-accessories',
+  '/offline',
   '/style.css?v=20261111.2',
-  '/js/product-images.js?v=20261110.1',
-  '/js/api-client.js?v=20261111.1',
+  '/js/product-images.js?v=20261112.1',
+  '/js/api-client.js?v=20261112.1',
   '/js/monthly-cycle.js?v=20261109.2',
   '/img/product/camping-20261109/manual-camping-tent-3-4-people.webp',
   '/img/core-img/logo-mark-hd.png',
@@ -41,11 +43,11 @@ self.addEventListener('fetch', (event) => {
 
   // Account, cart and checkout pages can contain private or rapidly changing
   // information, so they always use the network and are never cached.
-  if (/\/(?:cart|checkout|profile|my-order|notifications|login|register|otp|forget-password)/.test(url.pathname)) return;
+  if (/\/(?:cart|checkout|profile|edit-profile|my-order|notification|login|register|otp|forget-password|change-password|payment-success|intro|message|wishlist)/.test(url.pathname)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/offline.html'))
+      fetch(request).catch(() => caches.match('/offline'))
     );
     return;
   }

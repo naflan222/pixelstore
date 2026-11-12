@@ -6452,3 +6452,31 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
     background-position: center 60%;
   }
 }
+
+/* Camping uses the same category banner frame; other catalog searches remain available. */
+.camping-category-banner {
+  background-image: url('img/bg-img/camping-accessories-banner.webp');
+  background-color: #041521;
+}
+.camping-category-banner[hidden],
+#allProductsSearch[hidden] { display: none; }
+@media (min-width: 768px) {
+  .camping-category-banner {
+    background-size: auto 180px;
+    background-position: right center;
+    background-repeat: no-repeat;
+  }
+}
+@media (min-width: 768px) {
+  .camping-category-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 540px;
+    max-width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #041521, transparent 80px);
+    pointer-events: none;
+  }
+}

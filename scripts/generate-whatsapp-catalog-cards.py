@@ -41,7 +41,7 @@ def text_width(draw, value, face):
 
 def wrap_title(draw, label, max_width=1030, max_lines=3):
     words = label.replace(' — ', ' - ').split()
-    for sz in (77, 70, 63, 56, 49, 44, 39):
+    for sz in (77, 70, 63, 56, 49, 44, 39, 36, 33, 30):
         f = font(sz)
         lines, current = [], ''
         for w in words:
@@ -209,13 +209,13 @@ def build(row, original):
     # not a copy: no fake supplier watermarks, prices or extra products.
     for y in range(18, SIZE, 47):
         for x in range(20, SIZE, 47):
-            draw.ellipse((x, y, x+1, y+1), fill=(15, 19, 20, 8))
+            draw.ellipse((x, y, x+1, y+1), fill=(237, 238, 237, 255))
     draw.arc((1040, 204, 1430, 590), 195, 330,
-             fill=(*accent, 21), width=5)
+             fill=(235, 239, 235, 255), width=5)
     draw.arc((-270, 690, 190, 1150), 245, 342,
-             fill=(*accent, 19), width=4)
+             fill=(235, 239, 235, 255), width=4)
     draw.rectangle((0, 0, 17, SIZE), fill=(*accent, 255))
-    draw.rectangle((18, 0, 25, SIZE), fill=(*accent, 46))
+    draw.rectangle((18, 0, 25, SIZE), fill=(233, 239, 237, 255))
     draw_logo(card)
     draw = ImageDraw.Draw(card, 'RGBA')
     draw_brand(draw, cat, accent)
@@ -229,7 +229,7 @@ def build(row, original):
               fill=(255, 255, 255, 255))
 
     title = str(row.get('name') or 'Product').strip()
-    lines, titlefont = wrap_title(draw, title, max_width=1040, max_lines=3)
+    lines, titlefont = wrap_title(draw, title, max_width=1040, max_lines=2)
     # Reflow at smaller size for very long product names.
     line_gap = titlefont.size + 12
     title_start = 276
@@ -243,7 +243,7 @@ def build(row, original):
     # Product stage in off-white, no thick colored rectangles.
     stage = (57, top_photo, 1144, bottom_photo)
     shadow = (63, top_photo+8, 1149, bottom_photo+8)
-    draw.rounded_rectangle(shadow, radius=28, fill=(27, 33, 37, 18))
+    draw.rounded_rectangle(shadow, radius=28, fill=(228, 230, 230, 255))
     draw.rounded_rectangle(stage, radius=26,
                            fill=(255, 255, 255, 255),
                            outline=(226, 228, 227, 255), width=2)
@@ -283,7 +283,7 @@ def build(row, original):
     cf=font(34)
     x=821+(320-text_width(draw,label,cf))//2
     draw.text((x, 1081), label, font=cf, fill=(255, 255, 255, 255))
-    draw.line((72, 1168, 1143, 1168), fill=(*accent, 80), width=2)
+    draw.line((72, 1168, 1143, 1168), fill=(226, 232, 229, 255), width=2)
     draw.text((77, 1175), 'PIXELHOUSE.LK', font=font(16),
               fill=(122, 128, 130, 255))
     return card.convert('RGB')

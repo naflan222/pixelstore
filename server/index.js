@@ -27,6 +27,7 @@ const apiRoutes = require('./routes');
 const adminRoutes = require('./admin-routes');
 const db = require('./database');
 const { ensureProductUrls } = require('./product-urls');
+const { registerMetaCatalogRoutes } = require('./meta-catalog');
 const { ROUTE_FILES, cleanStorefrontRedirect } = require('./storefront-urls');
 const { createHtmlHandler, createSitemapHandler, canonicalHomepageRedirect } = require('./seo');
 const { rateLimit, securityHeaders } = require('./security');
@@ -179,6 +180,9 @@ const seoHtmlHandler = createHtmlHandler({
     CASE WHEN length(image) < 1024 THEN image ELSE NULL END AS image
     FROM products WHERE status = 'active' ORDER BY id DESC`),
 });
+// Public read-only product feed and images for Meta Commerce Manager.
+registerMetaCatalogRoutes(app, db);
+
 const legacyStorefrontRedirects = new Map([
   ['/featured-products.html', '/products'],
   ['/flash-sale.html', '/products'],

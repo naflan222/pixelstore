@@ -29,7 +29,13 @@ test('WhatsApp image URL is separate from the original website image', () => {
     assert.match(feed.csv, /https:\/\/pixelhouse\.lk\/img\/product\/18\.png/);
     assert.match(feed.csv, /"PH-1"/);
     assert.match(feed.csv, /"PH-2"/);
-    assert.match(feed.csv, /"out of stock"/);
+    // WhatsApp is an order-on-request catalog, independent of website stock.
+    assert.doesNotMatch(feed.csv, /"out of stock"/);
+    assert.equal((feed.csv.match(/"in stock"/g) || []).length, 2);
+    assert.match(feed.csv, /confirm availability and delivery time before ordering/);
+    // The original website-derived feed must still publish true stock.
+    assert.match(oldFeed.csv, /"out of stock"/);
+    assert.equal(products[1].stock, 0);
     assert.match(feed.csv, /"1200\.00 LKR"/);
     // Import into Meta is manual: the existing feed and source photos
     // still use their original unmodified image links.

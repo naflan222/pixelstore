@@ -34,6 +34,13 @@ function buildWhatsAppFeed(products, opts = {}) {
     const custom = whatsappImageFor(row, opts);
     if (custom !== row.image_link) redesigned++; else fallback++;
     row.image_link = custom;
+    // WhatsApp is an order-by-message channel: active items can be sourced on
+    // request even when their physical on-hand website stock is zero.
+    // This deliberately does NOT change the website product.stock field or
+    // the standard /meta-catalog.csv feed. Never promise immediate dispatch.
+    row.availability = 'in stock';
+    row.description = (row.description + ' Please message Pixel House to confirm ' +
+      'availability and delivery time before ordering.').slice(0, 4999);
     out.push(FIELDS.map(key => csvCell(row[key])).join(','));
   }
   return {
@@ -48,9 +55,10 @@ function buildWhatsAppFeed(products, opts = {}) {
 function registerWhatsAppCatalogRoute(app, db) {
   app.get('/whatsapp-catalog.csv', async (_req, res, next) => {
     try {
-      // Use the same live product query as /meta-catalog.csv. Source prices,
-      // names, links, availability, and every storefront product image remain
-      // unchanged. Only eligible image_link fields use the custom cards.
+      // Use the same live product query as /meta-catalog.csv. Prices, names,
+      // links and original storefront product images remain unchanged. This
+      // WhatsApp feed alone advertises active products as orderable, even when
+      // site stock is zero, and includes an availability confirmation note.
       const products = await db.all(`
         SELECT p.id, p.name, p.description, p.price, p.old_price, p.stock,
           p.url_slug, p.brand, p.mpn, p.gtin,

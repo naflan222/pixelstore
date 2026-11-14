@@ -19,10 +19,11 @@ PHONE = '0777466675'
 ORIGIN = 'https://pixelhouse.lk'
 
 PALETTES = {
-    'camping': ((14, 45, 32), (35, 98, 56), (235, 191, 94), 'CAMPING GEAR'),
-    'gopro': ((8, 21, 43), (10, 76, 132), (23, 190, 247), 'GoPro'),
-    'dji': ((12, 26, 31), (24, 73, 74), (73, 227, 171), 'DJI'),
-    'insta360': ((26, 15, 54), (85, 49, 121), (217, 148, 244), 'INSTA360'),
+    # White/ivory editorial card designs; family-specific restrained accent.
+    'camping': ((254, 253, 249), (246, 247, 240), (102, 123, 62), 'OUTDOOR & CAMPING'),
+    'gopro': ((253, 254, 255), (242, 248, 252), (16, 141, 202), 'ACTION CAMERA GEAR'),
+    'dji': ((254, 255, 254), (241, 249, 246), (19, 142, 125), 'OSMO ACCESSORIES'),
+    'insta360': ((255, 253, 255), (249, 244, 253), (112, 88, 158), '360 CAMERA GEAR'),
 }
 
 def font(size, bold=True):
@@ -153,90 +154,138 @@ def crop_subject(image):
     return img.crop((max(0, left-pad), max(0, top-pad),
                      min(img.width, right+pad), min(img.height, bottom+pad)))
 
+def draw_logo(card):
+    """Embed the genuine PixelHouse brand asset tracked in GitHub."""
+    logo = ROOT / 'img/icons/icon-512x512.png'
+    draw = ImageDraw.Draw(card, 'RGBA')
+    draw.rounded_rectangle((69, 51, 163, 145), radius=21,
+                           fill=(255, 255, 255, 255),
+                           outline=(219, 222, 221, 255), width=2)
+    if logo.is_file():
+        with Image.open(logo) as actual:
+            icon = actual.convert('RGBA')
+            icon.thumbnail((86, 86), Image.Resampling.LANCZOS)
+            card.alpha_composite(icon, (116 - icon.width // 2, 98 - icon.height // 2))
+    else:
+        draw.text((82, 78), 'PH', font=font(38), fill=(32, 35, 38, 255))
+    draw.text((185, 72), 'PIXEL HOUSE', font=font(36),
+              fill=(34, 37, 41, 255))
+    draw.text((187, 119), 'CAMERAS  /  ACCESSORIES  /  OUTDOOR',
+              font=font(16, False), fill=(99, 104, 105, 255))
+
+def draw_brand(draw, cat, accent):
+    """Category branding: compatible, not falsely marketed as OEM."""
+    if cat == 'gopro':
+        f=font(39)
+        draw.text((995, 68), 'GoPro', font=f, fill=(32, 36, 41, 255))
+        for i, col in enumerate(((0, 175, 228),(12, 137, 208),
+                                 (18, 105, 181),(35, 35, 40))):
+            draw.rounded_rectangle((1005+i*35, 113, 1034+i*35, 130),
+                                   radius=2, fill=col)
+        label='COMPATIBLE GEAR'
+    elif cat == 'dji':
+        draw.text((1021, 64), 'dji', font=font(49),
+                  fill=(30, 38, 41, 255))
+        label='OSMO ACCESSORIES'
+    elif cat == 'insta360':
+        draw.text((957, 70), 'INSTA360', font=font(27),
+                  fill=(30, 38, 41, 255))
+        label='360 CAMERA GEAR'
+    else:
+        label='OUTDOOR COLLECTION'
+    small=font(15)
+    draw.text((1140 - text_width(draw,label,small), 140),label,
+              font=small,fill=(*accent, 255))
+
 def build(row, original):
     cat = category(row)
-    dark, mid, accent, label = PALETTES[cat]
-    card = gradient(dark, mid).convert('RGBA')
+    top, bottom, accent, category_label = PALETTES[cat]
+    card = gradient(top, bottom).convert('RGBA')
     draw = ImageDraw.Draw(card, 'RGBA')
+    neutral = (34, 38, 42, 255)
+    muted = (117, 123, 124, 255)
 
-    # Visual identity differs by product family. Keep bottom area clear.
-    for i in range(5):
-        x, y = 990 + i * 37, 70 + i * 50
-        draw.ellipse((x-220, y-100, x+220, y+340),
-                     outline=(*accent, 25), width=10)
-    draw.rounded_rectangle((38, 35, 1162, 1025), radius=38,
-                           outline=(*accent, 110), width=3)
-    draw.rounded_rectangle((63, 52, 1136, 118), radius=18, fill=(0,0,0,95))
-    draw.text((88, 68), 'PIXEL HOUSE', font=font(29), fill='white')
+    # Quiet designer-paper details inspired by the user's reference examples;
+    # not a copy: no fake supplier watermarks, prices or extra products.
+    for y in range(18, SIZE, 47):
+        for x in range(20, SIZE, 47):
+            draw.ellipse((x, y, x+1, y+1), fill=(15, 19, 20, 8))
+    draw.arc((1040, 204, 1430, 590), 195, 330,
+             fill=(*accent, 21), width=5)
+    draw.arc((-270, 690, 190, 1150), 245, 342,
+             fill=(*accent, 19), width=4)
+    draw.rectangle((0, 0, 17, SIZE), fill=(*accent, 255))
+    draw.rectangle((18, 0, 25, SIZE), fill=(*accent, 46))
+    draw_logo(card)
+    draw = ImageDraw.Draw(card, 'RGBA')
+    draw_brand(draw, cat, accent)
 
-    # Use recognizable wordmark-style category branding. Generic accessory
-    # products are clearly labeled compatible instead of falsely manufacturer-made.
-    if cat == 'gopro':
-        brandfont = font(36)
-        draw.text((883, 62), 'GoPro', font=brandfont, fill='white')
-        for i, blue in enumerate(((0, 180, 245), (0, 134, 219),
-                                  (7, 96, 181), (245, 249, 255))):
-            draw.rectangle((1005 + i*26, 78, 1027 + i*26, 94), fill=blue)
-        draw.text((947, 100), 'COMPATIBLE ACCESSORIES',
-                  font=font(13), fill=(230, 245, 255, 255))
-    elif cat == 'dji':
-        draw.text((1033, 56), 'dji', font=font(42), fill='white')
-        draw.text((903, 101), 'OSMO ACCESSORIES',
-                  font=font(16), fill=(*accent, 255))
-    else:
-        right = 'CAMPING COLLECTION' if cat == 'camping' else 'INSTA360 ACCESSORIES'
-        rf = font(24)
-        draw.text((1112 - text_width(draw, right, rf), 74), right,
-                  font=rf, fill=(*accent, 255))
+    draw.line((69, 179, 1143, 179), fill=(208, 211, 210, 255), width=2)
+    draw.rounded_rectangle((70, 207, 327, 250), radius=12,
+                           fill=(*accent, 255))
+    label=category_label[:26]
+    mini=font(17)
+    draw.text((83, 219), label, font=mini,
+              fill=(255, 255, 255, 255))
 
-    lines, titlefont = wrap_title(draw, str(row.get('name') or 'Product'))
-    gap = titlefont.size + 10
+    title = str(row.get('name') or 'Product').strip()
+    lines, titlefont = wrap_title(draw, title, max_width=1040, max_lines=3)
+    # Reflow at smaller size for very long product names.
+    line_gap = titlefont.size + 12
+    title_start = 276
     for n, title_line in enumerate(lines):
-        draw.text((85, 150 + n * gap), title_line,
-                  font=titlefont, fill='white', stroke_width=1,
-                  stroke_fill=(0,0,0))
-    title_bottom = 150 + len(lines) * gap
-    top_photo = min(max(title_bottom + 12, 285), 415)
-    bottom_photo = 930
-    photo_rect = (84, top_photo, 1116, bottom_photo)
+        draw.text((73, title_start+n*line_gap), title_line,
+                  font=titlefont, fill=neutral)
+    title_end = title_start + len(lines)*line_gap
 
-    # A clean matte presentation retains the real product silhouette, logos and colors.
-    draw.rounded_rectangle((photo_rect[0] + 7, photo_rect[1] + 13,
-                            photo_rect[2] + 7, photo_rect[3] + 13),
-                           radius=35, fill=(0,0,0,100))
-    draw.rounded_rectangle(photo_rect, radius=35,
-                           fill=(247, 249, 248, 255))
+    top_photo = min(max(title_end+15, 405), 517)
+    bottom_photo = 1008
+    # Product stage in off-white, no thick colored rectangles.
+    stage = (57, top_photo, 1144, bottom_photo)
+    shadow = (63, top_photo+8, 1149, bottom_photo+8)
+    draw.rounded_rectangle(shadow, radius=28, fill=(27, 33, 37, 18))
+    draw.rounded_rectangle(stage, radius=26,
+                           fill=(255, 255, 255, 255),
+                           outline=(226, 228, 227, 255), width=2)
 
     photo = crop_subject(original)
     if photo.mode != 'RGBA':
         photo = photo.convert('RGBA')
-    photo = ImageEnhance.Contrast(photo).enhance(1.07)
-    photo = ImageEnhance.Sharpness(photo).enhance(1.30)
-    # Fit the photo without cropping or modifying the product's shape.
-    # Pillow.thumbnail never enlarges a small original; explicitly scale to
-    # the photo stage so products are visually prominent in WhatsApp previews.
-    scale = min(950 / photo.width, (bottom_photo - top_photo - 42) / photo.height)
-    photo = photo.resize((max(1, round(photo.width * scale)),
-                          max(1, round(photo.height * scale))),
-                         Image.Resampling.LANCZOS)
-    if scale > 1:
-        photo = photo.filter(ImageFilter.UnsharpMask(radius=1.0, percent=112, threshold=3))
-    px = (SIZE - photo.width) // 2
-    py = top_photo + (bottom_photo - top_photo - photo.height) // 2
-    card.alpha_composite(photo, (px, py))
+    photo = ImageEnhance.Contrast(photo).enhance(1.055)
+    photo = ImageEnhance.Sharpness(photo).enhance(1.20)
+    # Original product imagery is enlarged without distorting dimensions.
+    target_w, target_h = 1015, bottom_photo-top_photo-32
+    scale = min(target_w / photo.width, target_h / photo.height)
+    photo = photo.resize((max(1,round(photo.width * scale)),
+                          max(1,round(photo.height * scale))),
+                          Image.Resampling.LANCZOS)
+    if scale > 1.3:
+        photo = photo.filter(ImageFilter.UnsharpMask(radius=0.8, percent=105, threshold=3))
+    px, py = (SIZE-photo.width)//2, top_photo+(bottom_photo-top_photo-photo.height)//2
 
+    # Merge opaque white-source photographs seamlessly into the white stage.
+    # Fully transparent product cutouts retain the actual silhouette.
+    card.alpha_composite(photo, (px,py))
     draw = ImageDraw.Draw(card, 'RGBA')
-    # Footer is persistent and legible after WhatsApp's thumbnail crop.
-    draw.rounded_rectangle((62, 951, 1138, 1146), radius=31, fill=(0,0,0,208))
-    draw.text((88, 971), 'CASH ON DELIVERY', font=font(34),
-              fill=(*accent, 255))
-    draw.text((90, 1038), PHONE, font=font(58), fill='white')
-    draw.rounded_rectangle((726, 1032, 1113, 1115), radius=29,
+
+    draw.line((71, 1037, 1143, 1037), fill=(212, 215, 214, 255), width=2)
+    # Ordering footer, deliberately smaller than the featured product.
+    draw.text((75, 1057), 'WHATSAPP / CALL', font=font(21),
+              fill=muted)
+    draw.text((74, 1092), PHONE, font=font(43), fill=neutral)
+
+    draw.text((485, 1059), 'CASH ON', font=font(25), fill=neutral)
+    draw.text((485, 1090), 'DELIVERY', font=font(28), fill=(*accent, 255))
+
+    draw.rounded_rectangle((821, 1065, 1141, 1138), radius=27,
                            fill=(*accent, 255))
-    cta = 'SHOP NOW'
-    cf = font(37)
-    draw.text((726 + (387 - text_width(draw, cta, cf)) // 2, 1051),
-              cta, font=cf, fill=dark)
+    label='SHOP NOW'
+    cf=font(34)
+    x=821+(320-text_width(draw,label,cf))//2
+    draw.text((x, 1081), label, font=cf, fill=(255, 255, 255, 255))
+    draw.line((72, 1168, 1143, 1168), fill=(*accent, 80), width=2)
+    draw.text((77, 1175), 'PIXELHOUSE.LK', font=font(16),
+              fill=(122, 128, 130, 255))
     return card.convert('RGB')
 
 def main():

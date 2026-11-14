@@ -1,0 +1,28 @@
+name: Build separate WhatsApp catalog images
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/generate-whatsapp-catalog-cards.py'
+      - '.github/workflows/whatsapp-catalog-images.yml'
+permissions:
+  contents: read
+jobs:
+  build-cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image libraries
+        run: python -m pip install Pillow==11.3.0
+      - name: Generate one WhatsApp image for each active Pixelhouse product
+        run: python scripts/generate-whatsapp-catalog-cards.py
+      - name: Upload all WhatsApp catalog images as a ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pixelhouse-WhatsApp-Individual-Product-Images
+          path: dist/whatsapp-cards/
+          retention-days: 30
+          if-no-files-found: error

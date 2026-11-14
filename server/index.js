@@ -28,6 +28,7 @@ const adminRoutes = require('./admin-routes');
 const db = require('./database');
 const { ensureProductUrls } = require('./product-urls');
 const { registerMetaCatalogRoutes } = require('./meta-catalog');
+const { registerWhatsAppCatalogRoute } = require('./whatsapp-catalog');
 const { ROUTE_FILES, cleanStorefrontRedirect } = require('./storefront-urls');
 const { createHtmlHandler, createSitemapHandler, canonicalHomepageRedirect } = require('./seo');
 const { rateLimit, securityHeaders } = require('./security');
@@ -182,6 +183,8 @@ const seoHtmlHandler = createHtmlHandler({
 });
 // Public read-only product feed and images for Meta Commerce Manager.
 registerMetaCatalogRoutes(app, db);
+// This feed uses custom WhatsApp cards; the website catalog remains untouched.
+registerWhatsAppCatalogRoute(app, db);
 
 const legacyStorefrontRedirects = new Map([
   ['/featured-products.html', '/products'],

@@ -201,7 +201,14 @@ def build(row, original):
     photo = ImageEnhance.Contrast(photo).enhance(1.07)
     photo = ImageEnhance.Sharpness(photo).enhance(1.30)
     # Fit the photo without cropping or modifying the product's shape.
-    photo.thumbnail((970, bottom_photo-top_photo-38), Image.Resampling.LANCZOS)
+    # Pillow.thumbnail never enlarges a small original; explicitly scale to
+    # the photo stage so products are visually prominent in WhatsApp previews.
+    scale = min(950 / photo.width, (bottom_photo - top_photo - 42) / photo.height)
+    photo = photo.resize((max(1, round(photo.width * scale)),
+                          max(1, round(photo.height * scale))),
+                         Image.Resampling.LANCZOS)
+    if scale > 1:
+        photo = photo.filter(ImageFilter.UnsharpMask(radius=1.0, percent=112, threshold=3))
     px = (SIZE - photo.width) // 2
     py = top_photo + (bottom_photo - top_photo - photo.height) // 2
     card.alpha_composite(photo, (px, py))

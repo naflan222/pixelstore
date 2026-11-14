@@ -169,13 +169,25 @@ def build(row, original):
     draw.rounded_rectangle((63, 52, 1136, 118), radius=18, fill=(0,0,0,95))
     draw.text((88, 68), 'PIXEL HOUSE', font=font(29), fill='white')
 
-    right = ('CAMPING COLLECTION' if cat == 'camping'
-        else 'GoPro  |  COMPATIBLE' if cat == 'gopro'
-        else 'DJI  |  OSMO ACCESSORIES' if cat == 'dji'
-        else 'INSTA360  |  ACCESSORIES')
-    rf = font(24)
-    draw.text((1112 - text_width(draw, right, rf), 74), right,
-              font=rf, fill=(*accent, 255))
+    # Use recognizable wordmark-style category branding. Generic accessory
+    # products are clearly labeled compatible instead of falsely manufacturer-made.
+    if cat == 'gopro':
+        brandfont = font(36)
+        draw.text((883, 62), 'GoPro', font=brandfont, fill='white')
+        for i, blue in enumerate(((0, 180, 245), (0, 134, 219),
+                                  (7, 96, 181), (245, 249, 255))):
+            draw.rectangle((1005 + i*26, 78, 1027 + i*26, 94), fill=blue)
+        draw.text((947, 100), 'COMPATIBLE ACCESSORIES',
+                  font=font(13), fill=(230, 245, 255, 255))
+    elif cat == 'dji':
+        draw.text((1033, 56), 'dji', font=font(42), fill='white')
+        draw.text((903, 101), 'OSMO ACCESSORIES',
+                  font=font(16), fill=(*accent, 255))
+    else:
+        right = 'CAMPING COLLECTION' if cat == 'camping' else 'INSTA360 ACCESSORIES'
+        rf = font(24)
+        draw.text((1112 - text_width(draw, right, rf), 74), right,
+                  font=rf, fill=(*accent, 255))
 
     lines, titlefont = wrap_title(draw, str(row.get('name') or 'Product'))
     gap = titlefont.size + 10

@@ -9,7 +9,7 @@ import math
 import re
 import urllib.request
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageChops
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'dist' / 'whatsapp-cards'
@@ -130,6 +130,29 @@ def gradient(top, bottom):
         pix[0, y] = tuple(round(top[i] * (1 - t) + bottom[i] * t) for i in range(3))
     return strip.resize((SIZE, SIZE))
 
+def crop_subject(image):
+    """Trim excess white/transparent padding but never change the product itself."""
+    img = image.convert('RGBA')
+    # Transparent PNGs can be cropped exactly by their alpha silhouette.
+    alpha = img.getchannel('A')
+    bbox = alpha.point(lambda v: 255 if v > 15 else 0).getbbox()
+    if bbox and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 0.91 * img.width * img.height:
+        pass
+    else:
+        # Typical PixelHouse photos are of objects centered on pure-white pages.
+        # Detect the contrast region and keep generous margins.
+        diff = ImageChops.difference(img.convert('RGB'),
+                                     Image.new('RGB', img.size, 'white')).convert('L')
+        bbox = diff.point(lambda v: 255 if v > 27 else 0).getbbox()
+    if not bbox:
+        return img
+    left, top, right, bottom = bbox
+    if right - left < 18 or bottom - top < 18:
+        return img
+    pad = max(18, int(max(right-left, bottom-top) * .07))
+    return img.crop((max(0, left-pad), max(0, top-pad),
+                     min(img.width, right+pad), min(img.height, bottom+pad)))
+
 def build(row, original):
     cat = category(row)
     dark, mid, accent, label = PALETTES[cat]
@@ -172,7 +195,7 @@ def build(row, original):
     draw.rounded_rectangle(photo_rect, radius=35,
                            fill=(247, 249, 248, 255))
 
-    photo = original.copy()
+    photo = crop_subject(original)
     if photo.mode != 'RGBA':
         photo = photo.convert('RGBA')
     photo = ImageEnhance.Contrast(photo).enhance(1.07)

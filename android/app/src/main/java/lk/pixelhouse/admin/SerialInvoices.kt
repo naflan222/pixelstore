@@ -26,6 +26,7 @@ fun invoiceLineBody(item: Map<String,String>): JSONObject {
         serials.put(text)
     }
     return JSONObject().put("name", item["name"]!!.trim()).put("price", price).put("quantity", quantity)
+        .put("catalog_price", item["catalog_price"]?.toDoubleOrNull() ?: JSONObject.NULL)
         .put("product_id", item["product_id"]?.toLongOrNull() ?: JSONObject.NULL).put("serial_numbers", serials)
 }
 private fun newInvoiceLine() = mutableStateMapOf("name" to "", "price" to "0", "quantity" to "1", "serial_enabled" to "false")
@@ -54,7 +55,7 @@ private fun hasSerials(item: Map<String,String>) = item.any { (key,value) -> key
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
     fun select(product: JSONObject?) {
         val action = {
-            clearSerials(item);item["product_id"]=product?.display("id").orEmpty();item["name"]=product?.display("name").orEmpty();item["price"]=product?.display("price") ?: "0";item["serial_enabled"]=(product?.optBoolean("serial_eligible") == true).toString()
+            clearSerials(item);item["product_id"]=product?.display("id").orEmpty();item["name"]=product?.display("name").orEmpty();item["catalog_price"]=product?.display("price").orEmpty();item["price"]=product?.display("price") ?: "0";item["serial_enabled"]=(product?.optBoolean("serial_eligible") == true).toString()
         }
         if(hasSerials(item))pending=action else action()
     }
@@ -67,13 +68,14 @@ private fun hasSerials(item: Map<String,String>) = item.any { (key,value) -> key
             }
         }
         FieldInput(text("name",true),item["name"].orEmpty()){item["name"]=it}
-        FieldInput(number("price").copy(label="Unit price (editable)"),item["price"].orEmpty()){item["price"]=it}
+        FieldInput(number("price").copy(label="Selling price (editable)"),item["price"].orEmpty()){item["price"]=it}
         FieldInput(number("quantity"),item["quantity"].orEmpty()){ value ->
             val count=value.toIntOrNull()
             val excess=count != null && item.any { (k,v)-> (k.substringAfter("serial_", "").toIntOrNull() ?: -1) >= count && v.isNotBlank() }
             val action={ item["quantity"]=value;if(count!=null)item.keys.filter{(it.substringAfter("serial_", "").toIntOrNull() ?: -1)>=count}.forEach{item.remove(it)} }
             if(excess)pending=action else action()
         }
+        item["catalog_price"]?.toDoubleOrNull()?.let { Text("Original catalog unit price: " + displayMoney(it)) }
         Text("Line total: " + displayMoney((item["price"]?.toDoubleOrNull() ?: 0.0) * (item["quantity"]?.toIntOrNull() ?: 0)))
         SerialFields(item)
         if(remove!=null)TextButton(onClick=remove){Text("Remove item")}

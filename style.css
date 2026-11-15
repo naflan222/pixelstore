@@ -6480,3 +6480,18 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
     pointer-events: none;
   }
 }
+
+/* Checkout thumbnails reserve space before responsive images load. */
+.cart-table .cart-image-cell { width: 56px; min-width: 56px; }
+.cart-table .cart-image-cell img { display: block; width: 40px; height: 40px; min-width: 40px; object-fit: contain; }
+@media (min-width: 768px) {
+  .checkout-layout .container { width: calc(100% - 32px); max-width: 1120px; }
+  .cart-layout .cart-wrapper-area { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
+  .cart-layout .cart-table { grid-column: 1; grid-row: 1 / span 2; }
+  .cart-layout .coupon-card, .cart-layout .cart-amount-area { grid-column: 2; margin-bottom: 0 !important; }
+  .cart-layout .cart-amount-area .card-body { flex-wrap: wrap; gap: 16px; }
+  .billing-layout .checkout-wrapper-area { display: grid; grid-template-rows: auto auto 1fr; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 24px; align-items: start; }
+  .billing-layout .billing-information-card { grid-column: 1; grid-row: 1 / span 3; }
+  .billing-layout .shipping-method-choose.mb-3, .billing-layout .cart-amount-area { grid-column: 2; margin-bottom: 0 !important; }
+  .billing-layout .cart-amount-area .card-body { flex-wrap: wrap; gap: 16px; }
+}

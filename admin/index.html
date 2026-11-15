@@ -883,6 +883,7 @@ function selectOfflineCatalogProduct(row) {
   const input = row.querySelector('.offline-item-name');
   const match = offlineCatalog.find(product => product.name.toLocaleLowerCase() === input.value.trim().toLocaleLowerCase());
   if (!match) {
+    row.dataset.productId='';row.dataset.catalogPrice='';row.querySelector('.offline-item-product').value='';
     row.querySelector('.offline-item-info').textContent = '';
     return;
   }
@@ -891,10 +892,11 @@ function selectOfflineCatalogProduct(row) {
   row.serialValues=[];row.selectedInvoiceName=match.name;
   row.querySelector('.offline-item-product').value=match.id;
   row.dataset.productId = match.id;
+  row.dataset.catalogPrice = match.price;
   row.querySelector('.offline-item-price').value = Number(match.price).toFixed(2);
   row.querySelector('.offline-item-serial-toggle').checked = !!match.serial_eligible;
   renderInvoiceSerials(row);
-  row.querySelector('.offline-item-info').textContent = [match.sku && `SKU ${match.sku}`, match.description].filter(Boolean).join(' · ').slice(0, 180);
+  row.querySelector('.offline-item-info').textContent = ['Original unit price: ' + money(match.price), match.sku && `SKU ${match.sku}`, match.description].filter(Boolean).join(' · ').slice(0, 180);
   updateOfflineInvoiceTotals();
 }
 
@@ -903,13 +905,19 @@ function addOfflineInvoiceItem() {
   row.className = 'offline-invoice-row';
   const listId = `offline-products-${Math.random().toString(36).slice(2)}`;
   row.innerHTML = `
-    <div class="form-group description"><label>Choose product</label><select class="offline-item-product"></select><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
+    <div class="form-group description"><label>Find product by name or SKU</label><input class="offline-product-search" type="search" placeholder="Search products…" autocomplete="off"><select class="offline-item-product"></select><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
     <div class="form-group"><label>Quantity *</label><input class="offline-item-quantity" type="number" min="1" max="10000" step="1" value="1" required></div>
-    <div class="form-group"><label>Unit price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
+    <div class="form-group"><label>Selling price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
     <div class="form-group"><label>Line total</label><div class="line-total">Rs. 0.00</div></div>
     <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>
     <div class="form-group description" style="grid-column:1 / -1"><label><input type="checkbox" class="offline-item-serial-toggle"> Add serial numbers</label><div class="invoice-serial-inputs" hidden></div></div>`;
   row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateOfflineInvoiceTotals));
+  row.querySelector('.offline-product-search').addEventListener('input', e => {
+    const query=e.target.value.trim().toLocaleLowerCase();
+    const select=row.querySelector('.offline-item-product');
+    const matches=offlineCatalog.filter(p=>(p.name+' '+(p.sku || '')).toLocaleLowerCase().includes(query));
+    select.innerHTML='<option value="">'+(matches.length?'Choose a matching product':'No matching products')+'</option>'+matches.map(p=>`<option value="${p.id}">${esc(p.name)} — ${money(p.price)}</option>`).join('');
+  });
   row.querySelector('.offline-item-product').addEventListener('change', e => {
     const product = offlineCatalog.find(p => p.id === Number(e.target.value));
     if (row.serialValues?.some(Boolean) && !confirm('Changing product clears its entered serial numbers. Continue?')) { e.target.value=row.dataset.productId || '';return; }
@@ -943,6 +951,7 @@ function collectOfflineInvoiceItems() {
     quantity: Number(row.querySelector('.offline-item-quantity').value),
     price: Number(row.querySelector('.offline-item-price').value),
     product_id: Number(row.dataset.productId) || null,
+    catalog_price: row.dataset.productId ? Number(row.dataset.catalogPrice) : null,
     serial_numbers: row.querySelector('.offline-item-serial-toggle').checked ? Array.from({length:Number(row.querySelector('.offline-item-quantity').value)||1},(_,i)=>row.serialValues?.[i] || '') : [],
   })).filter(item => item.name || item.price > 0);
 }

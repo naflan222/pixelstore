@@ -819,7 +819,7 @@
           tbody.innerHTML = items.map((i) => (
             '<tr>' +
               '<th scope="row"><a class="remove-product" href="#" data-remove="' + i.cart_id + '"><i class="ti ti-x"></i></a></th>' +
-              '<td><img class="rounded" src="' + escapeHtml(i.image) + '" alt="' + escapeHtml(i.name) + '"></td>' +
+              '<td class="cart-image-cell"><img class="rounded" width="40" height="40" ' + pictureAttributes(i.image || '/img/product/1.webp', '40px') + ' alt="' + escapeHtml(i.name) + '" loading="eager" decoding="async"></td>' +
               '<td><a class="product-title" href="' + escapeHtml(i.url_path || routeHref(i.slug + '.html')) + '">' + escapeHtml(i.name) +
                 '<span class="mt-1">' + money(i.price) + ' × ' + i.quantity + '</span></a></td>' +
               '<td><div class="quantity"><input class="qty-text" type="number" min="1" max="99" value="' + i.quantity +
@@ -965,16 +965,25 @@
     },
 
     'checkout-payment.html': async function () {
-      try {
-        const settings = await get('/checkout-settings');
-        $$('.single-payment-method').forEach(option => {
-          const link = option.querySelector('a');
-          const method = link?.classList.contains('cash') ? 'cash' : link?.classList.contains('bank') ? 'bank' : 'unsupported';
-          option.hidden = !settings.payment_methods.includes(method);
-          option.style.display = option.hidden ? 'none' : '';
-          const column = option.closest('.col-6');if(column) { column.hidden=option.hidden;column.style.display=option.hidden?'none':''; }
-        });
-      } catch (_) { $$('.single-payment-method').forEach(option => { if (!option.querySelector('a.cash')) option.style.display='none'; }); }
+      const status = document.getElementById('paymentMethodsStatus');
+      async function loadMethods() {
+        if(status) status.textContent='Loading available payment methods…';
+        try {
+          const settings = await get('/checkout-settings');
+          $$('.single-payment-method').forEach(option => {
+            const link=option.querySelector('a');
+            const method=link?.classList.contains('cash')?'cash':link?.classList.contains('bank')?'bank':'unsupported';
+            const visible=settings.payment_methods.includes(method);
+            const column=option.closest('.col-6');
+            if(column) { column.hidden=!visible;column.style.display=visible?'':'none'; }
+            option.hidden=!visible;option.style.display=visible?'':'none';
+          });
+          if(status) status.textContent=settings.payment_methods.length?'':'No payment methods are available. Please contact the store.';
+        } catch (_) {
+          if(status) { status.replaceChildren(document.createTextNode('Could not load payment methods. '));const retry=document.createElement('button');retry.type='button';retry.className='btn btn-primary btn-sm';retry.textContent='Retry';retry.onclick=loadMethods;status.append(retry); }
+        }
+      }
+      await loadMethods();
     },
 
     // --- Final payment pages: place the real order on button click ---

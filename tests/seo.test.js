@@ -65,7 +65,8 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /"@type":"WebSite"/);
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
-  assert.equal(stylesheetHref(result), stylesheetHref(source), 'SEO must preserve the page stylesheet, including its cache version');
+  assert.equal(stylesheetHref(result).split('?')[0], stylesheetHref(source).split('?')[0], 'SEO must preserve the page stylesheet');
+  assert.equal(stylesheetHref(result), 'style.css?v=20261115.6');
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
 });
@@ -104,7 +105,7 @@ test('GoPro and DJI accessory categories explain the products and keep crawlable
     assert.ok(result.includes('href="' + product + '"'), filename + ': product link');
     assert.ok(result.includes('rel="canonical" href="https://pixelhouse.lk' + (FILE_PATHS[filename] || '/' + filename) + '"'), filename + ': canonical');
     assert.ok(result.includes('data-catalog-category='), filename + ': existing catalog remains functional');
-    assert.equal(stylesheetHref(result), stylesheetHref(source), filename + ': design stylesheet unchanged');
+    assert.equal(stylesheetHref(result).split('?')[0], stylesheetHref(source).split('?')[0], filename + ': design stylesheet unchanged');
   }
   assert.match(read('osmocat.html'), /href="osmocat\.html" aria-current="page">1<\/a>/);
 });
@@ -322,7 +323,7 @@ test('service worker installs current assets and refreshes CSS and JavaScript be
   let installation;
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await installation;
-  const stylesheet = '/' + stylesheetHref(read('home.html'));
+  const stylesheet = '/' + stylesheetHref(enhanceHtml(read('home.html'), 'home.html'));
   const client = enhanceHtml(read('home.html'), 'home.html').match(/<script\b[^>]*src="(js\/api-client\.js(?:\?[^"\s]+)?)"/);
   assert.ok(client, 'Homepage must load the storefront client');
   assert.ok(installedAssets.includes(stylesheet), 'Offline shell must use the homepage stylesheet version');

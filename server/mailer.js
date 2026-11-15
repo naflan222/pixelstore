@@ -287,7 +287,7 @@ function buildOrderMessage({ order, model, pdfBuffer }) {
   const text = [
     `Hi ${order.full_name || 'there'},`,
     '',
-    `Thank you for your order at ${shop.name}! We have received it and it is now being processed.`,
+    model.serialCopy ? 'This is a serial-number copy of your existing invoice. Your original invoice is unchanged.' : `Thank you for your order at ${shop.name}! We have received it and it is now being processed.`,
     '',
     summaryText,
     pdfBuffer
@@ -317,7 +317,7 @@ function buildOrderMessage({ order, model, pdfBuffer }) {
       </div>
       <div style="padding:24px">
         <p style="margin:0 0 6px;font-size:16px;color:#15181D"><strong>Hi ${escapeHtml(order.full_name || 'there')}, thank you for your order!</strong></p>
-        <p style="margin:0 0 18px;color:#6B7684;font-size:14px">We have received your order and it is now being processed. Your invoice is attached to this email as a PDF.</p>
+        <p style="margin:0 0 18px;color:#6B7684;font-size:14px">${model.serialCopy ? 'This is a serial-number copy of your existing invoice. Your original invoice is unchanged.' : 'We have received your order and it is now being processed. Your invoice is attached to this email as a PDF.'}</p>
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F9FA;border-radius:8px;font-size:13px;color:#33404F;margin-bottom:18px">
           <tr>
@@ -355,7 +355,7 @@ function buildOrderMessage({ order, model, pdfBuffer }) {
     </div>`;
 
   return {
-    subject: `${shop.name} order ${model.orderNumber} confirmed — invoice attached`,
+    subject: model.serialCopy ? `${shop.name} order ${model.orderNumber} — serial-number invoice copy` : `${shop.name} order ${model.orderNumber} confirmed — invoice attached`,
     text,
     html,
     attachment: pdfBuffer ? {

@@ -13,8 +13,8 @@ android {
         applicationId = "lk.pixelhouse.admin"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

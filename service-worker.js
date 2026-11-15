@@ -1,6 +1,6 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v30';
+const STATIC_CACHE = 'pixelhouse-static-v31';
 const APP_SHELL = [
   '/',
   '/products',
@@ -9,8 +9,8 @@ const APP_SHELL = [
   '/osmo-accessories',
   '/offline',
   '/style.css?v=20261112.4',
-  '/js/product-images.js?v=20261115.3',
-  '/js/api-client.js?v=20261115.3',
+  '/js/product-images.js?v=20261115.4',
+  '/js/api-client.js?v=20261115.4',
   '/js/monthly-cycle.js?v=20261109.2',
   '/img/product/camping-20261109/manual-camping-tent-3-4-people.webp',
   '/img/core-img/logo-mark-hd.png',

@@ -610,6 +610,8 @@ tr:last-child td{border-bottom:none}
 
 <div class="modal-overlay" id="promotionModal"><div class="modal"><button class="modal-close" onclick="closePromotionModal()" aria-label="Close">×</button><h3>Product promotion</h3><form onsubmit="return false"><input type="hidden" id="promotionId"><div class="form-grid"><div class="form-group full"><label for="promotionProduct">Product</label><select id="promotionProduct" required></select></div><div class="form-group"><label><input type="checkbox" id="promotionActive" checked> Promotion active</label></div><div class="form-group"><label><input type="checkbox" id="promotionPopup" checked> Show in website popup</label></div><div class="form-group"><label for="promotionOrder">Display order</label><input id="promotionOrder" type="number" min="0" step="1" value="0"></div><div class="form-group"><label for="promotionStarts">Starts at (UTC, optional)</label><input id="promotionStarts" type="datetime-local"></div><div class="form-group"><label for="promotionEnds">Ends at (UTC, optional)</label><input id="promotionEnds" type="datetime-local"></div></div><p>Turning the promotion off removes its advertising. The product's own status and stock remain controlled in Products.</p><div class="form-actions"><button class="btn btn-primary" onclick="savePromotion()">Save promotion</button><button class="btn btn-secondary" onclick="closePromotionModal()">Cancel</button></div></form></div></div>
 
+<div class="modal-overlay" id="serialInvoiceModal"><div class="modal"><button class="modal-close" onclick="document.getElementById('serialInvoiceModal').classList.remove('active')" aria-label="Close">×</button><h3 id="serialInvoiceTitle">Serial-number copy</h3><p>This creates a separate copy of the existing invoice. Original invoice, order totals and stock are unchanged.</p><div id="serialInvoiceItems"></div><div class="form-actions"><button class="btn btn-primary" onclick="saveSerialInvoice()">Save serial numbers</button><button class="btn btn-secondary" onclick="downloadSerialInvoice()">Download serial copy</button><button class="btn btn-secondary" onclick="emailSerialInvoice()">Email serial copy</button></div></div></div>
+
 <script>
 /* ==================== ADMIN APP ==================== */
 const API = '/api';
@@ -820,6 +822,7 @@ function initOfflineInvoiceForm() {
   api('/admin/invoices/catalog').then(data => {
     offlineCatalog = data.products || [];
     $$('#offlineInvoiceItems .offline-item-options').forEach(fillOfflineItemOptions);
+    $$('#offlineInvoiceItems .offline-invoice-row').forEach(fillOfflineProductSelect);
   }).catch(error => toast('Could not load product suggestions: ' + error.message, 'error'));
   ['offlineShippingFee', 'offlineDiscount'].forEach(id => $('#' + id).addEventListener('input', updateOfflineInvoiceTotals));
   updateOfflineInvoiceTotals();
@@ -834,6 +837,48 @@ function fillOfflineItemOptions(list) {
   }));
 }
 
+function fillOfflineProductSelect(row) {
+  const select = row.querySelector('.offline-item-product');
+  if (!select) return;
+  select.innerHTML = '<option value="">Custom item / choose product</option>' + offlineCatalog.map(p => `<option value="${p.id}">${esc(p.name)} — ${money(p.price)}</option>`).join('');
+}
+function renderInvoiceSerials(row) {
+  const box = row.querySelector('.invoice-serial-inputs');
+  const enabled = row.querySelector('.offline-item-serial-toggle').checked;
+  box.hidden = !enabled;if (!enabled) return;
+  const quantity = Math.max(1, Math.min(10000, Number(row.querySelector('.offline-item-quantity').value) || 1));
+  row.serialValues ||= [];row.serialPage = Math.min(row.serialPage || 0, Math.ceil(quantity / 10) - 1);
+  const start = row.serialPage * 10;
+  box.innerHTML = Array.from({length:Math.min(10,quantity-start)}, (_, n) => { const i=start+n;return `<div class="form-group"><label>Serial number — unit ${i+1} (optional)</label><input class="invoice-unit-serial" data-unit="${i}" maxlength="128" value="${esc(row.serialValues[i] || '')}" autocomplete="off"></div>`; }).join('') + (quantity>10 ? `<div><button type="button" class="btn btn-secondary serial-prev" ${start===0?'disabled':''}>Previous serials</button> <span>Units ${start+1}–${Math.min(start+10,quantity)} of ${quantity}</span> <button type="button" class="btn btn-secondary serial-next" ${start+10>=quantity?'disabled':''}>Next serials</button></div>` : '');
+  box.querySelectorAll('.invoice-unit-serial').forEach(input => input.addEventListener('input', () => { row.serialValues[Number(input.dataset.unit)] = input.value; }));
+  box.querySelector('.serial-prev')?.addEventListener('click',()=>{row.serialPage--;renderInvoiceSerials(row);});
+  box.querySelector('.serial-next')?.addEventListener('click',()=>{row.serialPage++;renderInvoiceSerials(row);});
+}
+function wireInvoiceSerials(row) {
+  row.serialValues ||= [];
+  row.querySelector('.offline-item-serial-toggle').addEventListener('change', e => {
+    if (!e.target.checked && row.serialValues.some(Boolean)) {
+      if (!confirm('Clear the entered serial numbers?')) { e.target.checked=true;return; }
+      row.serialValues=[];
+    }
+    renderInvoiceSerials(row);
+  });
+  let previous = Number(row.querySelector('.offline-item-quantity').value) || 1;
+  row.querySelector('.offline-item-quantity').addEventListener('input',e=>{
+    const next=Number(e.target.value);
+    if(Number.isSafeInteger(next) && next>=1 && next<=10000 && !row.serialValues.slice(next).some(Boolean)) {
+      row.serialValues=row.serialValues.slice(0,next);previous=next;renderInvoiceSerials(row);
+    }
+  });
+  row.querySelector('.offline-item-quantity').addEventListener('change',e=>{
+    const next = Number(e.target.value)||1;
+    if(next===previous)return;
+    if(next<previous && row.serialValues.slice(next).some(Boolean) && !confirm('Remove serial numbers for the reduced quantity?')) e.target.value=previous;
+    else { row.serialValues=row.serialValues.slice(0,next);previous=next; }
+    renderInvoiceSerials(row);updateOfflineInvoiceTotals();
+  });
+  renderInvoiceSerials(row);
+}
 function selectOfflineCatalogProduct(row) {
   const input = row.querySelector('.offline-item-name');
   const match = offlineCatalog.find(product => product.name.toLocaleLowerCase() === input.value.trim().toLocaleLowerCase());
@@ -841,7 +886,14 @@ function selectOfflineCatalogProduct(row) {
     row.querySelector('.offline-item-info').textContent = '';
     return;
   }
+  if (String(row.dataset.productId || '') === String(match.id)) return;
+  if (row.serialValues?.some(Boolean) && !confirm('Changing product clears its entered serial numbers. Continue?')) { input.value=row.selectedInvoiceName || '';return; }
+  row.serialValues=[];row.selectedInvoiceName=match.name;
+  row.querySelector('.offline-item-product').value=match.id;
+  row.dataset.productId = match.id;
   row.querySelector('.offline-item-price').value = Number(match.price).toFixed(2);
+  row.querySelector('.offline-item-serial-toggle').checked = !!match.serial_eligible;
+  renderInvoiceSerials(row);
   row.querySelector('.offline-item-info').textContent = [match.sku && `SKU ${match.sku}`, match.description].filter(Boolean).join(' · ').slice(0, 180);
   updateOfflineInvoiceTotals();
 }
@@ -851,12 +903,21 @@ function addOfflineInvoiceItem() {
   row.className = 'offline-invoice-row';
   const listId = `offline-products-${Math.random().toString(36).slice(2)}`;
   row.innerHTML = `
-    <div class="form-group description"><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
+    <div class="form-group description"><label>Choose product</label><select class="offline-item-product"></select><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
     <div class="form-group"><label>Quantity *</label><input class="offline-item-quantity" type="number" min="1" max="10000" step="1" value="1" required></div>
     <div class="form-group"><label>Unit price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
     <div class="form-group"><label>Line total</label><div class="line-total">Rs. 0.00</div></div>
-    <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>`;
+    <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>
+    <div class="form-group description" style="grid-column:1 / -1"><label><input type="checkbox" class="offline-item-serial-toggle"> Add serial numbers</label><div class="invoice-serial-inputs" hidden></div></div>`;
   row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateOfflineInvoiceTotals));
+  row.querySelector('.offline-item-product').addEventListener('change', e => {
+    const product = offlineCatalog.find(p => p.id === Number(e.target.value));
+    if (row.serialValues?.some(Boolean) && !confirm('Changing product clears its entered serial numbers. Continue?')) { e.target.value=row.dataset.productId || '';return; }
+    row.serialValues=[];row.dataset.productId='';
+    if(product) { row.querySelector('.offline-item-name').value=product.name;selectOfflineCatalogProduct(row); }
+    else { row.querySelector('.offline-item-name').value='';row.querySelector('.offline-item-price').value='';row.querySelector('.offline-item-serial-toggle').checked=false;renderInvoiceSerials(row); }
+    updateOfflineInvoiceTotals();
+  });
   row.querySelector('.offline-item-name').addEventListener('input', () => selectOfflineCatalogProduct(row));
   row.querySelector('.offline-item-name').addEventListener('change', () => selectOfflineCatalogProduct(row));
   row.querySelector('.offline-item-remove').addEventListener('click', () => {
@@ -865,10 +926,13 @@ function addOfflineInvoiceItem() {
       row.querySelector('.offline-item-quantity').value = '1';
       row.querySelector('.offline-item-price').value = '';
       row.querySelector('.offline-item-info').textContent = '';
+      row.serialValues=[];row.dataset.productId='';row.querySelector('.offline-item-product').value='';row.querySelector('.offline-item-serial-toggle').checked=false;renderInvoiceSerials(row);
     } else row.remove();
     updateOfflineInvoiceTotals();
   });
   $('#offlineInvoiceItems').appendChild(row);
+  fillOfflineProductSelect(row);
+  wireInvoiceSerials(row);
   fillOfflineItemOptions(row.querySelector('.offline-item-options'));
   updateOfflineInvoiceTotals();
 }
@@ -878,6 +942,8 @@ function collectOfflineInvoiceItems() {
     name: row.querySelector('.offline-item-name').value.trim(),
     quantity: Number(row.querySelector('.offline-item-quantity').value),
     price: Number(row.querySelector('.offline-item-price').value),
+    product_id: Number(row.dataset.productId) || null,
+    serial_numbers: row.querySelector('.offline-item-serial-toggle').checked ? Array.from({length:Number(row.querySelector('.offline-item-quantity').value)||1},(_,i)=>row.serialValues?.[i] || '') : [],
   })).filter(item => item.name || item.price > 0);
 }
 
@@ -1049,6 +1115,27 @@ async function resendOrderInvoice(id) {
   }
 }
 
+let serialInvoiceOrderId = null;
+async function openSerialInvoice(id) {
+  try {
+    const data = await api('/admin/orders/'+id+'/serial-invoice');serialInvoiceOrderId=id;
+    $('#serialInvoiceTitle').textContent='Serial-number copy — order #'+id;
+    $('#serialInvoiceItems').replaceChildren();
+    data.items.forEach(item=>{
+      const row=document.createElement('section');row.className='card';row.dataset.itemId=item.id;row.serialValues=item.serial_numbers || [];
+      row.innerHTML='<h4>'+esc(item.name)+'</h4><p>'+money(item.price)+' × '+item.quantity+'</p><input class="offline-item-quantity" type="hidden" value="'+item.quantity+'"><label><input class="offline-item-serial-toggle" type="checkbox" '+(item.serial_eligible || row.serialValues.some(Boolean)?'checked':'')+'> Add serial numbers</label><div class="invoice-serial-inputs" hidden></div>';
+      $('#serialInvoiceItems').append(row);wireInvoiceSerials(row);
+    });
+    $('#serialInvoiceModal').classList.add('active');
+  } catch(e) { toast(e.message,'error'); }
+}
+async function saveSerialInvoice(silent=false) {
+  const items=Array.from($('#serialInvoiceItems').children).map(row=>({order_item_id:Number(row.dataset.itemId),serial_numbers:row.querySelector('.offline-item-serial-toggle').checked ? Array.from({length:Number(row.querySelector('.offline-item-quantity').value)},(_,i)=>row.serialValues[i] || '') : []}));
+  try { await apiPut('/admin/orders/'+serialInvoiceOrderId+'/serial-invoice',{items});if(!silent)toast('Serial numbers saved');return true; } catch(e) { toast(e.message,'error');return false; }
+}
+async function downloadSerialInvoice() { if(await saveSerialInvoice(true)){const a=document.createElement('a');a.href='/api/admin/orders/'+serialInvoiceOrderId+'/serial-invoice?document=1';a.download='serial-invoice.pdf';a.click();} }
+async function emailSerialInvoice() { if(!confirm('Email this serial-number copy to the customer?'))return;if(await saveSerialInvoice(true)) { try { await apiPost('/admin/orders/'+serialInvoiceOrderId+'/serial-invoice/email',{});toast('Serial-number copy emailed'); } catch(e) { toast(e.message,'error'); } } }
+
 async function viewOrder(id) {
   try {
     const { order, payment, items, history } = await api('/admin/orders/' + id);
@@ -1088,6 +1175,7 @@ async function viewOrder(id) {
       </div>
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice" download><i class="ti ti-file-download"></i> Download invoice (PDF)</a>
       <a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice?view=1" target="_blank" rel="noopener"><i class="ti ti-eye"></i> Preview invoice</a>
+      <button class="btn btn-secondary" onclick="openSerialInvoice(${order.id})" type="button">Serial-number copy</button>
       <button class="btn btn-secondary" id="resendInvoiceBtn-${order.id}" onclick="resendOrderInvoice(${order.id})" type="button"><i class="ti ti-mail-forward"></i> Email invoice again</button></div>
       <div id="invoiceEmailStatus-${order.id}" role="status" aria-live="polite" style="margin-top:8px;font-size:13px;color:var(--text2)"></div>
       <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">

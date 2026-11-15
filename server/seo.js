@@ -414,7 +414,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
     : 'noindex,nofollow';
 
-  let output = require('./promotion-view').renderBundle(html, catalogProduct).replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.3')
+  let output = require('./promotion-view').renderBundle(html, catalogProduct).replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.4')
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')
@@ -440,7 +440,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
-  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.3');
+  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.4');
   if (!output.includes('/css/promotions.css?')) output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/css/promotions.css?v=20261115.1">\n</head>');
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
 

@@ -81,11 +81,13 @@ import java.time.temporal.ChronoUnit
 
 }
 @Composable fun OrderDetailsScreen(vm: AdminViewModel, data: JSONObject) {
+    var serialCopy by remember { mutableStateOf(false) }
     val order = data.optJSONObject("order") ?: return
     val payment = data.optJSONObject("payment") ?: JSONObject()
     val currency by vm.currency.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val id = order.optLong("id")
+    if (serialCopy) SerialCopyEditor(vm, id) { serialCopy = false }
     var edit by remember(id) { mutableStateOf<EditRequest?>(null) }
     var more by remember { mutableStateOf(false) }
     var delete by remember { mutableStateOf(false) }
@@ -97,7 +99,7 @@ import java.time.temporal.ChronoUnit
         item { InfoCard("Items") { data.optJSONArray("items")?.objects().orEmpty().forEach { item -> Text(item.display("name"), style = MaterialTheme.typography.titleSmall); Text("${item.optInt("quantity")} × ${displayMoney(item.number("price"), currency)} = ${displayMoney(item.optInt("quantity") * item.number("price"), currency)}"); HorizontalDivider() } } }
         item { InfoCard("Order totals") { listOf("subtotal" to "Items", "shipping_fee" to "Delivery", "discount_amount" to "Discount", "total" to "Total order value").forEach { (key,title) -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(title); Text(displayMoney(order.number(key), currency)) } }; Text("Payment: ${statusTitle(payment.display("payment_method"))} · ${statusTitle(payment.display("payment_status"))}"); Text("Amount recorded as paid: ${displayMoney(payment.number("amount_paid"), currency)}"); payment.display("transaction_id").takeIf(String::isNotBlank)?.let { Text("Transaction: $it") }; payment.display("paid_at").takeIf(String::isNotBlank)?.let { Text("Paid: ${displayTime(it)}") }; order.display("coupon_code").takeIf(String::isNotBlank)?.let { Text("Coupon: $it") } } }
         item { InfoCard("Delivery & notes") { listOf("shipping_method", "shipping_status", "carrier", "tracking_number", "shipping_notes", "internal_notes").forEach { key -> order.display(key).takeIf(String::isNotBlank)?.let { Text("${label(key)}: $it") } }; OutlinedButton(onClick = { edit = EditRequest("Delivery and internal notes", "/api/admin/orders/$id/fulfillment", "PUT", listOf(text("carrier"), text("tracking_number"), choice("shipping_status", "pending", "preparing", "shipped", "delivered", "returned"), Field("shipping_notes", kind = InputKind.Multiline), Field("internal_notes", kind = InputKind.Multiline)), order) }) { Text("Update delivery") } } }
-        item { Button(onClick = { edit = EditRequest("Update order status", "/api/admin/orders/$id/status", "PUT", listOf(choice("status", *orderStates), Field("note", kind = InputKind.Multiline)), order) }, modifier = Modifier.fillMaxWidth()) { Text("Update order status") }; OutlinedButton(onClick = { vm.work { shareDocument(context, vm.api.download("/api/admin/orders/$id/invoice"), "invoice-$id.pdf", "application/pdf") } }, modifier = Modifier.fillMaxWidth()) { Text("Download / share invoice") } }
+        item { Button(onClick = { edit = EditRequest("Update order status", "/api/admin/orders/$id/status", "PUT", listOf(choice("status", *orderStates), Field("note", kind = InputKind.Multiline)), order) }, modifier = Modifier.fillMaxWidth()) { Text("Update order status") }; OutlinedButton(onClick = { vm.work { shareDocument(context, vm.api.download("/api/admin/orders/$id/invoice"), "invoice-$id.pdf", "application/pdf") } }, modifier = Modifier.fillMaxWidth()) { Text("Download / share invoice") }; OutlinedButton(onClick = { serialCopy = true }, modifier = Modifier.fillMaxWidth()) { Text("Serial-number copy") } }
         item { InfoCard("Status history") { val history = data.optJSONArray("history")?.objects().orEmpty(); if(history.isEmpty()) Text("No status changes yet."); history.forEach { Text("${statusTitle(it.display("status").ifBlank { it.display("to_status") })} · ${displayTime(it.display("created_at"))}"); it.display("note").takeIf(String::isNotBlank)?.let { Text(it) } } } }
         item { TextButton(onClick = { more = !more }) { Text("More actions") }; if(more) TextButton(onClick = { delete = true }) { Text("Delete order", color = MaterialTheme.colorScheme.error) } }
     }

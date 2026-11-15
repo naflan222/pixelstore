@@ -594,7 +594,7 @@ async function defineSuite(t, ctx) {
       assert.equal(resent.data.recipient, payload.email);
       assert.equal(resent.data.invoice_number, response.data.invoice_number);
       const resentBody = JSON.parse(capturedEmail.options.body);
-      assert.match(resentBody.attachment[0].name, /\\.pdf$/);
+      assert.match(resentBody.attachment[0].name, /\.pdf$/);
       assert.equal(Buffer.from(resentBody.attachment[0].content, 'base64').subarray(0, 4).toString(), '%PDF');
       assert.equal((await ctx.db.get('SELECT COUNT(*) AS count FROM orders')).count, ordersBefore.count);
       assert.equal(Number((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock), Number(product.stock));

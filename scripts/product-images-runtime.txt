@@ -4,15 +4,20 @@ function localPath(value) {
 const responsiveAliases=new Map();
 for(const list of Object.values(variants))for(const item of list)responsiveAliases.set(item.src,list);
 function sources(value) { const key=localPath(value);return variants[key] || responsiveAliases.get(key) || []; }
+function attributes(value,sizes='(max-width: 767px) 45vw, (max-width: 1199px) 30vw, 360px') {
+  const list=sources(value);
+  if(!list.length)return '';
+  return 'src="'+list[0].src+'" sizes="'+sizes+'" srcset="'+list.map(item=>item.src+' '+item.width+'w').join(', ')+'"';
+}
 function updateImage(img) {
   const list=sources(img.getAttribute('src')||'');
   if(!list.length)return;
   const set=list.map(item=>item.src+' '+item.width+'w').join(', ');
-  if(img.getAttribute('srcset')!==set)img.setAttribute('srcset',set);
   const width=Math.ceil(img.getBoundingClientRect().width);
   // Actual rendered width avoids changing layout and selects an appropriate DPR source.
   const sizes=width>0?width+'px':'(max-width: 600px) 50vw, 300px';
   if(img.getAttribute('sizes')!==sizes)img.setAttribute('sizes',sizes);
+  if(img.getAttribute('srcset')!==set)img.setAttribute('srcset',set);
 }
 function scan(node) {
   if(!node||node.nodeType!==1&&node.nodeType!==9)return;
@@ -40,5 +45,5 @@ function start() {
  new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')scan(record.target);else record.addedNodes.forEach(scan);}}).observe(root.document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
  root.addEventListener('resize',schedule);root.addEventListener('load',schedule,{once:true});
 }
-root.PixelHouseProductImages={sources,scan};
+root.PixelHouseProductImages={sources,scan,attributes};
 if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start);else start();

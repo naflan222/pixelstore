@@ -13,19 +13,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.json.JSONArray
 import org.json.JSONObject
 
+fun invoiceLineAmount(item: Map<String,String>): Double = if(item["manual_amount"] == "true") item["line_amount"]?.toDoubleOrNull() ?: Double.NaN else (item["price"]?.toDoubleOrNull() ?: 0.0) * (item["quantity"]?.toIntOrNull() ?: 0)
+
 fun invoiceLineBody(item: Map<String,String>): JSONObject {
     val quantity = item["quantity"]?.toIntOrNull()
     require(quantity != null && quantity in 1..10000) { "Enter a whole-number quantity from 1 to 10000." }
     val price = item["price"]?.toDoubleOrNull()
     require(price != null && price.isFinite() && price >= 0) { "Enter a valid price." }
     require(!item["name"].isNullOrBlank()) { "Enter a product name." }
+    val amount=invoiceLineAmount(item)
+    require(amount.isFinite() && amount>=0 && amount<=1000000000 && kotlin.math.abs(amount*100-kotlin.math.round(amount*100))<0.0001) { "Enter a valid line amount with up to two decimal places." }
+    require(item["warranty_text"].orEmpty().length<=500) { "Warranty text must be up to 500 characters." }
     val serials = JSONArray()
     if (item["serial_enabled"] == "true") repeat(quantity) { i ->
         val text = item["serial_$i"].orEmpty().trim()
         require(text.length <= 128 && text.none { it.code < 32 || it.code == 127 }) { "Serial numbers must be printable text, up to 128 characters." }
         serials.put(text)
     }
-    return JSONObject().put("name", item["name"]!!.trim()).put("price", price).put("quantity", quantity)
+    return JSONObject().put("name", item["name"]!!.trim()).put("price", price).put("unit_price",price).put("line_amount",amount).put("warranty_text",item["warranty_text"].orEmpty().trim()).put("quantity", quantity)
         .put("catalog_price", item["catalog_price"]?.toDoubleOrNull() ?: JSONObject.NULL)
         .put("product_id", item["product_id"]?.toLongOrNull() ?: JSONObject.NULL).put("serial_numbers", serials)
 }
@@ -55,7 +60,7 @@ private fun hasSerials(item: Map<String,String>) = item.any { (key,value) -> key
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
     fun select(product: JSONObject?) {
         val action = {
-            clearSerials(item);item["product_id"]=product?.display("id").orEmpty();item["name"]=product?.display("name").orEmpty();item["catalog_price"]=product?.display("price").orEmpty();item["price"]=product?.display("price") ?: "0";item["serial_enabled"]=(product?.optBoolean("serial_eligible") == true).toString()
+            clearSerials(item);item["manual_amount"]="false";item["line_amount"]="";item["product_id"]=product?.display("id").orEmpty();item["name"]=product?.display("name").orEmpty();item["catalog_price"]=product?.display("price").orEmpty();item["price"]=product?.display("price") ?: "0";item["serial_enabled"]=(product?.optBoolean("serial_eligible") == true).toString()
         }
         if(hasSerials(item))pending=action else action()
     }
@@ -68,15 +73,17 @@ private fun hasSerials(item: Map<String,String>) = item.any { (key,value) -> key
             }
         }
         FieldInput(text("name",true),item["name"].orEmpty()){item["name"]=it}
-        FieldInput(number("price").copy(label="Selling price (editable)"),item["price"].orEmpty()){item["price"]=it}
+        FieldInput(number("price").copy(label="Unit price (editable)"),item["price"].orEmpty()){item["price"]=it}
         FieldInput(number("quantity"),item["quantity"].orEmpty()){ value ->
             val count=value.toIntOrNull()
             val excess=count != null && item.any { (k,v)-> (k.substringAfter("serial_", "").toIntOrNull() ?: -1) >= count && v.isNotBlank() }
             val action={ item["quantity"]=value;if(count!=null)item.keys.filter{(it.substringAfter("serial_", "").toIntOrNull() ?: -1)>=count}.forEach{item.remove(it)} }
             if(excess)pending=action else action()
         }
-        item["catalog_price"]?.toDoubleOrNull()?.let { Text("Original catalog unit price: " + displayMoney(it)) }
-        Text("Line total: " + displayMoney((item["price"]?.toDoubleOrNull() ?: 0.0) * (item["quantity"]?.toIntOrNull() ?: 0)))
+        FieldInput(number("line_amount").copy(label="Amount — total for this line"),if(item["manual_amount"]=="true")item["line_amount"].orEmpty() else String.format(java.util.Locale.US,"%.2f",invoiceLineAmount(item))){item["manual_amount"]="true";item["line_amount"]=it}
+        Text(if(item["manual_amount"]=="true") "Manually entered line total" else "Calculated from unit price × quantity")
+        FieldInput(text("warranty_text").copy(label="Warranty (optional)"),item["warranty_text"].orEmpty()){item["warranty_text"]=it}
+        Text("Line total: " + displayMoney(invoiceLineAmount(item).takeIf{it.isFinite()} ?: 0.0))
         SerialFields(item)
         if(remove!=null)TextButton(onClick=remove){Text("Remove item")}
     } }
@@ -88,16 +95,17 @@ private fun hasSerials(item: Map<String,String>) = item.any { (key,value) -> key
     val values=remember{mutableStateMapOf<String,String>().apply{fields.forEach{put(it.key,it.default)}}}
     val items=remember{mutableStateListOf(newInvoiceLine())}
     var serialsSupported by remember{mutableStateOf(false)}
+    var amountsSupported by remember{mutableStateOf(false)}
     var products by remember{mutableStateOf(listOf<JSONObject>())};var error by remember{mutableStateOf("")};var confirmed by remember{mutableStateOf(false)}
     val busy by vm.loading.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit){try{val data=vm.api.request("/api/admin/invoices/catalog");serialsSupported=data.optBoolean("serials_supported");products=data.optJSONArray("products")?.objects().orEmpty()}catch(_:Exception){error="Product list could not load. You can still enter a custom item."}}
-    fun body(): JSONObject { require(serialsSupported || items.none {hasSerials(it)}) { "Deploy the invoice server update before creating invoices with serial numbers." };return formBody(fields,values).put("items",JSONArray(items.map{invoiceLineBody(it)})) }
+    LaunchedEffect(Unit){try{val data=vm.api.request("/api/admin/invoices/catalog");serialsSupported=data.optBoolean("serials_supported");amountsSupported=data.optBoolean("independent_amounts_supported");products=data.optJSONArray("products")?.objects().orEmpty()}catch(_:Exception){error="Product list could not load. You can still enter a custom item."}}
+    fun body(): JSONObject { require(amountsSupported) { "Deploy the invoice conditions server update before using this invoice generator." };require(serialsSupported || items.none {hasSerials(it)}) { "Deploy the invoice server update before creating invoices with serial numbers." };return formBody(fields,values).put("items",JSONArray(items.map{invoiceLineBody(it)})) }
     AlertDialog(onDismissRequest={if(!busy)close()},title={Text("Create offline invoice")},text={Column(Modifier.imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        Text("Select products to fill prices automatically. You may edit the invoice price. Inventory is not changed.")
+        Text("Select products to fill prices automatically. Unit price and final line amount are independently editable. Inventory is not changed.")
         fields.forEach{f->FieldInput(f,values[f.key].orEmpty()){values[f.key]=it}}
         items.forEach{item->InvoiceProductLine(item,products,if(items.size>1)({items.remove(item);Unit}) else null)}
         TextButton(enabled=items.size<40,onClick={items.add(newInvoiceLine())}){Text("Add invoice item")}
-        val subtotal=items.sumOf{(it["price"]?.toDoubleOrNull() ?: 0.0)*(it["quantity"]?.toIntOrNull() ?: 0)}
+        val subtotal=items.sumOf{invoiceLineAmount(it).takeIf{value->value.isFinite()} ?: 0.0}
         Text("Subtotal: " + displayMoney(subtotal))
         Text("Invoice total: " + displayMoney(subtotal+(values["shipping_fee"]?.toDoubleOrNull() ?: 0.0)-(values["discount_amount"]?.toDoubleOrNull() ?: 0.0)))
         if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error)

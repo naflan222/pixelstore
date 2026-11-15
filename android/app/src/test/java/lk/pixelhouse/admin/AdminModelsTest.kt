@@ -82,4 +82,13 @@ class AdminModelsTest {
         val blank=invoiceLineBody(row+("serial_enabled" to "false"))
         assertEquals(0,blank.getJSONArray("serial_numbers").length())
     }
+    @Test fun `offline invoice amount is independent from unit price`() {
+        val row=mapOf("name" to "Camera", "price" to "92000", "quantity" to "2", "manual_amount" to "true", "line_amount" to "180000", "warranty_text" to "12-month supplier warranty")
+        val body=invoiceLineBody(row)
+        assertEquals(92000.0,body.getDouble("unit_price"),0.001)
+        assertEquals(180000.0,body.getDouble("line_amount"),0.001)
+        assertEquals("12-month supplier warranty",body.getString("warranty_text"))
+        assertEquals(180000.0,invoiceLineAmount(row+("quantity" to "3")),0.001)
+        assertEquals(184000.0,invoiceLineAmount(row+("manual_amount" to "false")),0.001)
+    }
 }

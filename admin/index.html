@@ -891,6 +891,7 @@ function selectOfflineCatalogProduct(row) {
   if (row.serialValues?.some(Boolean) && !confirm('Changing product clears its entered serial numbers. Continue?')) { input.value=row.selectedInvoiceName || '';return; }
   row.serialValues=[];row.selectedInvoiceName=match.name;
   row.querySelector('.offline-item-product').value=match.id;
+  row.dataset.manualAmount='';
   row.dataset.productId = match.id;
   row.dataset.catalogPrice = match.price;
   row.querySelector('.offline-item-price').value = Number(match.price).toFixed(2);
@@ -907,10 +908,11 @@ function addOfflineInvoiceItem() {
   row.innerHTML = `
     <div class="form-group description"><label>Find product by name or SKU</label><input class="offline-product-search" type="search" placeholder="Search products…" autocomplete="off"><select class="offline-item-product"></select><label>Product / description *</label><input class="offline-item-name" list="${listId}" maxlength="160" required placeholder="Type to select a product, or enter a custom item" autocomplete="off"><datalist class="offline-item-options" id="${listId}"></datalist><small class="offline-item-info" style="color:var(--text2)"></small></div>
     <div class="form-group"><label>Quantity *</label><input class="offline-item-quantity" type="number" min="1" max="10000" step="1" value="1" required></div>
-    <div class="form-group"><label>Selling price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
-    <div class="form-group"><label>Line total</label><div class="line-total">Rs. 0.00</div></div>
+    <div class="form-group"><label>Unit price (LKR) *</label><input class="offline-item-price" type="number" min="0" max="100000000" step="0.01" required placeholder="0.00"></div>
+    <div class="form-group"><label>Amount — line total (LKR) *</label><input class="offline-item-amount" type="number" min="0" max="1000000000" step="0.01" required><small class="offline-amount-note">Calculated from unit price × quantity</small><div class="line-total">Rs. 0.00</div></div>
     <button type="button" class="btn btn-danger btn-sm offline-item-remove" aria-label="Remove item" title="Remove item"><i class="ti ti-trash"></i></button>
-    <div class="form-group description" style="grid-column:1 / -1"><label><input type="checkbox" class="offline-item-serial-toggle"> Add serial numbers</label><div class="invoice-serial-inputs" hidden></div></div>`;
+    <div class="form-group description" style="grid-column:1 / -1"><label>Warranty (optional)</label><input class="offline-item-warranty" maxlength="500" placeholder="For example: 12-month supplier warranty or No commercial warranty"></div><div class="form-group description" style="grid-column:1 / -1"><label><input type="checkbox" class="offline-item-serial-toggle"> Add serial numbers</label><div class="invoice-serial-inputs" hidden></div></div>`;
+  row.querySelector('.offline-item-amount').addEventListener('input',()=>{row.dataset.manualAmount='true';});
   row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateOfflineInvoiceTotals));
   row.querySelector('.offline-product-search').addEventListener('input', e => {
     const query=e.target.value.trim().toLocaleLowerCase();
@@ -932,7 +934,7 @@ function addOfflineInvoiceItem() {
     if ($('#offlineInvoiceItems').children.length === 1) {
       row.querySelector('.offline-item-name').value = '';
       row.querySelector('.offline-item-quantity').value = '1';
-      row.querySelector('.offline-item-price').value = '';
+      row.querySelector('.offline-item-price').value = '';row.querySelector('.offline-item-amount').value='';row.querySelector('.offline-item-warranty').value='';row.dataset.manualAmount='';
       row.querySelector('.offline-item-info').textContent = '';
       row.serialValues=[];row.dataset.productId='';row.querySelector('.offline-item-product').value='';row.querySelector('.offline-item-serial-toggle').checked=false;renderInvoiceSerials(row);
     } else row.remove();
@@ -950,6 +952,9 @@ function collectOfflineInvoiceItems() {
     name: row.querySelector('.offline-item-name').value.trim(),
     quantity: Number(row.querySelector('.offline-item-quantity').value),
     price: Number(row.querySelector('.offline-item-price').value),
+    unit_price: Number(row.querySelector('.offline-item-price').value),
+    line_amount: Number(row.querySelector('.offline-item-amount').value),
+    warranty_text: row.querySelector('.offline-item-warranty').value.trim(),
     product_id: Number(row.dataset.productId) || null,
     catalog_price: row.dataset.productId ? Number(row.dataset.catalogPrice) : null,
     serial_numbers: row.querySelector('.offline-item-serial-toggle').checked ? Array.from({length:Number(row.querySelector('.offline-item-quantity').value)||1},(_,i)=>row.serialValues?.[i] || '') : [],
@@ -961,7 +966,10 @@ function updateOfflineInvoiceTotals() {
   $$('#offlineInvoiceItems .offline-invoice-row').forEach(row => {
     const quantity = Number(row.querySelector('.offline-item-quantity').value) || 0;
     const price = Number(row.querySelector('.offline-item-price').value) || 0;
-    const line = quantity * price;
+    const amountInput=row.querySelector('.offline-item-amount');
+    if(row.dataset.manualAmount!=='true') amountInput.value=(quantity*price).toFixed(2);
+    row.querySelector('.offline-amount-note').textContent=row.dataset.manualAmount==='true'?'Manually entered line total':'Calculated from unit price × quantity';
+    const line=Number(amountInput.value)||0;
     subtotal += line;
     row.querySelector('.line-total').textContent = money(line);
   });

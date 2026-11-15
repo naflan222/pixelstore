@@ -233,10 +233,13 @@ async function buildInvoiceModel(order, items, options = {}) {
   }
   let priceSnapshots = options.priceSnapshots || [];
   if (!options.priceSnapshots && (items || []).some(item => item.id)) priceSnapshots = await require('./database').all('SELECT s.* FROM invoice_price_snapshots s JOIN order_items i ON i.id = s.order_item_id WHERE i.order_id = ?', order.id);
+  let lineDetails = options.lineDetails || [];
+  if (!options.lineDetails && (items || []).some(item => item.id)) lineDetails = await require('./database').all('SELECT d.* FROM invoice_line_details d JOIN order_items i ON i.id=d.order_item_id WHERE i.order_id=?', order.id);
   const lines = (items || []).map((item, index) => {
     const sellingPrice = number(item.price);
     const snapshot = priceSnapshots.find(row => row.order_item_id === item.id);
-    const unitPrice = snapshot ? number(snapshot.catalog_price) : sellingPrice;
+    const detail = lineDetails.find(row => row.order_item_id === item.id);
+    const unitPrice = detail ? number(detail.unit_price) : snapshot ? number(snapshot.catalog_price) : sellingPrice;
     const quantity = number(item.quantity);
     return {
       index: index + 1,
@@ -246,7 +249,9 @@ async function buildInvoiceModel(order, items, options = {}) {
       quantity,
       unitPrice,
       sellingPrice,
-      amount: sellingPrice * quantity,
+      independentAmount: !!detail,
+      warranty: detail?.warranty_text || '',
+      amount: detail ? number(detail.line_amount) : sellingPrice * quantity,
     };
   });
 
@@ -285,7 +290,6 @@ async function buildInvoiceModel(order, items, options = {}) {
     terms.push(`Payment was collected with ${methodLabel.toLowerCase()} at checkout. No further amount is payable.`);
   }
   terms.push(`Prices are shown in ${currencyCode(shop)} and include all applicable taxes and duties.`);
-  terms.push('Undamaged accessories can be returned within 7 days of delivery; rental items must be returned by the agreed date.');
   if (shop.email || shop.phone) {
     terms.push(`Questions about this invoice? ${[shop.email, shop.phone].filter(Boolean).join(' · ')}.`);
   }
@@ -324,6 +328,7 @@ async function buildInvoiceModel(order, items, options = {}) {
       ['Order status', titleCase(order.status || 'pending')],
     ],
     terms,
+    conditions: require('./invoice-conditions'),
   };
 }
 
@@ -511,7 +516,8 @@ function drawItemsTable(doc, model, startY) {
   displayLines.forEach((line, index) => {
     const descriptionHeight = Math.max(textHeight(doc, line.name, { size: 9.1, width: descriptionColumn.width - 22, lineGap: 1.4 }), 10);
     const serialLabels = (line.serialNumbers || []).map(serial => (line.quantity === 1 ? 'Serial number: ' : 'Serial ' + serial.unit + ': ') + serial.value);
-    if (!line.continued && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice) serialLabels.unshift('Agreed selling price: ' + money(line.sellingPrice, model.shop) + ' each');
+    if (!line.continued && line.warranty) serialLabels.push('Warranty: ' + line.warranty);
+    if (!line.continued && !line.independentAmount && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice) serialLabels.unshift('Agreed selling price: ' + money(line.sellingPrice, model.shop) + ' each');
     const serialHeights = serialLabels.map(label => textHeight(doc, label, { size: 8, width: descriptionColumn.width - 22, lineGap: 1.2 }) + 3);
     const serialHeight = serialHeights.reduce((a,b) => a+b, 0);
     const rowHeight = Math.max(24, descriptionHeight + serialHeight + (line.sku ? 20 : 11), line.sku ? 34 : 24);
@@ -694,6 +700,22 @@ function renderPdf(model) {
         font: 'Helvetica-Bold', size: 8.2, color: BRAND.accentDeep, width: CONTENT_WIDTH, align: 'center', lineBreak: false,
       });
 
+      let conditionsY = newPage(doc, model) + 10;
+      function conditionsHeading() {
+        writeText(doc, 'PIXELHOUSE', PAGE.margin, conditionsY, { font: 'Helvetica-Bold', size: 13, width: CONTENT_WIDTH });
+        conditionsY += 22;
+        writeText(doc, 'SALES, WARRANTY & SERVICE CONDITIONS', PAGE.margin, conditionsY, { font: 'Helvetica-Bold', size: 12, width: CONTENT_WIDTH });
+        conditionsY += 30;
+      }
+      conditionsHeading();
+      const conditionParagraphs = (model.conditions || require('./invoice-conditions')).map((text, i) => `${i + 1}. ${text}`).concat(['Warranty enquiries: pixelhouse.lk', 'Thank you for shopping with Pixelhouse. We appreciate your trust.']);
+      for (const paragraph of conditionParagraphs) {
+        const height = textHeight(doc, paragraph, { size: 9, width: CONTENT_WIDTH, lineGap: 2 });
+        if (conditionsY + height > BODY_FLOOR - 10) { conditionsY = newPage(doc, model) + 10;conditionsHeading(); }
+        writeText(doc, paragraph, PAGE.margin, conditionsY, { size: 9, color: BRAND.body, width: CONTENT_WIDTH, lineGap: 2 });
+        conditionsY += height + 10;
+      }
+
       // Stamp the page footers last. The bottom margin is released while they are
       // drawn so a footer near the trim edge cannot push pdfkit onto a new page.
       const range = doc.bufferedPageRange();
@@ -725,7 +747,7 @@ function renderHtml(model) {
   const moneyHtml = (amount) => escapeHtml(money(amount, model.shop));
   const rows = model.lines.map((line) => `<tr>
       <td class="qty">${line.index}</td>
-      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice ? `<span class="serial-number">Agreed selling price: ${moneyHtml(line.sellingPrice)} each</span>` : ''}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
+      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.warranty ? `<span class="serial-number">Warranty: ${escapeHtml(line.warranty)}</span>` : ''}${!line.independentAmount && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice ? `<span class="serial-number">Agreed selling price: ${moneyHtml(line.sellingPrice)} each</span>` : ''}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
       <td class="num">${line.quantity}</td>
       <td class="num">${moneyHtml(line.unitPrice)}</td>
       <td class="num total">${moneyHtml(line.amount)}</td>
@@ -836,6 +858,7 @@ function renderHtml(model) {
         <span>Invoice ${escapeHtml(model.invoiceNumber)} · Order ${escapeHtml(model.orderNumber)}</span>
       </div>
     </div>
+    <section class="invoice-conditions" style="padding:32px 42px;break-before:page;page-break-before:always"><h2>PIXELHOUSE</h2><h3>SALES, WARRANTY &amp; SERVICE CONDITIONS</h3><ol>${(model.conditions || require('./invoice-conditions')).map(text=>`<li style="margin-bottom:12px;break-inside:avoid">${escapeHtml(text)}</li>`).join('')}</ol><p>Warranty enquiries: pixelhouse.lk</p><p>Thank you for shopping with Pixelhouse. We appreciate your trust.</p></section>
   </div>
 </body></html>`;
 }

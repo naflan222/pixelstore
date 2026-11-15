@@ -231,8 +231,12 @@ async function buildInvoiceModel(order, items, options = {}) {
   if (!options.serialRows && (items || []).some(item => item.id)) {
     serialRows = await require('./invoice-serials').loadRows(require('./database'), order.id, options.serialCopy ? 'copy' : 'offline');
   }
+  let priceSnapshots = options.priceSnapshots || [];
+  if (!options.priceSnapshots && (items || []).some(item => item.id)) priceSnapshots = await require('./database').all('SELECT s.* FROM invoice_price_snapshots s JOIN order_items i ON i.id = s.order_item_id WHERE i.order_id = ?', order.id);
   const lines = (items || []).map((item, index) => {
-    const unitPrice = number(item.price);
+    const sellingPrice = number(item.price);
+    const snapshot = priceSnapshots.find(row => row.order_item_id === item.id);
+    const unitPrice = snapshot ? number(snapshot.catalog_price) : sellingPrice;
     const quantity = number(item.quantity);
     return {
       index: index + 1,
@@ -241,7 +245,8 @@ async function buildInvoiceModel(order, items, options = {}) {
       sku: String(item.sku || '').trim(),
       quantity,
       unitPrice,
-      amount: unitPrice * quantity,
+      sellingPrice,
+      amount: sellingPrice * quantity,
     };
   });
 
@@ -506,6 +511,7 @@ function drawItemsTable(doc, model, startY) {
   displayLines.forEach((line, index) => {
     const descriptionHeight = Math.max(textHeight(doc, line.name, { size: 9.1, width: descriptionColumn.width - 22, lineGap: 1.4 }), 10);
     const serialLabels = (line.serialNumbers || []).map(serial => (line.quantity === 1 ? 'Serial number: ' : 'Serial ' + serial.unit + ': ') + serial.value);
+    if (!line.continued && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice) serialLabels.unshift('Agreed selling price: ' + money(line.sellingPrice, model.shop) + ' each');
     const serialHeights = serialLabels.map(label => textHeight(doc, label, { size: 8, width: descriptionColumn.width - 22, lineGap: 1.2 }) + 3);
     const serialHeight = serialHeights.reduce((a,b) => a+b, 0);
     const rowHeight = Math.max(24, descriptionHeight + serialHeight + (line.sku ? 20 : 11), line.sku ? 34 : 24);
@@ -719,7 +725,7 @@ function renderHtml(model) {
   const moneyHtml = (amount) => escapeHtml(money(amount, model.shop));
   const rows = model.lines.map((line) => `<tr>
       <td class="qty">${line.index}</td>
-      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
+      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice ? `<span class="serial-number">Agreed selling price: ${moneyHtml(line.sellingPrice)} each</span>` : ''}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
       <td class="num">${line.quantity}</td>
       <td class="num">${moneyHtml(line.unitPrice)}</td>
       <td class="num total">${moneyHtml(line.amount)}</td>

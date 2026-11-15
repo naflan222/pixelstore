@@ -19,3 +19,11 @@ The first production startup applies a one-time, audited setting change to cash 
 API tests cover both database engines, serial validation, invoice rendering and email attachments, unchanged original invoices, stock preservation, and the reversible payment setting. Browser checks cover mobile and desktop invoice editors and cash-only checkout. Android unit tests, lint and release build pass.
 
 Keep the additive table and serial data during rollback. Reverting code does not automatically restore the payment setting; use Store Settings if bank transfer should be re-enabled. No live orders or customer emails are used by the verification scripts.
+
+## Checkout and invoice pricing update (Android 1.3.1)
+
+Offline product selection supports name/SKU search in web admin and Android. The generator labels the editable value **Selling price** and shows the original catalog price separately. Issued invoices show the catalog snapshot as Unit Price and selling price × quantity as Amount. When these prices differ, an agreed-selling-price note explains the calculation. Totals, emails and analytics use the selling price; later catalog changes do not change the invoice. Custom items use their entered price in both columns. Older invoices retain their existing rendering.
+
+The additive `invoice_price_snapshots` table stores catalog prices by invoice item. New clients can submit optional `catalog_price`; older clients selecting a catalog product use its price at invoice creation. No historical price snapshots are invented. Deploy the server before installing Android 1.3.1.
+
+Cart and billing use the storefront width with a two-column desktop layout, keeping the mobile layout. Cart thumbnails reserve their dimensions and use responsive image variants. Payment choices start hidden and are revealed only after settings load; failed settings requests offer Retry without exposing paused methods. Updated asset and service-worker versions refresh returning visitors.

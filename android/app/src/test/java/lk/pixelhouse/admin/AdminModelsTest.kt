@@ -67,9 +67,10 @@ class AdminModelsTest {
         assertThrows(IllegalArgumentException::class.java) { formBody(module.fields, emptyMap()) }
     }
     @Test fun `invoice serial numbers preserve leading zeros and unit positions`() {
-        val row=mapOf("name" to "GoPro", "price" to "90000", "quantity" to "2", "product_id" to "20", "serial_enabled" to "true", "serial_0" to "000ABC", "serial_1" to "SN-002")
+        val row=mapOf("name" to "GoPro", "price" to "90000", "catalog_price" to "92000", "quantity" to "2", "product_id" to "20", "serial_enabled" to "true", "serial_0" to "000ABC", "serial_1" to "SN-002")
         val body=invoiceLineBody(row)
         assertEquals(90000.0,body.getDouble("price"),0.01)
+        assertEquals(92000.0,body.getDouble("catalog_price"),0.01)
         assertEquals("000ABC",body.getJSONArray("serial_numbers").getString(0))
         assertEquals("SN-002",body.getJSONArray("serial_numbers").getString(1))
         assertEquals(20,body.getInt("product_id"))

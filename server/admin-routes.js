@@ -866,8 +866,11 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
     let serials;
     try { serials = require('./invoice-serials').serialValues(raw.serial_numbers, quantity); }
     catch (error) { return res.status(400).json({ error: error.message }); }
-    if (raw.product_id && (!productId(raw.product_id) || !(await db.get('SELECT id FROM products WHERE id = ?', productId(raw.product_id))))) return res.status(400).json({ error: 'Selected product no longer exists.' });
-    items.push({ name, price: Math.round(price * 100) / 100, quantity, serials });
+    const product = raw.product_id && productId(raw.product_id) ? await db.get('SELECT id, price FROM products WHERE id = ?', productId(raw.product_id)) : null;
+    if (raw.product_id && !product) return res.status(400).json({ error: 'Selected product no longer exists.' });
+    const catalogPrice = raw.catalog_price == null ? product?.price : Number(raw.catalog_price);
+    if (catalogPrice != null && (!Number.isFinite(Number(catalogPrice)) || Number(catalogPrice) < 0 || Number(catalogPrice) > 100000000)) return res.status(400).json({ error: 'Enter a valid original catalog price.' });
+    items.push({ name, price: Math.round(price * 100) / 100, quantity, serials, catalogPrice });
   }
 
   const subtotal = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100;
@@ -896,6 +899,7 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
       for (const item of items) {
         const inserted = await tx.insert('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, NULL, ?, ?, ?)',
           id, item.name, item.price, item.quantity);
+        if (item.catalogPrice != null) await tx.run('INSERT INTO invoice_price_snapshots (order_item_id, catalog_price) VALUES (?, ?)', inserted.id, item.catalogPrice);
         await require('./invoice-serials').saveLine(tx, inserted.id, 'offline', item.serials);
       }
       await tx.run('INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',

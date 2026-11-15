@@ -32,7 +32,7 @@ async function cleanStoredDescriptions(db) {
   });
 }
 // Responsive sources leave the stored primary image and all product data intact.
-const variants = require('../catalog/product-image-variants.json');
+const variants = { ...require('../catalog/product-image-variants.json'), ...Object.fromEntries(Object.entries(require('../catalog/loading-image-sources.json')).filter(([source]) => source.startsWith('img/product/'))) };
 function withImageSources(product) {
   if (product && product.url_slug) product.url_path = '/product/' + product.url_slug;
   const list = variants[product.image];

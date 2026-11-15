@@ -153,6 +153,16 @@ CREATE TABLE IF NOT EXISTS coupons (
   updated_at          TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS promotions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL UNIQUE REFERENCES products(id) ON DELETE CASCADE,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  show_popup INTEGER NOT NULL DEFAULT 1,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  starts_at TEXT,
+  ends_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS promotional_banners (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   image         TEXT NOT NULL,

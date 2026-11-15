@@ -5,7 +5,8 @@ import json
 ROOT=Path(__file__).resolve().parents[1]
 paths=['img/core-img/'+s for s in ['woman-clothes.png','grocery.png','rowboat.webp','tv-table.png','beach.webp','rental-services.webp','camera-trade.webp','pixelhouse-footer-logo.jpg']]
 out=ROOT/'img/core-img/loading-20261115';out.mkdir(exist_ok=True)
-images={}
+existing=ROOT/'catalog/loading-image-sources.json'
+images={k:v for k,v in (json.loads(existing.read_text()) if existing.exists() else {}).items() if k.startswith('img/product/')}
 for source in paths:
  im=Image.open(ROOT/source).convert('RGBA');widths=[96,192,384] if 'footer-logo' not in source else [300,450,600]
  images[source]=[]

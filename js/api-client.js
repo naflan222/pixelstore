@@ -1265,6 +1265,10 @@
       const result = await get('/products/' + encodeURIComponent(slug));
       liveProduct = result.product;
       if (liveProduct) trackEcommerce('view_item', ga4SingleItemPayload(liveProduct));
+      if (liveProduct) {
+        const price = $('.p-title-price .sale-price');
+        if (price) price.innerHTML = money(liveProduct.price) + (liveProduct.old_price ? '<span>' + money(liveProduct.old_price) + '</span>' : '');
+      }
       if (isDynamicProduct && liveProduct) {
         const salePanel = $('.flash-sale-panel');
         if (salePanel && !Number(liveProduct.flash_sale)) salePanel.hidden = true;
@@ -1334,6 +1338,8 @@
         const prod = liveProduct || (await get('/products/' + encodeURIComponent(slug))).product;
         const salesVolume = $('.sales-volume');
         if (salesVolume) updateStockProgress(salesVolume, prod);
+        const orderWhatsApp = $('.btn-whatsapp');
+        if (orderWhatsApp) orderWhatsApp.href = 'https://wa.me/94777466675?text=' + encodeURIComponent('I would like to order ' + prod.name + ' (' + money(prod.price) + '). ' + location.origin + productUrlFor(prod));
         if (prod.stock != null && prod.stock <= 0) {
           // Show "Out of Stock" and disable the button
           const btn = cartForm.querySelector('button[type="submit"]');
@@ -1529,7 +1535,7 @@
       '<a href="https://www.instagram.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
       '<a href="https://wa.me/94777466675" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>' +
       '<a href="https://www.tiktok.com/@pixelhouse.store?_r=1&_t=ZS-99zFSeQAKj2" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><i class="ti ti-brand-tiktok"></i></a></div></section>' +
-      '<nav class="site-footer-links" aria-label="Customer policies"><h2>Customer care</h2><a href="privacy-policy.html">Privacy policy</a><a href="terms.html">Terms and conditions</a><a href="return-policy.html">Exchange and return policy</a><a href="shipping-policy.html">Shipping policy</a></nav>' +
+      '<nav class="site-footer-links" aria-label="Customer policies"><h2>Customer care</h2><a href="/promotions">Promotions</a><a href="privacy-policy.html">Privacy policy</a><a href="terms.html">Terms and conditions</a><a href="return-policy.html">Exchange and return policy</a><a href="shipping-policy.html">Shipping policy</a></nav>' +
       '<section class="site-footer-contact"><h2>Contact</h2><a href="tel:+94777466675" aria-label="Call 0777 4666 75"><i class="ti ti-phone" aria-hidden="true"></i><span>0777 4666 75</span></a><a href="mailto:contact@pixelhouse.lk" aria-label="Email contact@pixelhouse.lk"><i class="ti ti-mail" aria-hidden="true"></i><span>contact@pixelhouse.lk</span></a></section></div>' +
       '<div class="site-footer-copyright">© ' + new Date().getFullYear() + ' PixelHouse. All rights reserved.</div></div>';
     $('#footerNav').before(footer);
@@ -1815,6 +1821,44 @@
     });
   }
 
+  async function wirePromotions() {
+    const grid = document.getElementById('promotionsGrid');
+    const shopping = isHomepage || !!grid || !!globalThis.PixelHouseRoutes?.data?.productSlug || ['products.html','catagory.html','gpproducts2.html','actioncamera.html','osmocat.html','360accesories.html','rental-services.html'].includes(page);
+    if (!shopping) return;
+    const key = 'pixelhouse-promotion-session';
+    if (!grid) { try { if (sessionStorage.getItem(key) === 'shown') return; } catch (_) { if (globalThis.pixelhousePromotionShown) return; } }
+    let dialog = null;
+    async function refresh() {
+      if (document.hidden) return;
+      try {
+        const data = await get('/promotions');
+        const promotions = data.promotions || [];
+        if (grid) {
+          grid.innerHTML = promotions.length ? promotions.map(p => productCardHTML({ ...p, id: p.product_id })).join('') : '<p class="col-12">No promotions are available right now. <a href="/products">Browse products</a>.</p>';
+          bindProductButtons(grid);
+        }
+        if (dialog?.open && !promotions.some(p => p.id === Number(dialog.dataset.promotionId) && Number(p.show_popup))) dialog.close();
+        let seen = false;
+        try { seen = sessionStorage.getItem(key) === 'shown'; } catch (_) { seen = !!globalThis.pixelhousePromotionShown; }
+        if (seen || dialog) return;
+        const offer = promotions.find(p => Number(p.show_popup));
+        if (!offer || !offer.url_path || typeof HTMLDialogElement === 'undefined') return;
+        dialog = document.createElement('dialog');dialog.className = 'pixelhouse-promotion';dialog.dataset.promotionId = offer.id;
+        dialog.setAttribute('aria-labelledby', 'promotionPopupTitle');
+        const included = String(offer.description || '').split('Included items:')[1]?.split('\n\n')[0].split('\n').map(x => x.replace(/^[•\s]+/, '').trim()).filter(Boolean) || [];
+        dialog.innerHTML = '<button type="button" class="promotion-close" aria-label="Close promotion">×</button><p class="promotion-eyebrow">Current promotion</p><a href="' + escapeHtml(offer.url_path) + '"><img ' + pictureAttributes(offer.image, '140px') + ' alt="' + escapeHtml(offer.name) + '" width="140" height="140"></a><h2 id="promotionPopupTitle">' + escapeHtml(offer.name) + '</h2><p class="promotion-price">' + money(offer.price) + '</p>' + (included.length ? '<p class="promotion-included">Included items</p><ul>' + included.map(x => '<li>' + escapeHtml(x) + '</li>').join('') + '</ul>' : '') + '<a class="btn btn-primary w-100" href="' + escapeHtml(offer.url_path) + '">View offer</a><a class="promotion-all" href="/promotions">See all promotions</a>';
+        document.body.append(dialog);
+        if (!grid) { const check = setInterval(() => { if (dialog.open) refresh(); }, 30000);dialog.addEventListener('close', () => clearInterval(check), { once: true }); }
+        dialog.querySelector('.promotion-close').addEventListener('click', () => dialog.close());
+        dialog.addEventListener('click', e => { if (e.target === dialog) { const b = dialog.getBoundingClientRect();if(e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) dialog.close(); } });
+        setTimeout(() => { if (!document.hidden) { dialog.showModal();globalThis.pixelhousePromotionShown = true;try { sessionStorage.setItem(key, 'shown'); } catch (_) {} } }, 800);
+      } catch (_) { if (grid && !grid.querySelector('.product-card')) grid.innerHTML = '<p class="col-12">Promotions could not be loaded. Please refresh or <a href="/products">browse products</a>.</p>'; }
+    }
+    await refresh();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    if (grid) setInterval(refresh, 30000);
+  }
+
   /* ---------- boot ---------- */
   document.addEventListener('DOMContentLoaded', async () => {
     // Force-remove the preloader immediately — don't wait for window.onload
@@ -1823,6 +1867,7 @@
     if (pl) pl.style.display = 'none';
 
     ensureStoreFooter();
+    wirePromotions().catch(() => {});
     flushPendingEcommerce();
     startHomepageRatingSync();
 

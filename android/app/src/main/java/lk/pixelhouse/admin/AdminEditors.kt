@@ -53,11 +53,16 @@ import java.io.File
     } } }
     var error by remember { mutableStateOf("") }
     var accepted by remember { mutableStateOf(false) }
+    var products by remember { mutableStateOf(listOf<JSONObject>()) }
     var categories by remember { mutableStateOf(listOf<JSONObject>()) }
     val context = LocalContext.current
     val vm: AdminViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val busy by vm.loading.collectAsStateWithLifecycle()
     LaunchedEffect(request) {
+        if (request.fields.any { it.key == "product_id" }) {
+            try { products = vm.api.request("/api/admin/products").optJSONArray("products")?.objects().orEmpty() }
+            catch (_: Exception) { error = "Could not load products. Close and try again." }
+        }
         if (request.fields.any { it.key in listOf("category_id", "reassign_to") }) {
             try { categories = vm.api.request("/api/admin/categories").optJSONArray("categories")?.objects().orEmpty() }
             catch (_: Exception) { error = "Could not load categories. Close and try again." }
@@ -69,6 +74,16 @@ import java.io.File
             if (destructive) { Text("This permanently removes the record. Existing server rules still apply."); Row { Checkbox(accepted, { accepted = it }); Text("I want to delete this record.", Modifier.padding(top = 12.dp)) } }
             request.fields.forEach { f ->
                 if (f.key == "image" && values[f.key].orEmpty().startsWith("data:")) { ProductImage(values[f.key].orEmpty(), Modifier.height(120.dp)); Text("Selected image") }
+                else if (f.key == "product_id") {
+                    var expanded by remember { mutableStateOf(false) }
+                    val selected = products.firstOrNull { it.display("id") == values[f.key] }?.display("name") ?: "Choose product"
+                    ExposedDropdownMenuBox(expanded, { expanded = it }) {
+                        OutlinedTextField(selected, {}, readOnly = true, label = { Text("Product") }, modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable))
+                        ExposedDropdownMenu(expanded, { expanded = false }) {
+                            products.forEach { product -> DropdownMenuItem(text = { Text(product.display("name") + " — Rs. " + product.display("price")) }, onClick = { values[f.key] = product.display("id"); expanded = false }) }
+                        }
+                    }
+                }
                 else if (f.key in listOf("category_id", "reassign_to")) {
                     var expanded by remember { mutableStateOf(false) }
                     val selectedName = categories.firstOrNull { it.display("id") == values[f.key] }?.display("name") ?: "None"

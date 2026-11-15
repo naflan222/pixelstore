@@ -173,6 +173,7 @@ const publicRoot = path.join(__dirname, '..');
 const seoHtmlHandler = createHtmlHandler({
   rootDir: publicRoot,
   productUrlLookup: (slug) => db.get("SELECT * FROM products WHERE url_slug = ? AND status = 'active'", slug),
+  promotionList: () => require('./promotions').listPromotions(db, true),
   productRoutes: () => db.all("SELECT id, slug, url_slug FROM products WHERE status = 'active' ORDER BY id"),
   productLookup: (slug) => db.get("SELECT id, name, description, price, image, stock, status, sku, brand, mpn, gtin, slug, url_slug FROM products WHERE slug = ? AND status = 'active'", slug),
   // A lightweight catalog snapshot renders in the first HTML response, while
@@ -229,6 +230,8 @@ app.use((err, req, res, next) => {
 async function start(port = PORT) {
   await db.init();
   await ensureProductUrls(db);
+  try { if (process.env.NODE_ENV !== 'test' && !process.env.NODE_TEST_CONTEXT) await require('./promotions').launch(db); }
+  catch (error) { console.error('[PROMOTION LAUNCH] Not applied:', error.message); }
   try {
     const updated = await require('./product-presentation').cleanStoredDescriptions(db);
     if (updated) console.log(`[CATALOG] Cleaned product descriptions: ${updated}.`);

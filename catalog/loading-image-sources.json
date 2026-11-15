@@ -116,5 +116,77 @@
       "src": "img/core-img/loading-20261115/make-up.webp",
       "width": 300
     }
+  ],
+  "img/product/hero13-bundle-20261115-300.webp": [
+    {
+      "src": "img/product/hero13-bundle-20261115-300.webp",
+      "width": 300
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-600.webp",
+      "width": 600
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1024.webp",
+      "width": 1024
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1536.webp",
+      "width": 1536
+    }
+  ],
+  "img/product/hero13-bundle-20261115-600.webp": [
+    {
+      "src": "img/product/hero13-bundle-20261115-300.webp",
+      "width": 300
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-600.webp",
+      "width": 600
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1024.webp",
+      "width": 1024
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1536.webp",
+      "width": 1536
+    }
+  ],
+  "img/product/hero13-bundle-20261115-1024.webp": [
+    {
+      "src": "img/product/hero13-bundle-20261115-300.webp",
+      "width": 300
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-600.webp",
+      "width": 600
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1024.webp",
+      "width": 1024
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1536.webp",
+      "width": 1536
+    }
+  ],
+  "img/product/hero13-bundle-20261115-1536.webp": [
+    {
+      "src": "img/product/hero13-bundle-20261115-300.webp",
+      "width": 300
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-600.webp",
+      "width": 600
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1024.webp",
+      "width": 1024
+    },
+    {
+      "src": "img/product/hero13-bundle-20261115-1536.webp",
+      "width": 1536
+    }
   ]
 }

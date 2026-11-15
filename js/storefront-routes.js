@@ -81,6 +81,7 @@
   "admin/camping-preview.html": "/admin/camping-preview",
   "admin/accessories-preview.html": "/admin/accessories-preview"
 };
+  FILE_PATHS["promotions.html"]="/promotions";
   const ROUTE_FILES={};for(const [file,url]of Object.entries(FILE_PATHS)){if(!url.includes('?')&&(!ROUTE_FILES[url]||['home.html','products.html'].includes(file)))ROUTE_FILES[url]=file;}
   function cleanHref(value,productPaths={},origin='https://pixelhouse.lk',current='/'){
     if(typeof value!=='string'||!value)return value;

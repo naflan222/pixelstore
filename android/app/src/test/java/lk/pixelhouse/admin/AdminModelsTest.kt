@@ -57,4 +57,13 @@ class AdminModelsTest {
         assertEquals(0.0, points[0].sales, 0.0)
         assertEquals(1200.0, points[1].sales, 0.0)
     }
+    @Test fun `promotion editor sends a linked product and independent boolean controls`() {
+        val module = modules.first { it.endpoint == "promotions" }
+        assertTrue(module.create && module.delete)
+        val body = formBody(module.fields, mapOf("product_id" to "23", "is_active" to "true", "show_popup" to "false", "display_order" to "0"))
+        assertEquals(23, body.getInt("product_id"))
+        assertTrue(body.getBoolean("is_active"))
+        assertFalse(body.getBoolean("show_popup"))
+        assertThrows(IllegalArgumentException::class.java) { formBody(module.fields, emptyMap()) }
+    }
 }

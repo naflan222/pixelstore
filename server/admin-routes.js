@@ -8,6 +8,7 @@ const db = require('./database');
 const { requireAdmin, requirePermission } = require('./auth');
 const { sendInvoice, buildInvoiceModel, renderPdf, invoiceNumberFor } = require('./invoice');
 const { emailEnabled, sendOrderConfirmationEmail } = require('./mailer');
+const { rateLimit } = require('./security');
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.use(express.text({ type: ['text/csv', 'application/csv', 'application/vnd
 
 const owners = requirePermission('owner', 'admin');
 const orderAccess = requirePermission('owner', 'admin', 'order_manager');
+const invoiceResendLimiter = rateLimit({ windowMs: 60 * 1000, max: 5 });
 const catalogAccess = requirePermission('owner', 'admin', 'catalog_manager');
 const supportAccess = requirePermission('owner', 'admin', 'support');
 const audit = async (req, action, entityType, entityId, details = '') => {
@@ -724,6 +726,51 @@ router.get('/orders/:id/invoice', orderAccess, async (req, res) => {
     WHERE oi.order_id = ? ORDER BY oi.id`, id);
   await audit(req, 'downloaded invoice', 'order', id);
   sendInvoice(res, order, items);
+});
+
+// Retry a previously created invoice without creating a second order or changing stock.
+// Both website checkout and offline-admin invoices can use this recovery path.
+router.post('/orders/:id/email-invoice', orderAccess, invoiceResendLimiter, async (req, res) => {
+  const id = productId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid order ID.' });
+  const order = await db.get('SELECT * FROM orders WHERE id = ?', id);
+  if (!order) return res.status(404).json({ error: 'Order not found.' });
+  const recipient = String(order.email || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+    return res.status(409).json({ error: 'This order has no valid customer email address.' });
+  }
+  if (!emailEnabled()) {
+    return res.status(503).json({ error: 'Email is not configured on the server. Check BREVO_API_KEY and MAIL_FROM in your hosting settings.' });
+  }
+
+  try {
+    const items = await db.all(`SELECT oi.name, oi.price, oi.quantity, p.sku
+      FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = ? ORDER BY oi.id`, id);
+    const model = await buildInvoiceModel(order, items);
+    // Do not claim an invoice PDF is attached if PDF generation fails.
+    const pdfBuffer = await renderPdf(model);
+    await sendOrderConfirmationEmail(recipient, { order, model, pdfBuffer });
+    // Audit failure must not make a successful send look like a failure, which
+    // could otherwise encourage duplicate customer emails.
+    await audit(req, 'resent invoice email', 'order', id).catch((e) => {
+      console.error(`[admin invoice] audit of order #${id} resend failed:`, e.message);
+    });
+    return res.json({
+      ok: true,
+      email_sent: true,
+      invoice_number: model.invoiceNumber,
+      recipient,
+    });
+  } catch (error) {
+    console.error(`[admin invoice] resend for order #${id} failed:`, error.message);
+    // Only authenticated order managers see this provider diagnostic.
+    return res.status(502).json({
+      ok: false,
+      email_sent: false,
+      error: `Invoice not emailed. ${error.message}`,
+    });
+  }
 });
 
 router.delete('/orders/:id', owners, async (req, res) => {

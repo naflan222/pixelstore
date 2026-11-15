@@ -145,7 +145,12 @@ function describeConfig() {
 
 function describeError(e) {
   const msg = String(e && e.message || e);
-  // Help operators fix the most common SMTP/API misconfigurations
+  // Help operators fix the most common SMTP/API misconfigurations.
+  // Brevo can reject a valid key if an unfamiliar hosting IP was blocked.
+  // Never auto-authorize an IP: first verify it belongs to the site's server.
+  if (/brevo/i.test(msg) && /(unknown|unrecognised|unrecognized|unauthori[sz]ed|denied|blocked|restricted|not allowed|whitelist|allowlist)/i.test(msg) && /\bip\b|ip.address/i.test(msg)) {
+    return 'Brevo rejected an unfamiliar sending IP. Verify the outbound IP in your hosting provider first; if it is trusted, review Brevo Settings > Security > Authorized IPs. If unfamiliar, rotate the affected API key. Provider: ' + msg;
+  }
   if (/550/.test(msg) && /sender|mail from|reject|not allowed|verify|permission/i.test(msg))
     return `Mail provider rejected the sender address (MAIL_FROM): ${msg} — make sure the MAIL_FROM address is verified/allowed on your mail account (Brevo: sender addresses must be verified, and the API key needs "Transactional" scope).`;
   if (/535|authentication/i.test(msg))

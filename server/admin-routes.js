@@ -736,7 +736,7 @@ router.post('/orders/:id/email-invoice', orderAccess, invoiceResendLimiter, asyn
   const order = await db.get('SELECT * FROM orders WHERE id = ?', id);
   if (!order) return res.status(404).json({ error: 'Order not found.' });
   const recipient = String(order.email || '').trim();
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
     return res.status(409).json({ error: 'This order has no valid customer email address.' });
   }
   if (!emailEnabled()) {

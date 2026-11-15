@@ -404,7 +404,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
     : 'noindex,nofollow';
 
-  let output = html
+  let output = html.replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.1')
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')

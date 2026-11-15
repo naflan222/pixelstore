@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { responsiveImage } = require('./image-loading');
 const path = require('path');
 const { FILE_PATHS, ROUTE_FILES } = require('./storefront-urls');
 const { cleanHref } = require('../js/storefront-routes');
@@ -347,6 +348,13 @@ function improveImages(html, fallbackAlt = '') {
     const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i);
     const src = srcMatch && srcMatch[1];
     let updated = tag;
+    // Deliver the right source before the preload scanner can fetch the original.
+    const responsive = src && responsiveImage(src);
+    if (responsive) {
+      updated = updated.replace(/\bsrc=["'][^"']*["']/i, 'src="' + escapeHtml(responsive.src) + '"');
+      updated = updated.replace(/\s(?:srcset|sizes)=["'][^"']*["']/gi, '');
+      updated = updated.replace(/>$/, ' srcset="' + escapeHtml(responsive.srcset) + '" sizes="' + responsive.sizes + '">');
+    }
 
     if (src && IMAGE_ALT[src] && /\balt=["']\s*["']/i.test(updated)) {
       updated = updated.replace(/\balt=["']\s*["']/i, `alt="${escapeHtml(IMAGE_ALT[src])}"`);
@@ -404,7 +412,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
     : 'noindex,nofollow';
 
-  let output = html.replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.1')
+  let output = html.replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.2')
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')
@@ -430,6 +438,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
+  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.2');
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
 
   // Old template pages contained invented review counts and comments. Product

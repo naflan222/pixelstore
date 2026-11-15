@@ -211,6 +211,9 @@ app.get('/sitemap.xml', createSitemapHandler({
 
 // Serve only storefront assets. The project root also contains application
 // source and, by default, the customer database; those must never be public.
+app.get(['/js/product-images.js', '/js/api-client.js'], require('./public-script-cache').publicScriptCache(publicRoot));
+// Enhanced picture URLs carry source hashes; reuse them across repeat visits.
+app.use('/img/product/enhanced-20261115', express.static(path.join(publicRoot, 'img/product/enhanced-20261115'), { maxAge: '1y', immutable: true }));
 for (const directory of ['css', 'js', 'img', 'admin']) {
   app.use(`/${directory}`, express.static(path.join(publicRoot, directory)));
 }

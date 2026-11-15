@@ -189,7 +189,6 @@
   function productCardHTML(p) {
     const name = escapeHtml(p.name);
     const slug = escapeHtml(p.slug);
-    const image = escapeHtml(p.image);
     const productUrl = productUrlFor(p);
     const badge = p.badge ? '<span class="badge rounded-pill badge-warning">' + escapeHtml(p.badge) + '</span>' : '';
     const old = p.old_price ? '<span>' + money(p.old_price) + '</span>' : '';
@@ -204,7 +203,7 @@
         '<div class="card product-card catalog-product-card" style="position:relative">' +
           '<div class="card-body">' +
             (outOfStock ? stockBadge : badge) +
-            '<a class="product-thumbnail d-block" href="' + productUrl + '"><img class="mb-2" src="' + image + '" alt="' + name + '" loading="lazy" decoding="async"></a>' +
+            '<a class="product-thumbnail d-block" href="' + productUrl + '"><img class="mb-2" ' + pictureAttributes(p.image) + ' alt="' + name + '" loading="lazy" decoding="async"></a>' +
             '<a class="product-title" href="' + productUrl + '">' + name + '</a>' +
             '<p class="sale-price">' + money(p.price) + old + '</p>' +
             rating +
@@ -1284,8 +1283,8 @@
             ...(Array.isArray(liveProduct.images) ? liveProduct.images : []).filter(image => !liveProduct.zoom_image || image !== liveProduct.image),
           ].filter((image) => typeof image === 'string' && image.trim())));
           slides.innerHTML = gallery.map((image) =>
-            '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" src="' +
-            escapeHtml(image) + '" alt="' + escapeHtml(liveProduct.name) + '" draggable="false"></div>'
+            '<div class="single-product-slide dynamic-product-slide"><img class="dynamic-product-image" ' +
+            pictureAttributes(image, '(min-width: 1200px) 1120px, 100vw') + ' alt="' + escapeHtml(liveProduct.name) + '" draggable="false"></div>'
           ).join('');
           if (carousel && typeof carousel.owlCarousel === 'function') {
             carousel.owlCarousel({
@@ -1386,13 +1385,17 @@
     })[character]);
   }
 
+  function pictureAttributes(source, sizes) {
+    return globalThis.PixelHouseProductImages?.attributes?.(source, sizes) || 'src="' + escapeHtml(source) + '"';
+  }
+
   const monthlyAnchor = '2026-11-08T00:00:00Z';
   function homeProductCard(product, variant) {
     if (variant === 'featured_gear') {
       const stock = Math.max(0, Number(product.stock) || 0);
       const percent = Math.min(100, stock);
       return '<div class="card flash-sale-card"><div class="card-body"><a href="' + escapeHtml(productUrlFor(product)) + '">' +
-        '<img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async">' +
+        '<img ' + pictureAttributes(product.image || 'img/product/1.webp') + ' alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async">' +
         '<span class="product-title">' + escapeHtml(product.name) + '</span><p class="sale-price">' + money(product.price) +
         (product.old_price ? '<span class="real-price">' + money(product.old_price) + '</span>' : '') + '</p>' +
         '<div class="progress"><div class="progress-bar bg-warning" role="progressbar" style="width:' + percent + '%" aria-valuenow="' + percent +
@@ -1401,7 +1404,7 @@
     if (variant === 'weekly_best_sellers' || variant === 'featured_products') {
       const featured = variant === 'featured_products';
       const url = productUrlFor(product);
-      const image = '<div class="product-thumbnail-side"><a class="product-thumbnail d-block" href="' + url + '"><img src="' + escapeHtml(product.image || 'img/product/1.webp') + '" alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async"></a></div>';
+      const image = '<div class="product-thumbnail-side"><a class="product-thumbnail d-block" href="' + url + '"><img ' + pictureAttributes(product.image || 'img/product/1.webp', featured ? undefined : '80px') + ' alt="' + escapeHtml(product.name) + '" loading="lazy" decoding="async"></a></div>';
       const description = '<div class="product-description"><a class="product-title d-block" href="' + url + '">' + escapeHtml(product.name) + '</a><p class="sale-price">' + money(product.price) + (product.old_price ? '<span>' + money(product.old_price) + '</span>' : '') + '</p></div>';
       return '<div class="' + (featured ? 'col-4' : 'col-12') + '"><div class="card ' + (featured ? 'featured-product-card' : 'horizontal-product-card') + '"><div class="' + (featured ? 'card-body' : 'd-flex align-items-center') + '">' + (featured ? '<span class="badge badge-warning custom-badge"><i class="ti ti-star-filled"></i></span>' : '') + image + description + '</div></div></div>';
     }
@@ -1521,7 +1524,7 @@
         '<span data-manual-review-position aria-live="polite">1 / 3</span>' +
         '<button type="button" data-manual-review-next aria-label="Next review">›</button>' +
       '</div></div><div class="site-footer-desktop-reviews"><div class="site-footer-desktop-review-list"></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-desktop-review-more hidden>Show more reviews</button></div>' : '<div class="site-footer-review-list" data-customer-reviews><p class="site-footer-muted">Loading customer reviews…</p></div><button class="btn btn-sm btn-outline-light review-load-more" type="button" data-review-more hidden>Show more reviews</button>') + '</section>' +
-      '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" src="img/core-img/pixelhouse-footer-logo.jpg" alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
+      '<div class="site-footer-main"><section class="site-footer-about"><img class="site-footer-logo" ' + pictureAttributes('img/core-img/pixelhouse-footer-logo.jpg', '150px') + ' alt="PixelHouse — GoPro cameras, accessories and camera rental" width="150" height="62" loading="lazy" decoding="async"><p>PixelHouse Sri Lanka brings together GoPro, DJI, and Insta360 cameras, accessories, rentals, and camera trade for creators and adventurers. Find genuine gear, explore reliable everyday essentials, and get friendly guidance from a local team that understands every shot and journey.</p><div class="site-footer-social" aria-label="Social media">' +
       '<a href="http://facebook.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="ti ti-brand-facebook"></i></a>' +
       '<a href="https://www.instagram.com/pixelhouse.lk" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>' +
       '<a href="https://wa.me/94777466675" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>' +
@@ -1773,7 +1776,7 @@
         } else {
           box.innerHTML = matches.map((p) =>
             `<a href="${escapeHtml(productUrlFor(p))}" data-slug="${escapeHtml(p.slug)}">` +
-              `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">` +
+              `<img ${pictureAttributes(p.image, '48px')} alt="${escapeHtml(p.name)}">` +
               `<span class="ss-name">${escapeHtml(p.name)}</span>` +
               `<span class="ss-price">${money(p.price)}</span>` +
             '</a>'

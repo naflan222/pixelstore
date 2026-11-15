@@ -323,7 +323,7 @@ test('service worker installs current assets and refreshes CSS and JavaScript be
   listeners.install({ waitUntil: promise => { installation = promise; } });
   await installation;
   const stylesheet = '/' + stylesheetHref(read('home.html'));
-  const client = read('home.html').match(/<script\b[^>]*src="(js\/api-client\.js(?:\?[^"\s]+)?)"/);
+  const client = enhanceHtml(read('home.html'), 'home.html').match(/<script\b[^>]*src="(js\/api-client\.js(?:\?[^"\s]+)?)"/);
   assert.ok(client, 'Homepage must load the storefront client');
   assert.ok(installedAssets.includes(stylesheet), 'Offline shell must use the homepage stylesheet version');
   assert.ok(installedAssets.includes('/' + client[1]), 'Offline shell must use the homepage client version');

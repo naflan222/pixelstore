@@ -1,0 +1,120 @@
+{
+  "img/core-img/woman-clothes.png": [
+    {
+      "src": "img/core-img/loading-20261115/woman-clothes-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/woman-clothes-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/woman-clothes-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/grocery.png": [
+    {
+      "src": "img/core-img/loading-20261115/grocery-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/grocery-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/grocery-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/rowboat.webp": [
+    {
+      "src": "img/core-img/loading-20261115/rowboat-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/rowboat-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/rowboat-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/tv-table.png": [
+    {
+      "src": "img/core-img/loading-20261115/tv-table-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/tv-table-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/tv-table-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/beach.webp": [
+    {
+      "src": "img/core-img/loading-20261115/beach-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/beach-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/beach-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/rental-services.webp": [
+    {
+      "src": "img/core-img/loading-20261115/rental-services-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/rental-services-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/rental-services-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/camera-trade.webp": [
+    {
+      "src": "img/core-img/loading-20261115/camera-trade-96.webp",
+      "width": 96
+    },
+    {
+      "src": "img/core-img/loading-20261115/camera-trade-192.webp",
+      "width": 192
+    },
+    {
+      "src": "img/core-img/loading-20261115/camera-trade-384.webp",
+      "width": 384
+    }
+  ],
+  "img/core-img/pixelhouse-footer-logo.jpg": [
+    {
+      "src": "img/core-img/loading-20261115/pixelhouse-footer-logo-300.webp",
+      "width": 300
+    },
+    {
+      "src": "img/core-img/loading-20261115/pixelhouse-footer-logo-450.webp",
+      "width": 450
+    },
+    {
+      "src": "img/core-img/loading-20261115/pixelhouse-footer-logo-600.webp",
+      "width": 600
+    }
+  ],
+  "img/bg-img/make-up.png": [
+    {
+      "src": "img/core-img/loading-20261115/make-up.webp",
+      "width": 300
+    }
+  ]
+}

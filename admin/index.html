@@ -1025,6 +1025,27 @@ async function deleteOrder(id) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+// Uses the original order's invoice, customer email and payment state; it
+// never creates a new order or touches inventory.
+async function resendOrderInvoice(id) {
+  if (!confirm(`Email the existing invoice for order #${id} to its saved customer address? This may send a duplicate if it was delivered before.`)) return;
+  const button = $('#resendInvoiceBtn-' + id);
+  const status = $('#invoiceEmailStatus-' + id);
+  if (button) button.disabled = true;
+  if (status) status.textContent = 'Sending invoice...';
+  try {
+    const data = await apiPost('/admin/orders/' + id + '/email-invoice', {});
+    const note = `Brevo accepted invoice ${data.invoice_number} for ${data.recipient}. Check Brevo transactional logs for final delivery status.`;
+    if (status) status.textContent = note;
+    toast('Invoice email submitted.');
+  } catch (error) {
+    if (status) status.textContent = error.message;
+    toast('Invoice email failed. See the message in order details.', 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function viewOrder(id) {
   try {
     const { order, payment, items, history } = await api('/admin/orders/' + id);
@@ -1062,8 +1083,10 @@ async function viewOrder(id) {
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
         <span>Total:</span><span style="color:var(--green)">${money(order.total)}</span>
       </div>
-      <div style="margin-top:16px"><a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice" download><i class="ti ti-file-download"></i> Download invoice (PDF)</a>
-      <a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice?view=1" target="_blank" rel="noopener"><i class="ti ti-eye"></i> Preview invoice</a></div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice" download><i class="ti ti-file-download"></i> Download invoice (PDF)</a>
+      <a class="btn btn-secondary" href="/api/admin/orders/${order.id}/invoice?view=1" target="_blank" rel="noopener"><i class="ti ti-eye"></i> Preview invoice</a>
+      <button class="btn btn-secondary" id="resendInvoiceBtn-${order.id}" onclick="resendOrderInvoice(${order.id})" type="button"><i class="ti ti-mail-forward"></i> Email invoice again</button></div>
+      <div id="invoiceEmailStatus-${order.id}" role="status" aria-live="polite" style="margin-top:8px;font-size:13px;color:var(--text2)"></div>
       <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:18px">
         <h4 style="margin-bottom:12px;font-size:14px">Fulfillment</h4>
         <div class="form-grid">

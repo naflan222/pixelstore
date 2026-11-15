@@ -440,6 +440,11 @@ router.get('/products/:slug', async (req, res) => {
 
 /* ---------------- PROMOTIONS / COUPONS ---------------- */
 
+router.get('/promotions', async (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ promotions: await require('./promotions').listPromotions(db, true) });
+});
+
 router.get('/promotional-banners', async (req, res) => {
   const banners = await db.all(`SELECT id, image, title, description, button_text, button_url, display_order, starts_at, ends_at
     FROM promotional_banners WHERE is_active = 1

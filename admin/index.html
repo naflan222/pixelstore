@@ -411,6 +411,7 @@ tr:last-child td{border-bottom:none}
 
       <!-- MARKETING -->
       <div class="tab" id="tab-marketing">
+        <div class="card"><h3>Product promotions</h3><p>Choose an existing product to promote. Its name, price, included items, image and stock are managed in Products.</p><button class="btn btn-primary" onclick="openPromotionModal()">Add Promotion</button><div class="table-wrap"><table><thead><tr><th>Product</th><th>Price</th><th>Active</th><th>Popup</th><th>Order</th><th>Actions</th></tr></thead><tbody id="promotionsBody"></tbody></table></div></div>
         <div class="section-toolbar"><button class="btn btn-primary" onclick="openCouponModal()"><i class="ti ti-plus"></i> Add Coupon</button><button class="btn btn-secondary" onclick="openBannerModal()"><i class="ti ti-photo-plus"></i> Add Banner</button></div>
         <div class="card homepage-sections-card"><h3><i class="ti ti-layout-grid"></i> Homepage product sections</h3><p>Choose the products shown in each homepage row. Only active products are selectable.</p><div id="homepageSectionEditor" class="homepage-section-editor"><div class="empty">Loading homepage sections…</div></div></div>
         <div class="card"><h3><i class="ti ti-ticket"></i> Coupons</h3><div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Minimum order</th><th>Usage</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody id="couponsBody"></tbody></table></div></div>
@@ -606,6 +607,8 @@ tr:last-child td{border-bottom:none}
 <div class="modal-overlay" id="customerModal"><div class="modal"><span class="modal-close" onclick="closeCustomerModal()">&times;</span><h3>Customer Details</h3><div id="customerDetail"></div></div></div>
 <div class="modal-overlay" id="couponModal"><div class="modal"><span class="modal-close" onclick="closeCouponModal()">&times;</span><h3 id="couponModalTitle">Add Coupon</h3><form onsubmit="return false"><input type="hidden" id="couponId"><div class="form-grid"><div class="form-group"><label>Code *</label><input id="couponCode" maxlength="32" required></div><div class="form-group"><label>Discount type *</label><select id="couponType" onchange="toggleCouponMaximum()"><option value="percentage">Percentage</option><option value="fixed">Fixed amount</option></select></div><div class="form-group"><label>Discount value *</label><input id="couponValue" type="number" min="0.01" step="0.01" required></div><div class="form-group"><label>Minimum order amount</label><input id="couponMinimum" type="number" min="0" step="0.01" value="0"></div><div class="form-group"><label>Maximum discount</label><input id="couponMaximum" type="number" min="0" step="0.01"></div><div class="form-group"><label>Usage limit</label><input id="couponLimit" type="number" min="0" step="1"></div><div class="form-group"><label>Expiry date</label><input id="couponExpires" type="datetime-local"></div><div class="form-group" style="padding-top:28px"><label><input type="checkbox" id="couponActive" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveCoupon()">Save Coupon</button><button class="btn btn-secondary" onclick="closeCouponModal()">Cancel</button></div></form></div></div>
 <div class="modal-overlay" id="bannerModal"><div class="modal"><span class="modal-close" onclick="closeBannerModal()">&times;</span><h3 id="bannerModalTitle">Add Promotional Banner</h3><form onsubmit="return false"><input type="hidden" id="bannerId"><div class="form-grid"><div class="form-group full"><label>Image URL/path *</label><input id="bannerImage" required placeholder="img/bg-img/promo.jpg"></div><div class="form-group"><label>Title *</label><input id="bannerTitle" maxlength="160" required></div><div class="form-group"><label>Button text</label><input id="bannerButtonText" maxlength="80"></div><div class="form-group full"><label>Description</label><textarea id="bannerDescription"></textarea></div><div class="form-group full"><label>Button URL</label><input id="bannerButtonUrl" placeholder="/shop-grid.html"></div><div class="form-group"><label>Display order</label><input id="bannerOrder" type="number" min="0" step="1" value="0"></div><div class="form-group"><label>Starts at</label><input id="bannerStarts" type="datetime-local"></div><div class="form-group"><label>Ends at</label><input id="bannerEnds" type="datetime-local"></div><div class="form-group" style="padding-top:28px"><label><input type="checkbox" id="bannerActive" checked> Active</label></div></div><div class="form-actions"><button class="btn btn-primary" onclick="saveBanner()">Save Banner</button><button class="btn btn-secondary" onclick="closeBannerModal()">Cancel</button></div></form></div></div>
+
+<div class="modal-overlay" id="promotionModal"><div class="modal"><button class="modal-close" onclick="closePromotionModal()" aria-label="Close">×</button><h3>Product promotion</h3><form onsubmit="return false"><input type="hidden" id="promotionId"><div class="form-grid"><div class="form-group full"><label for="promotionProduct">Product</label><select id="promotionProduct" required></select></div><div class="form-group"><label><input type="checkbox" id="promotionActive" checked> Promotion active</label></div><div class="form-group"><label><input type="checkbox" id="promotionPopup" checked> Show in website popup</label></div><div class="form-group"><label for="promotionOrder">Display order</label><input id="promotionOrder" type="number" min="0" step="1" value="0"></div><div class="form-group"><label for="promotionStarts">Starts at (UTC, optional)</label><input id="promotionStarts" type="datetime-local"></div><div class="form-group"><label for="promotionEnds">Ends at (UTC, optional)</label><input id="promotionEnds" type="datetime-local"></div></div><p>Turning the promotion off removes its advertising. The product's own status and stock remain controlled in Products.</p><div class="form-actions"><button class="btn btn-primary" onclick="savePromotion()">Save promotion</button><button class="btn btn-secondary" onclick="closePromotionModal()">Cancel</button></div></form></div></div>
 
 <script>
 /* ==================== ADMIN APP ==================== */
@@ -1280,6 +1283,7 @@ async function saveProduct() {
     }
     closeProductModal();
     loadProducts();
+    if (document.getElementById('tab-marketing').classList.contains('active')) loadPromotions();
   } catch (err) { toast(err.message, 'error'); }
 }
 
@@ -1576,6 +1580,7 @@ const homepageSectionNames = { featured_gear: 'Featured Gear', top_products: 'To
 let homepageEditorProducts = [];
 const inputDateTime = value => value ? String(value).replace(' ', 'T').slice(0, 16) : '';
 async function loadMarketing() {
+  loadPromotions();
   $('#couponsBody').innerHTML = '<tr><td colspan="7" class="empty">Loading coupons...</td></tr>';
   $('#bannersBody').innerHTML = '<tr><td colspan="6" class="empty">Loading banners...</td></tr>';
   try {
@@ -1586,6 +1591,35 @@ async function loadMarketing() {
     $('#bannersBody').innerHTML = banners.map(b => `<tr><td><img class="prod-img" src="../${esc(b.image)}" alt=""></td><td><strong>${esc(b.title)}</strong><br><span style="font-size:11px;color:var(--text2)">${esc(b.button_url || '')}</span></td><td style="font-size:12px">${esc(b.starts_at || 'Immediately')}<br>${esc(b.ends_at || 'No end date')}</td><td>${b.display_order}</td><td><span class="badge ${b.is_active ? 'badge-success' : 'badge-danger'}">${b.is_active ? 'Active' : 'Disabled'}</span></td><td><button class="btn btn-secondary btn-sm" onclick="editBanner(${b.id})"><i class="ti ti-edit"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteBanner(${b.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No promotional banners created yet</td></tr>';
   } catch (err) { toast(err.message, 'error'); }
 }
+let promotions = [], promotionProducts = [];
+async function loadPromotions() {
+  try {
+    const [data, products] = await Promise.all([api('/admin/promotions'), api('/admin/products')]);
+    promotions = data.promotions || []; promotionProducts = products.products || [];
+    $('#promotionsBody').innerHTML = promotions.map(p => `<tr><td>${esc(p.name)}</td><td>${money(p.price)}</td><td><input aria-label="Promotion active for ${esc(p.name)}" type="checkbox" ${p.is_active ? 'checked' : ''} onchange="togglePromotion(${p.id}, 'is_active', this.checked)"></td><td><input aria-label="Popup for ${esc(p.name)}" type="checkbox" ${p.show_popup ? 'checked' : ''} onchange="togglePromotion(${p.id}, 'show_popup', this.checked)"></td><td>${p.display_order}</td><td><button class="btn btn-secondary btn-sm" onclick="openPromotionModal(${p.id})">Edit promotion</button> <button class="btn btn-secondary btn-sm" onclick="editPromotionProduct(${p.product_id})">Edit product</button> <button class="btn btn-danger btn-sm" onclick="deletePromotion(${p.id})">Remove</button></td></tr>`).join('') || '<tr><td colspan="6">No product promotions yet.</td></tr>';
+  } catch(e) { $('#promotionsBody').innerHTML = '<tr><td colspan="6">Could not load promotions.</td></tr>'; }
+}
+function openPromotionModal(id) {
+  const p = promotions.find(p => p.id === id);
+  $('#promotionId').value = p?.id || '';
+  $('#promotionProduct').innerHTML = '<option value="">Choose product</option>' + promotionProducts.map(x => `<option value="${x.id}">${esc(x.name)} — ${money(x.price)}</option>`).join('');
+  $('#promotionProduct').value = p?.product_id || '';
+  $('#promotionActive').checked = p ? !!p.is_active : true; $('#promotionPopup').checked = p ? !!p.show_popup : true;
+  $('#promotionOrder').value = p?.display_order || 0; $('#promotionStarts').value = inputDateTime(p?.starts_at); $('#promotionEnds').value = inputDateTime(p?.ends_at);
+  $('#promotionModal').classList.add('active');
+}
+function closePromotionModal() { $('#promotionModal').classList.remove('active'); }
+async function savePromotion() {
+  const id = $('#promotionId').value, body = { product_id: Number($('#promotionProduct').value), is_active: $('#promotionActive').checked, show_popup: $('#promotionPopup').checked, display_order: Number($('#promotionOrder').value), starts_at: $('#promotionStarts').value, ends_at: $('#promotionEnds').value };
+  try { await (id ? apiPut('/admin/promotions/' + id, body) : apiPost('/admin/promotions', body)); closePromotionModal(); toast('Promotion saved'); loadPromotions(); } catch(e) { toast(e.message, 'error'); }
+}
+async function togglePromotion(id, key, value) {
+  const p = promotions.find(p => p.id === id); if (!p) return;
+  try { await apiPut('/admin/promotions/' + id, { ...p, [key]: value }); toast('Promotion updated'); } catch(e) { toast(e.message, 'error'); } loadPromotions();
+}
+async function editPromotionProduct(id) { await loadProducts(); editProduct(id); }
+async function deletePromotion(id) { if (!confirm('Remove this promotion? The product will remain in your catalog.')) return; try { await apiDel('/admin/promotions/' + id); loadPromotions(); } catch(e) { toast(e.message, 'error'); } }
+
 function renderHomepageSectionEditor(selections) {
   const editor = $('#homepageSectionEditor');
   const activeProducts = homepageEditorProducts.filter(product => product.status === 'active');

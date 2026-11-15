@@ -18,6 +18,7 @@ val categoryFields = listOf(text("name", true), text("slug", true), Field("descr
 val adminFields = listOf(text("username", true), text("email", true), text("full_name"), text("phone"), choice("role", "admin", "order_manager", "catalog_manager", "support", "owner"), flag("is_active"), Field("password", "Password (required for a new account)", InputKind.Password))
 val couponFields = listOf(text("code", true), choice("discount_type", "percentage", "fixed"), number("discount_value", "0"), number("minimum_order_amount", "0"), number("maximum_discount"), number("usage_limit"), text("expires_at"), flag("is_active"))
 val bannerFields = listOf(text("title", true), text("image", true), Field("description", kind = InputKind.Multiline), text("button_text"), text("button_url"), number("display_order", "0"), text("starts_at"), text("ends_at"), flag("is_active"))
+val promotionFields = listOf(Field("product_id", "Product", InputKind.Number, required = true), flag("is_active"), flag("show_popup"), number("display_order", "0"), text("starts_at"), text("ends_at"))
 val settingsFields = listOf(text("store_name", true), text("currency", true), text("store_email"), text("store_phone"), flag("store_open"), flag("cash_enabled"), flag("bank_enabled"), number("shipping_fee", "0"), flag("standard_delivery_enabled"), flag("express_delivery_enabled"), flag("order_notifications"), flag("low_stock_notifications"), flag("vendor_notifications"))
 val modules = listOf(
     Module("Dashboard", "stats"),
@@ -30,6 +31,7 @@ val modules = listOf(
     Module("Customers", "customers", "customers"),
     Module("Sales analytics", "analytics", filters = listOf(choice("range", "last_30_days", "last_7_days", "today", "this_month", "last_month", "this_year", "custom"), text("start"), text("end"))),
     Module("Coupons", "coupons", "coupons", couponFields, true, true),
+    Module("Promotions", "promotions", "promotions", promotionFields, true, true),
     Module("Promotional banners", "promotional-banners", "banners", bannerFields, true, true),
     Module("Homepage sections", "homepage-sections"),
     Module("Messages", "messages", "messages"),

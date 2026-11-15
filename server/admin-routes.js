@@ -1002,6 +1002,47 @@ router.delete('/coupons/:id', owners, async (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/promotions', catalogAccess, async (_req, res) => {
+  res.json({ promotions: await require('./promotions').listPromotions(db) });
+});
+async function promotionValues(body) {
+  const id = productId(body.product_id), order = Number(body.display_order ?? 0);
+  const asUtc = value => {
+    if (value === undefined || value === null || value === '') return value;
+    const text = String(value);
+    return /(?:Z|[+-]\d{2}:\d{2})$/i.test(text) ? text : (text.length === 10 ? text + 'T00:00:00Z' : text.replace(' ', 'T') + 'Z');
+  };
+  const starts = optionalDateTime(asUtc(body.starts_at)), ends = optionalDateTime(asUtc(body.ends_at));
+  if (!id || !Number.isSafeInteger(order) || order < 0 || starts === false || ends === false || (starts && ends && starts >= ends)) return null;
+  if (!(await db.get('SELECT id FROM products WHERE id = ?', id))) return null;
+  return [id, body.is_active === false || body.is_active === 0 || body.is_active === '0' ? 0 : 1,
+    body.show_popup === false || body.show_popup === 0 || body.show_popup === '0' ? 0 : 1, order, starts, ends];
+}
+router.post('/promotions', catalogAccess, async (req, res) => {
+  const values = await promotionValues(req.body || {});
+  if (!values) return res.status(400).json({ error: 'Choose a product and valid promotion settings.' });
+  if (await db.get('SELECT id FROM promotions WHERE product_id = ?', values[0])) return res.status(409).json({ error: 'This product already has a promotion. Edit it instead.' });
+  const result = await db.insert('INSERT INTO promotions (product_id, is_active, show_popup, display_order, starts_at, ends_at) VALUES (?, ?, ?, ?, ?, ?)', ...values);
+  await audit(req, 'created', 'promotion', result.id);
+  res.status(201).json({ ok: true, id: Number(result.id) });
+});
+router.put('/promotions/:id', catalogAccess, async (req, res) => {
+  const id = productId(req.params.id), values = await promotionValues(req.body || {});
+  if (!id || !values) return res.status(400).json({ error: 'Choose a product and valid promotion settings.' });
+  if (!(await db.get('SELECT id FROM promotions WHERE id = ?', id))) return res.status(404).json({ error: 'Promotion not found.' });
+  if (await db.get('SELECT id FROM promotions WHERE product_id = ? AND id != ?', values[0], id)) return res.status(409).json({ error: 'This product already has a promotion.' });
+  await db.run('UPDATE promotions SET product_id = ?, is_active = ?, show_popup = ?, display_order = ?, starts_at = ?, ends_at = ? WHERE id = ?', ...values, id);
+  await audit(req, 'updated', 'promotion', id);
+  res.json({ ok: true });
+});
+router.delete('/promotions/:id', catalogAccess, async (req, res) => {
+  const id = productId(req.params.id);
+  if (!id || !(await db.get('SELECT id FROM promotions WHERE id = ?', id))) return res.status(404).json({ error: 'Promotion not found.' });
+  await db.run('DELETE FROM promotions WHERE id = ?', id);
+  await audit(req, 'deleted', 'promotion', id);
+  res.json({ ok: true });
+});
+
 router.get('/promotional-banners', catalogAccess, async (req, res) => {
   res.json({ banners: await db.all('SELECT * FROM promotional_banners ORDER BY display_order ASC, id ASC') });
 });

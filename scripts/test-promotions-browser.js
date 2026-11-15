@@ -1,0 +1,29 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {freshSqlitePath}=require('../tests/helpers');Object.assign(process.env,{DB_ENGINE:'sqlite',SQLITE_DB_PATH:freshSqlitePath(),NODE_ENV:'test',SEED_DEMO_DATA:'true'});delete process.env.DATABASE_URL;
+const db=require('../server/database'),{start}=require('../server');
+(async()=>{const{server,port}=await start(0),base='http://127.0.0.1:'+port;await require('../server/promotions').launch(db);
+const bundle=await db.get("SELECT * FROM products WHERE slug='gopro-hero13-bundle'");assert.equal(bundle.stock,20);
+const{chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});const out='/workspace/shared/promotions-preview';fs.mkdirSync(out,{recursive:true});const errors=[];
+try{for(const width of [390,1440])for(const theme of ['light','dark']){
+ const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'});await context.addInitScript(t=>localStorage.setItem('theme',t),theme);await context.route('https://www.googletagmanager.com/**',r=>r.abort());const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(base+'/');await page.locator('.pixelhouse-promotion[open]').waitFor();assert.equal(await page.locator('#promotionPopupTitle').innerText(),'GoPro HERO13 Bundle');assert.match(await page.locator('.promotion-price').innerText(),/105,000/);assert.equal(await page.locator('.pixelhouse-promotion li').count(),6);
+ assert.ok(await page.locator('.pixelhouse-promotion').evaluate(n=>n.getBoundingClientRect().width<=340));await page.screenshot({path:path.join(out,`popup-${width}-${theme}.png`)});
+ await page.getByRole('button',{name:'Close promotion'}).click();await page.locator('a[href="/promotions"]').first().click();await page.waitForURL('**/promotions');await page.locator('#promotionsGrid .product-card').waitFor();assert.equal(await page.locator('.pixelhouse-promotion[open]').count(),0);
+ await page.locator('#promotionsGrid .product-title').click();await page.waitForURL('**/product/gopro-hero13-bundle');await page.waitForFunction(()=>document.querySelector('.dynamic-product-image')?.complete);assert.match(await page.locator('.bundle-description').innerText(),/50-in-1/);assert.ok(!/20\s*(?:in stock|available)|(?:available|stock)\s*:?\s*20/i.test(await page.locator('.product-description').innerText()));assert.equal(await page.locator('.cart-form button').innerText(),'Add To Cart');
+ assert.ok((await page.locator('.btn-whatsapp').getAttribute('href')).includes('GoPro%20HERO13%20Bundle'));await page.screenshot({path:path.join(out,`bundle-${width}-${theme}.png`),fullPage:true});
+ const response=page.waitForResponse(r=>r.url().endsWith('/api/cart')&&r.request().method()==='POST');await page.locator('.cart-form button').click();assert.equal((await response).status(),200);await page.waitForURL('**/cart');
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ if (width === 390 && theme === 'light') { await page.goto(base+'/product/gopro-hero-13-black');await page.waitForFunction(()=>document.querySelector('.p-title-price .sale-price')?.innerText.includes('120,000'));assert.match(await page.locator('.p-title-price .sale-price').innerText(),/92,000/); }
+ await context.close();
+}
+ const nojs=await browser.newContext({javaScriptEnabled:false});const staticPage=await nojs.newPage();await staticPage.goto(base+'/promotions');assert.equal(await staticPage.locator('#promotionsGrid .product-card').count(),1);await nojs.close();
+ const admin=await browser.newContext();await admin.request.post(base+'/api/auth/login',{data:{username:'demo',password:'demo1234'}});const page=await admin.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/admin/');await page.locator('[data-tab="marketing"]').click();await page.locator('#promotionsBody tr').filter({hasText:'GoPro HERO13 Bundle'}).waitFor();
+ const promotion=(await(await admin.request.get(base+'/api/admin/promotions')).json()).promotions[0];
+ await page.getByLabel('Promotion active for GoPro HERO13 Bundle',{exact:true}).uncheck();await page.waitForTimeout(300);assert.equal((await(await admin.request.get(base+'/api/promotions')).json()).promotions.length,0);
+ const hidden=await browser.newContext();const hiddenPage=await hidden.newPage();await hiddenPage.goto(base+'/');await hiddenPage.waitForTimeout(1200);assert.equal(await hiddenPage.locator('.pixelhouse-promotion[open]').count(),0);await hidden.close();
+ await page.getByLabel('Promotion active for GoPro HERO13 Bundle',{exact:true}).check();await page.waitForTimeout(300);
+ await page.getByRole('button',{name:'Add Promotion',exact:true}).click();const hero=await db.get("SELECT id FROM products WHERE slug='hero13'");await page.locator('#promotionProduct').selectOption(String(hero.id));await page.locator('#promotionPopup').uncheck();await page.getByRole('button',{name:'Save promotion',exact:true}).click();await page.waitForTimeout(300);assert.equal((await(await admin.request.get(base+'/api/promotions')).json()).promotions.length,2);
+ await page.getByRole('button',{name:'Edit product',exact:true}).first().click();await page.locator('#productModal.active').waitFor();assert.ok(await page.locator('#prodCategory option').count()>1);await page.screenshot({path:path.join(out,'admin-promotion-product.png')});await admin.close();
+ assert.deepEqual(errors,[]);console.log('PASS: mobile/desktop light/dark popup, six included items, session dismissal, promotions navigation, product/cart/WhatsApp, web admin on/off, future promotions and product editing.');
+}finally{await browser.close();await new Promise(r=>server.close(r));await db.close();}})().catch(e=>{console.error(e);process.exitCode=1});

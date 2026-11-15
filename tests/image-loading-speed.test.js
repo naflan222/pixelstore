@@ -8,7 +8,7 @@ test('first HTML response has responsive product sources instead of downloading 
  assert.match(result,/<img[^>]+src="img\/product\/enhanced-20261115\/[^>]+sizes=/);
  assert.doesNotMatch(result,/<img[^>]+src="img\/product\/18.png"/);
  assert.match(result,/3840w/);
- assert.match(result,/product-images.js\?v=20261115.2/);
+ assert.match(result,/product-images.js\?v=20261115.3/);
  assert.equal(responsiveImage('data:image/png;base64,owner-upload'),null);
  const icon=responsiveImage('img/core-img/grocery.png');assert.equal(icon.sizes,'48px');assert.ok(icon.src.endsWith('-96.webp'));
 });

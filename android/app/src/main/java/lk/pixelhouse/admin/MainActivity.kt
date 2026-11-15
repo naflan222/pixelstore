@@ -168,6 +168,10 @@ data class DeleteRequest(val path: String, val name: String, val fields: List<Fi
                 Summary(row)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TextButton(onClick = { when (module.endpoint) { "orders" -> vm.openOrder(id); "customers" -> vm.openCustomer(id); else -> inspect = row } }) { Text("Details") }
+                    if (module.endpoint == "promotions") TextButton(onClick = { vm.work {
+                        val product = vm.api.request("/api/products/" + row.display("slug")).getJSONObject("product")
+                        edit = EditRequest("Edit product", "/api/admin/products/" + row.display("product_id"), "PUT", productFields, product, transform = { body -> productEditBody(body, product) })
+                    } }) { Text("Edit product details") }
                     if (module.fields.isNotEmpty()) TextButton(onClick = { edit = EditRequest("Edit ${row.title()}", "/api/admin/${module.endpoint}/$id", "PUT", module.fields, row, transform = { body -> if (module.endpoint == "products") productEditBody(body, row) else body }) }) { Text("Edit") }
                     when (module.endpoint) {
                         "products" -> TextButton(onClick = { images = id }) { Text("Images") }
@@ -209,7 +213,7 @@ data class DeleteRequest(val path: String, val name: String, val fields: List<Fi
     AsyncImage(model = model, contentDescription = "Product image", modifier = modifier)
 }
 @Composable private fun Summary(row: JSONObject) {
-    listOf("id", "status", "payment_status", "total", "price", "stock", "email", "phone", "role", "rating", "comment", "body", "created_at").forEach { key ->
+    listOf("id", "status", "payment_status", "total", "price", "stock", "is_active", "show_popup", "email", "phone", "role", "rating", "comment", "body", "created_at").forEach { key ->
         row.display(key).takeIf { it.isNotBlank() }?.let { Text("${label(key)}: ${if (key in listOf("total", "price")) "Rs. " else ""}$it", style = MaterialTheme.typography.bodyMedium, maxLines = 3) }
     }
 }

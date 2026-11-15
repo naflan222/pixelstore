@@ -12,6 +12,7 @@ const GA4_MEASUREMENT_ID = 'G-JJWCEW1DGE';
 const DEFAULT_IMAGE = `${SITE_URL}/img/icons/icon-512x512.png`;
 
 const PAGE_META = {
+  'promotions.html': { title: 'Promotions & Camera Bundles | PixelHouse Sri Lanka', description: 'Explore current PixelHouse promotions and camera bundles. View included items, prices, availability and ordering options.', heading: 'Promotions' },
   'home.html': {
     title: 'Cameras in Sri Lanka | GoPro, DJI & Insta360 | PixelHouse',
     description: 'Shop GoPro, DJI Osmo and Insta360 cameras in Sri Lanka at PixelHouse. Browse action cameras, prices and compatible accessories with nationwide delivery.',
@@ -121,6 +122,7 @@ const PRODUCT_PAGES = [
 ];
 
 const INDEXABLE_PAGES = [
+  'promotions.html',
   'home.html', 'products.html',
   'catagory.html', 'gpproducts2.html', 'actioncamera.html', 'insta360-camera.html',
   'dji-osmo-camera.html', '360accesories.html', 'osmocat.html',
@@ -412,7 +414,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     ? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
     : 'noindex,nofollow';
 
-  let output = html.replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.2')
+  let output = require('./promotion-view').renderBundle(html, catalogProduct).replace(/js\/product-images\.js\?v=[^"']+/g, 'js/product-images.js?v=20261115.3')
     .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, '')
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, '')
@@ -438,7 +440,8 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
-  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.2');
+  output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.3');
+  if (!output.includes('/css/promotions.css?')) output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/css/promotions.css?v=20261115.1">\n</head>');
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);
 
   // Old template pages contained invented review counts and comments. Product
@@ -599,7 +602,7 @@ function routeHtml(html, filename, product, products, current) {
   }));
 }
 
-function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = null, productRoutes = null, catalogList = null }) {
+function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = null, productRoutes = null, catalogList = null, promotionList = null }) {
   return async function serveSeoHtml(req, res, next) {
     try {
       // Old cached cart/search code can link imported products as /slug.html
@@ -645,7 +648,8 @@ function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = n
       const routeCanonical = ROUTE_FILES[req.path]
         ? SITE_URL + req.path + (['/products','/gopro-accessories','/osmo-accessories','/insta360-accessories'].includes(req.path) && Number.isSafeInteger(Number(req.query.page)) && Number(req.query.page) > 1 ? '?page=' + Number(req.query.page) : '') : null;
       const canonicalOverride = productPath(catalogProduct) ? SITE_URL + productPath(catalogProduct) : routeCanonical || (dynamicSlug && catalogProduct ? SITE_URL + '/single-product.html?product=' + encodeURIComponent(dynamicSlug) : null);
-      const pageHtml = filename === 'products.html' && catalogList ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir) : html;
+      let pageHtml = filename === 'products.html' && catalogList ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir) : html;
+      if (filename === 'promotions.html' && promotionList) pageHtml = require('./promotion-view').renderPromotionList(pageHtml, await promotionList());
       const enriched = enhanceHtml(pageHtml, filename, catalogProduct, canonicalOverride);
       // Customer pages are never cached; public catalog HTML must revalidate.
       res.set('Cache-Control', INDEXABLE_SET.has(filename) ? 'public, max-age=0, must-revalidate' : 'private, no-store');

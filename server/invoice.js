@@ -227,12 +227,17 @@ async function readPaymentRecord(orderId) {
 async function buildInvoiceModel(order, items, options = {}) {
   const shop = options.shop || await readShopSettings();
   const payment = options.payment === undefined ? await readPaymentRecord(order.id) : options.payment;
+  let serialRows = options.serialRows || [];
+  if (!options.serialRows && (items || []).some(item => item.id)) {
+    serialRows = await require('./invoice-serials').loadRows(require('./database'), order.id, options.serialCopy ? 'copy' : 'offline');
+  }
   const lines = (items || []).map((item, index) => {
     const unitPrice = number(item.price);
     const quantity = number(item.quantity);
     return {
       index: index + 1,
       name: String(item.name || `Item ${index + 1}`),
+      serialNumbers: serialRows.filter(row => row.order_item_id === item.id).map(row => ({ unit: row.unit_index + 1, value: row.serial_number })),
       sku: String(item.sku || '').trim(),
       quantity,
       unitPrice,
@@ -285,7 +290,8 @@ async function buildInvoiceModel(order, items, options = {}) {
   return {
     shop,
     invoiceNumber,
-    fileKey,
+    fileKey: options.serialCopy ? fileKey + '-Serials' : fileKey,
+    serialCopy: !!options.serialCopy,
     orderNumber: `#${order.id}`,
     totalLabel: paymentStatus === 'paid' ? 'Total paid' : (cancelled ? 'Order total' : 'Amount due'),
     statusLabel,
@@ -304,6 +310,7 @@ async function buildInvoiceModel(order, items, options = {}) {
     lines,
     totals: { subtotal, discount, shipping, total, itemCount, coupon: String(order.coupon_code || '').trim() },
     meta: [
+      ...(options.serialCopy ? [['Document', 'Serial-number copy of ' + invoiceNumber]] : []),
       ['Invoice number', invoiceNumber],
       ['Order number', `#${order.id}`],
       ['Issue date', formatDate(order.created_at)],
@@ -378,7 +385,7 @@ function drawLetterhead(doc, model) {
   drawLogo(doc, PAGE.margin, Math.round((TOP_BAR - logoHeight) / 2) - 1, logoHeight);
 
   // Right-aligned document title, invoice number and payment status pill.
-  rightText(doc, 'INVOICE', CONTENT_RIGHT, 22, {
+  rightText(doc, model.serialCopy ? 'INVOICE COPY' : 'INVOICE', CONTENT_RIGHT, 22, {
     font: 'Helvetica-Bold', size: 22, color: '#FFFFFF', spacing: 2.4, lineBreak: false,
   });
   rightText(doc, `No. ${model.invoiceNumber}`, CONTENT_RIGHT, 50, {
@@ -492,9 +499,16 @@ function drawItemsTable(doc, model, startY) {
     return rightText(doc, text, column.x + column.width - 11, rowY + (rowHeight - (options.size || 9) * 1.06) / 2, centered);
   };
 
-  model.lines.forEach((line, index) => {
+  const displayLines = model.lines.flatMap(line => {
+    if (!line.serialNumbers?.length) return [line];
+    return Array.from({ length: Math.ceil(line.serialNumbers.length / 8) }, (_, i) => ({ ...line, serialNumbers: line.serialNumbers.slice(i * 8, i * 8 + 8), continued: i > 0, name: line.name + (i > 0 ? ' (continued)' : '') }));
+  });
+  displayLines.forEach((line, index) => {
     const descriptionHeight = Math.max(textHeight(doc, line.name, { size: 9.1, width: descriptionColumn.width - 22, lineGap: 1.4 }), 10);
-    const rowHeight = Math.max(24, descriptionHeight + (line.sku ? 20 : 11), line.sku ? 34 : 24);
+    const serialLabels = (line.serialNumbers || []).map(serial => (line.quantity === 1 ? 'Serial number: ' : 'Serial ' + serial.unit + ': ') + serial.value);
+    const serialHeights = serialLabels.map(label => textHeight(doc, label, { size: 8, width: descriptionColumn.width - 22, lineGap: 1.2 }) + 3);
+    const serialHeight = serialHeights.reduce((a,b) => a+b, 0);
+    const rowHeight = Math.max(24, descriptionHeight + serialHeight + (line.sku ? 20 : 11), line.sku ? 34 : 24);
     if (y + rowHeight > BODY_FLOOR) {
       y = drawTableHeader(doc, columns, newPage(doc, model) + 14);
     }
@@ -504,14 +518,19 @@ function drawItemsTable(doc, model, startY) {
     writeText(doc, line.name, descriptionColumn.x + 11, y + 6, {
       size: 9.1, color: BRAND.ink, width: descriptionColumn.width - 22, lineGap: 1.4,
     });
+    let serialY = y + descriptionHeight + 8;
+    serialLabels.forEach((label, i) => {
+      writeText(doc, label, descriptionColumn.x + 11, serialY, { size: 8, color: BRAND.body, width: descriptionColumn.width - 22, lineGap: 1.2 });
+      serialY += serialHeights[i];
+    });
     if (line.sku) {
-      writeText(doc, `Item code ${line.sku}`, descriptionColumn.x + 11, y + descriptionHeight + 9.5, {
+      writeText(doc, `Item code ${line.sku}`, descriptionColumn.x + 11, y + descriptionHeight + serialHeight + 9.5, {
         size: 6.9, color: BRAND.faint, spacing: 0.5, width: descriptionColumn.width - 22, lineBreak: false,
       });
     }
-    cell(columns[2], String(line.quantity), y, rowHeight, { size: 8.8, color: BRAND.body });
-    cell(columns[3], money(line.unitPrice, model.shop), y, rowHeight, { size: 8.8, color: BRAND.body });
-    cell(columns[4], money(line.amount, model.shop), y, rowHeight, {
+    cell(columns[2], line.continued ? '' : String(line.quantity), y, rowHeight, { size: 8.8, color: BRAND.body });
+    cell(columns[3], line.continued ? '' : money(line.unitPrice, model.shop), y, rowHeight, { size: 8.8, color: BRAND.body });
+    cell(columns[4], line.continued ? '' : money(line.amount, model.shop), y, rowHeight, {
       font: 'Helvetica-Bold', size: 9.2, color: BRAND.ink,
     });
 
@@ -700,7 +719,7 @@ function renderHtml(model) {
   const moneyHtml = (amount) => escapeHtml(money(amount, model.shop));
   const rows = model.lines.map((line) => `<tr>
       <td class="qty">${line.index}</td>
-      <td><strong>${escapeHtml(line.name)}</strong>${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
+      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
       <td class="num">${line.quantity}</td>
       <td class="num">${moneyHtml(line.unitPrice)}</td>
       <td class="num total">${moneyHtml(line.amount)}</td>
@@ -740,6 +759,7 @@ function renderHtml(model) {
   td.qty,th.qty{width:34px;color:var(--muted)}
   td.num,th.num{text-align:right;width:104px;color:var(--body)}
   td.total{font-weight:700;color:var(--ink)}
+  .serial-number{display:block;margin-top:4px;font-size:12px;color:var(--body);overflow-wrap:anywhere}
   .sku{display:block;font-size:11px;color:var(--muted);letter-spacing:.5px}
   .foot{display:grid;grid-template-columns:1fr 300px;gap:30px;margin-top:26px}
   .terms{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted)}
@@ -769,7 +789,7 @@ function renderHtml(model) {
     <div class="band">
       <div>${logo ? `<img src="${logo}" alt="${escapeHtml(model.shop.name)}">` : `<div class="no" style="font-size:20px;color:#fff;letter-spacing:2px">${escapeHtml(model.shop.name.toUpperCase())}</div>`}</div>
       <div style="text-align:right">
-        <h1>INVOICE</h1>
+        <h1>${model.serialCopy ? 'INVOICE COPY' : 'INVOICE'}</h1>
         <div class="no">No. ${escapeHtml(model.invoiceNumber)}</div>
         <div class="pill${model.statusLabel === 'Paid in full' ? ' paid' : ''}">${escapeHtml(model.statusLabel)}</div>
       </div>

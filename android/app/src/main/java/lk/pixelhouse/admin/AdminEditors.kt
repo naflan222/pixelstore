@@ -212,23 +212,3 @@ suspend fun shareDocument(context: android.content.Context, bytes: ByteArray, na
         } }, confirmButton = { TextButton(enabled = !busy && selected.size in 1..24, onClick = { vm.saveHomeSection(key, selected.toList()) { editing = null } }) { Text("Save selection") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } })
     }
 }
-
-@Composable fun InvoiceEditor(vm: AdminViewModel, close: () -> Unit) {
-    val fields = remember { listOf(text("full_name", true), text("email", true), text("phone"), text("address"), choice("source", "phone", "whatsapp", "in_store", "other"), choice("payment_method", "cash", "bank", "credit-card", "paypal"), choice("payment_status", "pending", "paid"), choice("shipping_method", "standard", "express", "pickup", "courier"), number("shipping_fee", "0"), number("discount_amount", "0")) }
-    val values = remember { mutableStateMapOf<String,String>().apply { fields.forEach { put(it.key, it.default) } } }
-    val items = remember { mutableStateListOf(mutableStateMapOf("name" to "", "price" to "0", "quantity" to "1")) }
-    var error by remember { mutableStateOf("") }
-    var confirmed by remember { mutableStateOf(false) }
-    val busy by vm.loading.collectAsStateWithLifecycle()
-    AlertDialog(onDismissRequest = { if (!busy) close() }, title = { Text("Create offline invoice") }, text = { Column(Modifier.imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Creates an order and emails the invoice. Inventory is not changed.")
-        fields.forEach { f -> FieldInput(f, values[f.key].orEmpty()) { values[f.key] = it } }
-        items.forEachIndexed { i, item -> Card { Column(Modifier.padding(10.dp)) { Text("Item ${i + 1}"); listOf(text("name", true), number("price"), number("quantity")).forEach { f -> FieldInput(f, item[f.key].orEmpty()) { item[f.key] = it } }; if (items.size > 1) TextButton(onClick = { items.remove(item) }) { Text("Remove item") } } } }
-        TextButton(enabled = items.size < 40, onClick = { items.add(mutableStateMapOf("name" to "", "price" to "0", "quantity" to "1")) }) { Text("Add invoice item") }
-        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
-    } }, confirmButton = { TextButton(enabled = !busy, onClick = { try {
-        formBody(fields, values).put("items", JSONArray(items.map { formBody(listOf(text("name", true), number("price"), number("quantity")), it) }))
-        confirmed = true
-    } catch (e: Exception) { error = e.message.orEmpty() } }) { Text("Review and create") } }, dismissButton = { TextButton(enabled = !busy, onClick = close) { Text("Cancel") } })
-    if (confirmed) AlertDialog(onDismissRequest = { confirmed = false }, title = { Text("Create and email invoice?") }, text = { Text("For ${values["full_name"]}, ${items.size} item(s), payment ${values["payment_status"]}. This will create a permanent order record.") }, confirmButton = { TextButton(enabled = !busy, onClick = { val body = formBody(fields, values).put("items", JSONArray(items.map { formBody(listOf(text("name", true), number("price"), number("quantity")), it) })); vm.mutate("/api/admin/invoices/offline", "POST", body) { result -> confirmed = false; close(); vm.pendingOrder = result.optLong("order_id") } }) { Text("Create invoice") } }, dismissButton = { TextButton(onClick = { confirmed = false }) { Text("Back") } })
-}

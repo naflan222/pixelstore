@@ -722,7 +722,7 @@ router.get('/orders/:id/invoice', async (req, res) => {
 
   // The product join only feeds the printed item code, so the invoice still works
   // for orders whose product has since been removed from the catalog.
-  const items = await db.all(`SELECT oi.name, oi.price, oi.quantity, p.sku
+  const items = await db.all(`SELECT oi.id, oi.name, oi.price, oi.quantity, p.sku
     FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
     WHERE oi.order_id = ? ORDER BY oi.id`, order.id);
   sendInvoice(res, order, items);

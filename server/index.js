@@ -230,6 +230,8 @@ app.use((err, req, res, next) => {
 async function start(port = PORT) {
   await db.init();
   await ensureProductUrls(db);
+  try { if (process.env.NODE_ENV !== 'test' && !process.env.NODE_TEST_CONTEXT) await require('./invoice-serials').pauseBankTransfer(db); }
+  catch (error) { console.error('[CHECKOUT CONFIGURATION] Bank pause not applied:', error.message); }
   try { if (process.env.NODE_ENV !== 'test' && !process.env.NODE_TEST_CONTEXT) await require('./promotions').launch(db); }
   catch (error) { console.error('[PROMOTION LAUNCH] Not applied:', error.message); }
   try {

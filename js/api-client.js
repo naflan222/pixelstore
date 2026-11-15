@@ -479,6 +479,7 @@
     return function () {
       const btn = $('a[href="payment-success.html"]');
       if (!btn) return;
+      get('/checkout-settings').then(settings => { if (!settings.payment_methods.includes(paymentMethod)) { btn.hidden=true;const p=document.createElement('p');p.innerHTML='This payment method is currently paused. <a href="/checkout-payment">Choose cash on delivery</a>.';btn.parentNode.insertBefore(p,btn); } }).catch(() => {});
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
         // Billing details were validated & saved on the checkout page
@@ -961,6 +962,19 @@
           location.href = routeHref('checkout-payment.html');
         });
       });
+    },
+
+    'checkout-payment.html': async function () {
+      try {
+        const settings = await get('/checkout-settings');
+        $$('.single-payment-method').forEach(option => {
+          const link = option.querySelector('a');
+          const method = link?.classList.contains('cash') ? 'cash' : link?.classList.contains('bank') ? 'bank' : 'unsupported';
+          option.hidden = !settings.payment_methods.includes(method);
+          option.style.display = option.hidden ? 'none' : '';
+          const column = option.closest('.col-6');if(column) { column.hidden=option.hidden;column.style.display=option.hidden?'none':''; }
+        });
+      } catch (_) { $$('.single-payment-method').forEach(option => { if (!option.querySelector('a.cash')) option.style.display='none'; }); }
     },
 
     // --- Final payment pages: place the real order on button click ---

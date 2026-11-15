@@ -66,4 +66,19 @@ class AdminModelsTest {
         assertFalse(body.getBoolean("show_popup"))
         assertThrows(IllegalArgumentException::class.java) { formBody(module.fields, emptyMap()) }
     }
+    @Test fun `invoice serial numbers preserve leading zeros and unit positions`() {
+        val row=mapOf("name" to "GoPro", "price" to "90000", "quantity" to "2", "product_id" to "20", "serial_enabled" to "true", "serial_0" to "000ABC", "serial_1" to "SN-002")
+        val body=invoiceLineBody(row)
+        assertEquals(90000.0,body.getDouble("price"),0.01)
+        assertEquals("000ABC",body.getJSONArray("serial_numbers").getString(0))
+        assertEquals("SN-002",body.getJSONArray("serial_numbers").getString(1))
+        assertEquals(20,body.getInt("product_id"))
+    }
+    @Test fun `invoice serial validation rejects controls and invalid quantities`() {
+        val row=mapOf("name" to "Camera", "price" to "100", "quantity" to "1", "serial_enabled" to "true", "serial_0" to "bad\nserial")
+        assertThrows(IllegalArgumentException::class.java){invoiceLineBody(row)}
+        assertThrows(IllegalArgumentException::class.java){invoiceLineBody(row+("quantity" to "1.5"))}
+        val blank=invoiceLineBody(row+("serial_enabled" to "false"))
+        assertEquals(0,blank.getJSONArray("serial_numbers").length())
+    }
 }

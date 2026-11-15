@@ -241,6 +241,15 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity   INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invoice_serials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_item_id INTEGER NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+  document_kind TEXT NOT NULL CHECK(document_kind IN ('offline','copy')),
+  unit_index INTEGER NOT NULL CHECK(unit_index >= 0),
+  serial_number TEXT NOT NULL,
+  UNIQUE(order_item_id, document_kind, unit_index)
+);
+
 CREATE TABLE IF NOT EXISTS vendor_applications (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,

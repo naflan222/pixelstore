@@ -721,7 +721,7 @@ router.get('/orders/:id/invoice', orderAccess, async (req, res) => {
   if (!id) return res.status(400).json({ error: 'Invalid order ID.' });
   const order = await db.get('SELECT * FROM orders WHERE id = ?', id);
   if (!order) return res.status(404).json({ error: 'Order not found.' });
-  const items = await db.all(`SELECT oi.name, oi.price, oi.quantity, p.sku
+  const items = await db.all(`SELECT oi.id, oi.name, oi.price, oi.quantity, p.sku
     FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
     WHERE oi.order_id = ? ORDER BY oi.id`, id);
   await audit(req, 'downloaded invoice', 'order', id);
@@ -744,7 +744,7 @@ router.post('/orders/:id/email-invoice', orderAccess, invoiceResendLimiter, asyn
   }
 
   try {
-    const items = await db.all(`SELECT oi.name, oi.price, oi.quantity, p.sku
+    const items = await db.all(`SELECT oi.id, oi.name, oi.price, oi.quantity, p.sku
       FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = ? ORDER BY oi.id`, id);
     const model = await buildInvoiceModel(order, items);
@@ -791,10 +791,40 @@ router.delete('/orders/:id', owners, async (req, res) => {
   res.json({ ok: true });
 });
 
+router.get('/orders/:id/serial-invoice', orderAccess, async (req, res) => {
+  const order = await db.get('SELECT * FROM orders WHERE id = ?', productId(req.params.id) || 0);
+  if (!order) return res.status(404).json({ error: 'Order not found.' });
+  const items = await require('./invoice-serials').documentItems(db, order.id);
+  if (req.query.document === '1') return sendInvoice(res, order, items, { serialCopy: true });
+  res.json({ order, items });
+});
+router.put('/orders/:id/serial-invoice', orderAccess, async (req, res) => {
+  const order = await db.get('SELECT id FROM orders WHERE id = ?', productId(req.params.id) || 0);
+  if (!order) return res.status(404).json({ error: 'Order not found.' });
+  try { await require('./invoice-serials').saveCopy(db, order.id, req.body?.items); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
+  await audit(req, 'saved serial-number copy', 'order', order.id);
+  res.json({ ok: true });
+});
+router.post('/orders/:id/serial-invoice/email', orderAccess, invoiceResendLimiter, async (req, res) => {
+  const order = await db.get('SELECT * FROM orders WHERE id = ?', productId(req.params.id) || 0);
+  if (!order) return res.status(404).json({ error: 'Order not found.' });
+  if (!emailEnabled()) return res.status(503).json({ error: 'Email is not configured.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(order.email || ''))) return res.status(409).json({ error: 'Customer email is missing or invalid.' });
+  try {
+    const items = await require('./invoice-serials').documentItems(db, order.id);
+    const model = await buildInvoiceModel(order, items, { serialCopy: true });
+    const pdfBuffer = await renderPdf(model);
+    await sendOrderConfirmationEmail(order.email, { order, model, pdfBuffer });
+    await audit(req, 'emailed serial-number copy', 'order', order.id).catch(() => {});
+    res.json({ ok: true, email_sent: true });
+  } catch (error) { res.status(502).json({ error: error.message }); }
+});
+
 router.get('/invoices/catalog', orderAccess, async (_req, res) => {
-  const products = await db.all(`SELECT id, name, description, sku, price FROM products
+  const products = await db.all(`SELECT id, name, slug, description, sku, price, category FROM products
     WHERE status = 'active' ORDER BY lower(name), id`);
-  res.json({ products });
+  res.json({ serials_supported: true, products: products.map(p => ({ ...p, serial_eligible: require('./invoice-serials').cameraProduct(p) })) });
 });
 
 // Create an offline phone/WhatsApp/in-store order and email its branded invoice.
@@ -833,7 +863,11 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
         !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10000) {
       return res.status(400).json({ error: `Check item ${index + 1}: enter a name, a valid price, and a whole-number quantity.` });
     }
-    items.push({ name, price: Math.round(price * 100) / 100, quantity });
+    let serials;
+    try { serials = require('./invoice-serials').serialValues(raw.serial_numbers, quantity); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    if (raw.product_id && (!productId(raw.product_id) || !(await db.get('SELECT id FROM products WHERE id = ?', productId(raw.product_id))))) return res.status(400).json({ error: 'Selected product no longer exists.' });
+    items.push({ name, price: Math.round(price * 100) / 100, quantity, serials });
   }
 
   const subtotal = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100;
@@ -860,8 +894,9 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
       await tx.run(`INSERT INTO payments (order_id, payment_method, payment_status, amount_paid, paid_at)
         VALUES (?, ?, ?, ?, ?)`, id, paymentMethod, paymentStatus, paymentStatus === 'paid' ? total : 0, paidAt);
       for (const item of items) {
-        await tx.run('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, NULL, ?, ?, ?)',
+        const inserted = await tx.insert('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, NULL, ?, ?, ?)',
           id, item.name, item.price, item.quantity);
+        await require('./invoice-serials').saveLine(tx, inserted.id, 'offline', item.serials);
       }
       await tx.run('INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',
         req.user.id, 'generated offline invoice', 'order', String(id), `Source: ${orderSource}`);
@@ -869,7 +904,7 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
     });
 
     const order = await db.get('SELECT * FROM orders WHERE id = ?', orderId);
-    const orderItems = await db.all('SELECT name, price, quantity FROM order_items WHERE order_id = ? ORDER BY id', orderId);
+    const orderItems = await db.all('SELECT id, name, price, quantity FROM order_items WHERE order_id = ? ORDER BY id', orderId);
     const payment = await db.get('SELECT payment_method, payment_status, amount_paid, paid_at FROM payments WHERE order_id = ?', orderId);
     const invoiceUrl = `/api/admin/orders/${orderId}/invoice`;
     let emailSent = false;

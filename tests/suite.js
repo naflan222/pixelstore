@@ -580,6 +580,42 @@ async function defineSuite(t, ctx) {
       assert.match(download.headers.get('content-type'), /application\/pdf/);
       const bytes = Buffer.from(await download.arrayBuffer());
       assert.equal(bytes.subarray(0, 4).toString(), '%PDF');
+
+      // Resend the *existing* invoice for an offline order: no new order or
+      // inventory mutation, and only authenticated order managers may do it.
+      const resendPath = `/api/admin/orders/${saved.id}/email-invoice`;
+      assert.equal((await guest.post(resendPath, {})).status, 401);
+      assert.equal((await owner.post('/api/admin/orders/not-an-id/email-invoice', {})).status, 400);
+      assert.equal((await owner.post('/api/admin/orders/99999999/email-invoice', {})).status, 404);
+      const ordersBefore = await ctx.db.get('SELECT COUNT(*) AS count FROM orders');
+      const resent = await owner.post(resendPath, {});
+      assert.equal(resent.status, 200, JSON.stringify(resent.data));
+      assert.equal(resent.data.email_sent, true);
+      assert.equal(resent.data.recipient, payload.email);
+      assert.equal(resent.data.invoice_number, response.data.invoice_number);
+      const resentBody = JSON.parse(capturedEmail.options.body);
+      assert.match(resentBody.attachment[0].name, /\\.pdf$/);
+      assert.equal(Buffer.from(resentBody.attachment[0].content, 'base64').subarray(0, 4).toString(), '%PDF');
+      assert.equal((await ctx.db.get('SELECT COUNT(*) AS count FROM orders')).count, ordersBefore.count);
+      assert.equal(Number((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock), Number(product.stock));
+      assert.ok(await ctx.db.get("SELECT id FROM audit_logs WHERE action = 'resent invoice email' AND entity_id = ?", String(saved.id)));
+
+      // A provider rejection reports failure rather than claiming delivery,
+      // and it leaves the saved invoice in place for a later manual retry.
+      global.fetch = async (url, options) => {
+        if (String(url) === 'https://api.brevo.com/v3/smtp/email') {
+          return new Response(JSON.stringify({ message: 'Unauthorized IP address' }),
+            { status: 403, headers: { 'content-type': 'application/json' } });
+        }
+        return realFetch(url, options);
+      };
+      const blocked = await owner.post(resendPath, {});
+      assert.equal(blocked.status, 502);
+      assert.equal(blocked.data.email_sent, false);
+      assert.match(blocked.data.error, /Brevo.*IP/i);
+      assert.equal((await ctx.db.get('SELECT COUNT(*) AS count FROM orders')).count, ordersBefore.count);
+      assert.equal((await ctx.db.get('SELECT stock FROM products WHERE id = ?', product.id)).stock, product.stock);
+
       assert.equal((await guest.del(`/api/admin/orders/${saved.id}`)).status, 401);
       assert.equal((await owner.del(`/api/admin/orders/${saved.id}`)).status, 200);
       assert.equal((await owner.get(`/api/admin/orders/${saved.id}`)).status, 404);

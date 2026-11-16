@@ -824,7 +824,7 @@ router.post('/orders/:id/serial-invoice/email', orderAccess, invoiceResendLimite
 router.get('/invoices/catalog', orderAccess, async (_req, res) => {
   const products = await db.all(`SELECT id, name, slug, description, sku, price, category FROM products
     WHERE status = 'active' ORDER BY lower(name), id`);
-  res.json({ serials_supported: true, products: products.map(p => ({ ...p, serial_eligible: require('./invoice-serials').cameraProduct(p) })) });
+  res.json({ serials_supported: true, independent_amounts_supported: true, products: products.map(p => ({ ...p, serial_eligible: require('./invoice-serials').cameraProduct(p) })) });
 });
 
 // Create an offline phone/WhatsApp/in-store order and email its branded invoice.
@@ -857,7 +857,7 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
   const items = [];
   for (const [index, raw] of source.items.entries()) {
     const name = String(raw?.name || '').trim();
-    const price = Number(raw?.price);
+    const price = Number(raw?.unit_price ?? raw?.price);
     const quantity = Number(raw?.quantity);
     if (!name || name.length > 160 || !Number.isFinite(price) || price < 0 || price > 100000000 ||
         !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10000) {
@@ -870,10 +870,13 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
     if (raw.product_id && !product) return res.status(400).json({ error: 'Selected product no longer exists.' });
     const catalogPrice = raw.catalog_price == null ? product?.price : Number(raw.catalog_price);
     if (catalogPrice != null && (!Number.isFinite(Number(catalogPrice)) || Number(catalogPrice) < 0 || Number(catalogPrice) > 100000000)) return res.status(400).json({ error: 'Enter a valid original catalog price.' });
-    items.push({ name, price: Math.round(price * 100) / 100, quantity, serials, catalogPrice });
+    const lineAmount = raw.line_amount == null ? Math.round(Math.round(price * 100) / 100 * quantity * 100) / 100 : Number(raw.line_amount);
+    const warranty = String(raw.warranty_text || '').trim();
+    if (!Number.isFinite(lineAmount) || lineAmount < 0 || lineAmount > 1000000000 || Math.abs(lineAmount * 100 - Math.round(lineAmount * 100)) > 0.0001 || warranty.length > 500 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(warranty)) return res.status(400).json({ error: 'Enter a valid line amount (up to two decimal places) and warranty text up to 500 characters.' });
+    items.push({ name, price: lineAmount / quantity, unitPrice: Math.round(price * 100) / 100, lineAmount, independent: raw.unit_price != null || raw.line_amount != null || !!warranty, warranty, quantity, serials, catalogPrice });
   }
 
-  const subtotal = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100) / 100;
+  const subtotal = Math.round(items.reduce((sum, item) => sum + item.lineAmount, 0) * 100) / 100;
   const shippingFeeInput = finiteMoney(source.shipping_fee ?? 0, { min: 0, required: true });
   const discountAmountInput = finiteMoney(source.discount_amount ?? 0, { min: 0, required: true });
   if (shippingFeeInput === null || shippingFeeInput > 100000000 || discountAmountInput === null ||
@@ -899,6 +902,7 @@ router.post('/invoices/offline', orderAccess, async (req, res) => {
       for (const item of items) {
         const inserted = await tx.insert('INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, NULL, ?, ?, ?)',
           id, item.name, item.price, item.quantity);
+        if (item.independent) await tx.run('INSERT INTO invoice_line_details (order_item_id, unit_price, line_amount, warranty_text) VALUES (?, ?, ?, ?)', inserted.id, item.unitPrice, item.lineAmount, item.warranty);
         if (item.catalogPrice != null) await tx.run('INSERT INTO invoice_price_snapshots (order_item_id, catalog_price) VALUES (?, ?)', inserted.id, item.catalogPrice);
         await require('./invoice-serials').saveLine(tx, inserted.id, 'offline', item.serials);
       }

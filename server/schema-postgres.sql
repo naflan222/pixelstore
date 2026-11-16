@@ -241,6 +241,13 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity   INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invoice_line_details (
+  order_item_id INTEGER PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
+  unit_price DOUBLE PRECISION NOT NULL CHECK(unit_price >= 0),
+  line_amount DOUBLE PRECISION NOT NULL CHECK(line_amount >= 0),
+  warranty_text TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS invoice_price_snapshots (
   order_item_id INTEGER PRIMARY KEY REFERENCES order_items(id) ON DELETE CASCADE,
   catalog_price DOUBLE PRECISION NOT NULL CHECK(catalog_price >= 0)

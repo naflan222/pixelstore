@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs');
+const assert=require('node:assert/strict');
 module.exports=async function(ctx){
  const {db,makeSession}=ctx,owner=makeSession(),buyer=makeSession();await owner.post('/api/auth/login',{username:'demo',password:'demo1234'});
  const camera=await db.get("SELECT * FROM products WHERE slug='hero13'");
@@ -23,7 +23,6 @@ module.exports=async function(ctx){
  try {const sent=await owner.post('/api/admin/orders/'+id+'/serial-invoice/email',{});assert.equal(sent.status,200,JSON.stringify(sent.data));assert.match(emailBody.subject,/serial-number invoice copy/);assert.match(emailBody.attachment[0].name,/-Serials\.pdf$/);}
  finally {global.fetch=originalFetch;if(oldKey===undefined)delete process.env.BREVO_API_KEY;else process.env.BREVO_API_KEY=oldKey;if(oldFrom===undefined)delete process.env.MAIL_FROM;else process.env.MAIL_FROM=oldFrom;}
  const pdf=await owner.request('GET','/api/admin/orders/'+id+'/serial-invoice?document=1');assert.match(pdf.headers.get('content-type'),/pdf/);const bytes=Buffer.from(await pdf.arrayBuffer());assert.equal(bytes.subarray(0,4).toString(),'%PDF');
- fs.mkdirSync('/workspace/shared/invoice-serials',{recursive:true});fs.writeFileSync('/workspace/shared/invoice-serials/serial-copy.pdf',bytes);
  const offline=await owner.post('/api/admin/invoices/offline',{full_name:'Offline Serial Buyer',email:'offline@example.test',payment_method:'cash',items:[{product_id:camera.id,name:camera.name,price:90000,quantity:2,serial_numbers:['00111','00222']}]});assert.equal(offline.status,201,JSON.stringify(offline.data));
  const offlineHtml=await(await owner.request('GET',offline.data.invoice_url+'?format=html')).text();assert.match(offlineHtml,/00111/);assert.match(offlineHtml,/00222/);assert.match(offlineHtml,/Agreed selling price:/);assert.match(offlineHtml,/92,000/);assert.match(offlineHtml,/180,000/);
  const savedSnapshot=await db.get('SELECT s.catalog_price FROM invoice_price_snapshots s JOIN order_items i ON i.id=s.order_item_id WHERE i.order_id=?',offline.data.order_id);assert.equal(savedSnapshot.catalog_price,92000);
@@ -33,9 +32,9 @@ module.exports=async function(ctx){
  const independentOrder=await db.get('SELECT subtotal,total FROM orders WHERE id=?',independent.data.order_id);assert.equal(independentOrder.subtotal,180000);
  const details=await db.get('SELECT d.* FROM invoice_line_details d JOIN order_items i ON i.id=d.order_item_id WHERE i.order_id=?',independent.data.order_id);assert.equal(details.unit_price,92000);assert.equal(details.line_amount,180000);
  for(const bad of [-1,NaN,180000.001]){const rejected=await owner.post('/api/admin/invoices/offline',{full_name:'Bad amount',email:'bad@example.test',items:[{name:'Camera',unit_price:92000,quantity:2,line_amount:Number.isNaN(bad)?'bad':bad}]});assert.equal(rejected.status,400);}
- const independentPdf=await owner.request('GET',independent.data.invoice_url);fs.writeFileSync('/workspace/shared/invoice-serials/conditions-offline.pdf',Buffer.from(await independentPdf.arrayBuffer()));
+ const independentPdf=await owner.request('GET',independent.data.invoice_url);assert.equal(independentPdf.status,200);assert.match(independentPdf.headers.get('content-type'),/pdf/);assert.equal(Buffer.from(await independentPdf.arrayBuffer()).subarray(0,4).toString(),'%PDF');
  const huge=Array.from({length:40},(_,i)=>({unit_index:i,order_item_id:item.id,serial_number:'CAM-'+String(i).padStart(4,'0')+'-'+ 'X'.repeat(100)}));
- const {buildInvoiceModel,renderPdf}=require('../server/invoice');const orderRow=await db.get('SELECT * FROM orders WHERE id=?',id);const largeModel=await buildInvoiceModel(orderRow,[{...item,quantity:40}],{serialCopy:true,serialRows:huge});const largePdf=await renderPdf(largeModel);assert.ok(largePdf.length>3000);fs.writeFileSync('/workspace/shared/invoice-serials/multi-page.pdf',largePdf);
+ const {buildInvoiceModel,renderPdf}=require('../server/invoice');const orderRow=await db.get('SELECT * FROM orders WHERE id=?',id);const largeModel=await buildInvoiceModel(orderRow,[{...item,quantity:40}],{serialCopy:true,serialRows:huge});const largePdf=await renderPdf(largeModel);assert.ok(largePdf.length>3000);
  const settingsBefore=await db.get('SELECT store_name, contact, shipping_fee FROM store_settings WHERE id=1');
  assert.equal(await require('../server/invoice-serials').pauseBankTransfer(db),true);assert.deepEqual((await buyer.get('/api/checkout-settings')).data.payment_methods,['cash']);
  const blocked=await buyer.post('/api/orders',{full_name:'Bank Buyer',email:'bank@example.test',phone:'1',address:'Test',payment_method:'bank'});assert.equal(blocked.status,400);

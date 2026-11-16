@@ -30,10 +30,14 @@ Cart and billing use the storefront width with a two-column desktop layout, keep
 
 ## Conditions and independent amounts (Android 1.4.0)
 
-Every generated PDF and HTML invoice, including website invoices and serial-number copies, includes the complete Pixelhouse Sales, Warranty & Service Conditions. PDF conditions start on a separate page. The prior unconditional seven-day invoice return statement is removed; payment notes remain. Website policy pages are unchanged.
+Every generated PDF and HTML invoice, including website invoices and serial-number copies, includes the complete Pixelhouse Sales, Warranty & Service Conditions. Conditions appear in compact text beside the totals, replacing Notes & Payment Terms; no separate conditions page is appended. The prior unconditional seven-day invoice return statement is removed; payment notes remain. Website policy pages are unchanged.
 
 Offline web/Android invoice editors now provide independent **Unit price** and **Amount — line total** fields. Selecting a product fills unit price; amount follows unit price × quantity until edited manually. Manual amounts remain unchanged when unit price or quantity changes. Selecting another product resets automatic calculation. The invoice prints the entered unit price and exact amount, with an optional warranty statement beneath the product. Blank warranty fields do not imply coverage. Invoice subtotal is the sum of amounts; shipping and invoice discounts retain their existing behavior. Catalog prices and stock are not modified.
 
 The offline API accepts optional `unit_price`, `line_amount` and `warranty_text` (500 characters maximum). An additive `invoice_line_details` table stores the display unit price, exact line amount and warranty by order item. The existing financial item price stores effective amount/quantity for compatible reporting, while invoice rendering uses the exact saved amount. Older requests without the new fields retain previous behavior. Existing pricing snapshots remain supported. No past warranty or independent amount is inferred.
 
 Deploy the server before installing Firebase-enabled Android 1.4.0; the new app checks the server capability to avoid silently losing entered amounts. Keep the additive metadata tables during rollback. Older rendering code cannot display independent amounts correctly, so retain the updated invoice renderer for invoices issued with these fields.
+
+## Compact invoice conditions
+
+The conditions replace the Notes & Payment Terms column beside the totals in PDF and HTML. The PDF no longer adds a dedicated conditions page or the redundant Order at a Glance block and fixed blank spacer. One- and four-product invoices are verified to fit on one page with all 12 conditions, serials and prices retained. Long item/serial lists still paginate when necessary to avoid dropping or overlapping invoice data. This is a server renderer update; the existing Android app requires no reinstall.

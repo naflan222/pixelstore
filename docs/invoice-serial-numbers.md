@@ -41,3 +41,7 @@ Deploy the server before installing Firebase-enabled Android 1.4.0; the new app 
 ## Compact invoice conditions
 
 The conditions replace the Notes & Payment Terms column beside the totals in PDF and HTML. The PDF no longer adds a dedicated conditions page or the redundant Order at a Glance block and fixed blank spacer. One- and four-product invoices are verified to fit on one page with all 12 conditions, serials and prices retained. Long item/serial lists still paginate when necessary to avoid dropping or overlapping invoice data. This is a server renderer update; the existing Android app requires no reinstall.
+
+## Automatic item discount display
+
+Independent offline invoice lines display a discount of max(0, unit price × quantity − entered line amount), rounded to cents. The summary shows Before item discounts, Item discounts, then the existing net Subtotal. These are display calculations from saved invoice values; they do not deduct the discount again, change order totals or change inventory. Any manually entered invoice discount remains separate and is labelled Additional discount. Equal/higher amounts do not display an item discount. The current Android app receives this server-rendered invoice without an update.

@@ -971,7 +971,8 @@ function updateOfflineInvoiceTotals() {
     row.querySelector('.offline-amount-note').textContent=row.dataset.manualAmount==='true'?'Manually entered line total':'Calculated from unit price × quantity';
     const line=Number(amountInput.value)||0;
     subtotal += line;
-    row.querySelector('.line-total').textContent = money(line);
+    const itemDiscount=Math.max(0,Math.round((price*quantity-line)*100)/100);
+    row.querySelector('.line-total').textContent = money(line)+(itemDiscount>0?' · Discount: '+money(itemDiscount):'');
   });
   const shipping = Number($('#offlineShippingFee').value) || 0;
   const discount = Number($('#offlineDiscount').value) || 0;

@@ -250,6 +250,7 @@ async function buildInvoiceModel(order, items, options = {}) {
       unitPrice,
       sellingPrice,
       independentAmount: !!detail,
+      itemDiscount: detail ? Math.max(0, Math.round((unitPrice * quantity - number(detail.line_amount)) * 100) / 100) : 0,
       warranty: detail?.warranty_text || '',
       amount: detail ? number(detail.line_amount) : sellingPrice * quantity,
     };
@@ -317,7 +318,7 @@ async function buildInvoiceModel(order, items, options = {}) {
       status: order.shipping_status ? titleCase(order.shipping_status) : '',
     },
     lines,
-    totals: { subtotal, discount, shipping, total, itemCount, coupon: String(order.coupon_code || '').trim() },
+    totals: { subtotal, discount, shipping, total, itemCount, itemDiscount: Math.round(lines.reduce((sum,line)=>sum+line.itemDiscount,0)*100)/100, coupon: String(order.coupon_code || '').trim() },
     meta: [
       ...(options.serialCopy ? [['Document', 'Serial-number copy of ' + invoiceNumber]] : []),
       ['Invoice number', invoiceNumber],
@@ -516,6 +517,7 @@ function drawItemsTable(doc, model, startY) {
   displayLines.forEach((line, index) => {
     const descriptionHeight = Math.max(textHeight(doc, line.name, { size: 9.1, width: descriptionColumn.width - 22, lineGap: 1.4 }), 10);
     const serialLabels = (line.serialNumbers || []).map(serial => (line.quantity === 1 ? 'Serial number: ' : 'Serial ' + serial.unit + ': ') + serial.value);
+    if (!line.continued && line.itemDiscount > 0) serialLabels.push('Discount: ' + money(line.itemDiscount, model.shop));
     if (!line.continued && line.warranty) serialLabels.push('Warranty: ' + line.warranty);
     if (!line.continued && !line.independentAmount && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice) serialLabels.unshift('Agreed selling price: ' + money(line.sellingPrice, model.shop) + ' each');
     const serialHeights = serialLabels.map(label => textHeight(doc, label, { size: 8, width: descriptionColumn.width - 22, lineGap: 1.2 }) + 3);
@@ -568,11 +570,14 @@ function drawTotalsAndNotes(doc, model, startY) {
   while(conditionSize>5.5 && y+conditionHeight(conditionSize)>BODY_FLOOR-25) conditionSize=Math.max(5.5,conditionSize-0.25);
   if(y+Math.max(conditionHeight(conditionSize),132)>BODY_FLOOR-25) y=newPage(doc,model)+6;
 
-  const totals = [
-    ['Subtotal', money(model.totals.subtotal, model.shop), null],
-  ];
+  const totals = [];
+  if(model.totals.itemDiscount>0) {
+    totals.push(['Before item discounts',money(model.totals.subtotal+model.totals.itemDiscount,model.shop),null]);
+    totals.push(['Item discounts',`-${money(model.totals.itemDiscount,model.shop)}`,'discount']);
+  }
+  totals.push(['Subtotal',money(model.totals.subtotal,model.shop),null]);
   if (model.totals.discount > 0) {
-    totals.push([`Discount${model.totals.coupon ? ` (${model.totals.coupon})` : ''}`, `-${money(model.totals.discount, model.shop)}`, 'discount']);
+    totals.push([`${model.totals.itemDiscount>0?'Additional discount':'Discount'}${model.totals.coupon ? ` (${model.totals.coupon})` : ''}`, `-${money(model.totals.discount, model.shop)}`, 'discount']);
   }
   totals.push(['Delivery', model.totals.shipping > 0 ? money(model.totals.shipping, model.shop) : 'Free', model.totals.shipping > 0 ? null : 'free']);
   totals.push([model.totalLabel, money(model.totals.total, model.shop), 'grand']);
@@ -729,7 +734,7 @@ function renderHtml(model) {
   const moneyHtml = (amount) => escapeHtml(money(amount, model.shop));
   const rows = model.lines.map((line) => `<tr>
       <td class="qty">${line.index}</td>
-      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.warranty ? `<span class="serial-number">Warranty: ${escapeHtml(line.warranty)}</span>` : ''}${!line.independentAmount && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice ? `<span class="serial-number">Agreed selling price: ${moneyHtml(line.sellingPrice)} each</span>` : ''}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
+      <td><strong>${escapeHtml(line.name)}</strong>${(line.serialNumbers || []).map(serial => `<span class="serial-number">${line.quantity === 1 ? 'Serial number' : 'Serial ' + serial.unit}: ${escapeHtml(serial.value)}</span>`).join('')}${line.itemDiscount > 0 ? `<span class="serial-number">Discount: ${moneyHtml(line.itemDiscount)}</span>` : ''}${line.warranty ? `<span class="serial-number">Warranty: ${escapeHtml(line.warranty)}</span>` : ''}${!line.independentAmount && line.sellingPrice !== undefined && line.sellingPrice !== line.unitPrice ? `<span class="serial-number">Agreed selling price: ${moneyHtml(line.sellingPrice)} each</span>` : ''}${line.sku ? `<span class="sku">${escapeHtml(line.sku)}</span>` : ''}</td>
       <td class="num">${line.quantity}</td>
       <td class="num">${moneyHtml(line.unitPrice)}</td>
       <td class="num total">${moneyHtml(line.amount)}</td>
@@ -830,8 +835,9 @@ function renderHtml(model) {
           <p class="compact-conditions">Warranty enquiries: pixelhouse.lk<br>Thank you for shopping with Pixelhouse. We appreciate your trust.</p>
         </div>
         <div class="totals">
+          ${model.totals.itemDiscount > 0 ? `<div><span>Before item discounts</span><b>${moneyHtml(model.totals.subtotal + model.totals.itemDiscount)}</b></div><div class="discount"><span>Item discounts</span><b>-${moneyHtml(model.totals.itemDiscount)}</b></div>` : ''}
           <div><span>Subtotal</span><b>${moneyHtml(model.totals.subtotal)}</b></div>
-          ${model.totals.discount > 0 ? `<div class="discount"><span>Discount${model.totals.coupon ? ` (${escapeHtml(model.totals.coupon)})` : ''}</span><b>-${moneyHtml(model.totals.discount)}</b></div>` : ''}
+          ${model.totals.discount > 0 ? `<div class="discount"><span>${model.totals.itemDiscount>0?'Additional discount':'Discount'}${model.totals.coupon ? ` (${escapeHtml(model.totals.coupon)})` : ''}</span><b>-${moneyHtml(model.totals.discount)}</b></div>` : ''}
           <div${model.totals.shipping > 0 ? '' : ' class="free"'}><span>Delivery</span><b>${model.totals.shipping > 0 ? moneyHtml(model.totals.shipping) : 'Free'}</b></div>
           <div class="grand"><span>${escapeHtml(model.totalLabel)} · ${escapeHtml(model.currency)}</span><b>${moneyHtml(model.totals.total)}</b></div>
         </div>

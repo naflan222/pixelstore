@@ -8,3 +8,5 @@ for(const [amount,expected] of [[180000,4000],[184000,0],[190000,0],[0,184000]])
  assert.equal(model.lines[0].itemDiscount,expected);assert.equal(model.totals.itemDiscount,expected);assert.equal(model.lines[0].amount,amount);assert.equal(model.totals.subtotal,amount);assert.equal(model.totals.discount,100);assert.equal(model.totals.total,amount+150);
  const html=renderHtml(model);assert.equal(html.includes('Before item discounts'),expected>0);if(expected>0){assert.match(html,/Additional discount/);assert.match(html,/Discount: Rs\./);}
 });
+
+test('invoice conditions contain exactly five numbered items with aligned text',async()=>{const model=await modelFor(1);assert.equal(model.conditions.length,5);const html=renderHtml(model);const block=html.match(/<ol class="compact-conditions">([\s\S]*?)<\/ol>/)[1];assert.equal((block.match(/<li>/g)||[]).length,5);assert.match(block,/Proof of Purchase:/);assert.match(block,/Warranty Coverage &amp; Period:/);assert.match(block,/Warranty Exclusions:/);assert.match(block,/Service, Returns &amp; Exchanges:/);assert.match(block,/Consumer Rights:/);assert.match(html,/list-style-position:outside/);});

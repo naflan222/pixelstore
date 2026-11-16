@@ -564,9 +564,9 @@ function drawTotalsAndNotes(doc, model, startY) {
   const notesWidth = CONTENT_WIDTH - totalsWidth - 34;
   let y = startY;
 
-  const paragraphs = (model.conditions || require('./invoice-conditions')).map((text,i)=>`${i+1}. ${text}`).concat(['Warranty enquiries: pixelhouse.lk', 'Thank you for shopping with Pixelhouse. We appreciate your trust.']);
-  const conditionHeight = size => 25 + paragraphs.reduce((height,text)=>height + textHeight(doc,text,{size,width:notesWidth,lineGap:0.5})+2.5,0);
-  let conditionSize=6.5;
+  const paragraphs = (model.conditions || require('./invoice-conditions')).map((text,i)=>({number:`${i+1}.`,text})).concat([{text:'Warranty enquiries: pixelhouse.lk'},{text:'Thank you for shopping with Pixelhouse. We appreciate your trust.'}]);
+  const conditionHeight = size => 25 + paragraphs.reduce((height,paragraph)=>height + textHeight(doc,paragraph.text,{size,width:notesWidth-(paragraph.number?11:0),lineGap:1})+5,0);
+  let conditionSize=7;
   while(conditionSize>5.5 && y+conditionHeight(conditionSize)>BODY_FLOOR-25) conditionSize=Math.max(5.5,conditionSize-0.25);
   if(y+Math.max(conditionHeight(conditionSize),132)>BODY_FLOOR-25) y=newPage(doc,model)+6;
 
@@ -613,8 +613,10 @@ function drawTotalsAndNotes(doc, model, startY) {
   writeText(doc,'SALES, WARRANTY & SERVICE CONDITIONS',PAGE.margin,notesY,{font:'Helvetica-Bold',size:6.2,width:notesWidth});
   notesY+=15;
   for(const paragraph of paragraphs) {
-    writeText(doc,paragraph,PAGE.margin,notesY,{size:conditionSize,color:BRAND.body,width:notesWidth,lineGap:0.5});
-    notesY=doc.y+2.5;
+    const indent=paragraph.number?11:0;
+    if(paragraph.number) writeText(doc,paragraph.number,PAGE.margin,notesY,{size:conditionSize,color:BRAND.body,width:9,lineBreak:false});
+    writeText(doc,paragraph.text,PAGE.margin+indent,notesY,{size:conditionSize,color:BRAND.body,width:notesWidth-indent,lineGap:1,align:paragraph.number?'justify':'left'});
+    notesY=doc.y+5;
   }
 
   return Math.max(totalsY, notesY) + 16;
@@ -777,7 +779,7 @@ function renderHtml(model) {
   .serial-number{display:block;margin-top:4px;font-size:12px;color:var(--body);overflow-wrap:anywhere}
   .sku{display:block;font-size:11px;color:var(--muted);letter-spacing:.5px}
   .foot{display:grid;grid-template-columns:1fr 300px;gap:30px;margin-top:26px}
-  .compact-conditions{font-size:7px;line-height:1.2;margin:0;padding-left:10px}.compact-conditions li{margin-bottom:3px}
+  .compact-conditions{font-size:8px;line-height:1.35;margin:0;padding-left:0}ol.compact-conditions{padding-left:12px;list-style-position:outside}.compact-conditions li{margin-bottom:5px;padding-left:2px;text-align:justify}
   .terms{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted)}
   .terms li{margin-bottom:6px}
   .totals{align-self:start;border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -794,7 +796,7 @@ function renderHtml(model) {
   .actions a,.actions button{border:0;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;background:var(--accent);color:#fff}
   .actions .ghost{background:#fff;color:var(--body);border:1px solid var(--line)}
   @media(max-width:700px){.grid,.foot{grid-template-columns:1fr}.body{padding:22px 18px 6px}.band{padding:20px 18px}.contact{margin:22px -18px 0;padding:14px 18px 18px}}
-  @media print{body{background:#fff;padding:0}.grid{grid-template-columns:1fr 1fr}.foot{grid-template-columns:1fr 1fr;gap:24px}.band{padding:16px 24px}.body{padding:20px 24px 6px}.sheet{overflow:visible}.compact-conditions{font-size:6.5px;line-height:1.15}.compact-conditions li{margin-bottom:2px}.sheet{border:0;border-radius:0;box-shadow:none;max-width:none}thead th{-webkit-print-color-adjust:exact}.actions{display:none}}
+  @media print{body{background:#fff;padding:0}.grid{grid-template-columns:1fr 1fr}.foot{grid-template-columns:1fr 1fr;gap:24px}.band{padding:16px 24px}.body{padding:20px 24px 6px}.sheet{overflow:visible}.compact-conditions{font-size:7px;line-height:1.3}.compact-conditions li{margin-bottom:4px}.sheet{border:0;border-radius:0;box-shadow:none;max-width:none}thead th{-webkit-print-color-adjust:exact}.actions{display:none}}
 </style></head>
 <body>
   <div class="actions">

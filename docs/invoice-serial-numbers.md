@@ -45,3 +45,7 @@ The conditions replace the Notes & Payment Terms column beside the totals in PDF
 ## Automatic item discount display
 
 Independent offline invoice lines display a discount of max(0, unit price × quantity − entered line amount), rounded to cents. The summary shows Before item discounts, Item discounts, then the existing net Subtotal. These are display calculations from saved invoice values; they do not deduct the discount again, change order totals or change inventory. Any manually entered invoice discount remains separate and is labelled Additional discount. Equal/higher amounts do not display an item discount. The current Android app receives this server-rendered invoice without an update.
+
+## Five aligned conditions
+
+The compact invoice block now contains five key conditions: proof of purchase; product-specific warranty coverage and period; exclusions including environmental damage and unauthorized repairs; assessment, service and returns; and Sri Lankan consumer rights. PDF numbers occupy a fixed column and wrapped text shares consistent margins with justified paragraphs. HTML uses matching hanging list indentation. The enquiry and thank-you lines remain unnumbered. Prices, discounts, serials, warranties and totals are unchanged; no APK update is needed.

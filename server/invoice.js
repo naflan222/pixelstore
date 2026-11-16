@@ -562,8 +562,11 @@ function drawTotalsAndNotes(doc, model, startY) {
   const notesWidth = CONTENT_WIDTH - totalsWidth - 34;
   let y = startY;
 
-  // Make sure the summary block starts on a page with room for it.
-  if (y + 132 > BODY_FLOOR) y = newPage(doc, model) + 6;
+  const paragraphs = (model.conditions || require('./invoice-conditions')).map((text,i)=>`${i+1}. ${text}`).concat(['Warranty enquiries: pixelhouse.lk', 'Thank you for shopping with Pixelhouse. We appreciate your trust.']);
+  const conditionHeight = size => 25 + paragraphs.reduce((height,text)=>height + textHeight(doc,text,{size,width:notesWidth,lineGap:0.5})+2.5,0);
+  let conditionSize=6.5;
+  while(conditionSize>5.5 && y+conditionHeight(conditionSize)>BODY_FLOOR-25) conditionSize=Math.max(5.5,conditionSize-0.25);
+  if(y+Math.max(conditionHeight(conditionSize),132)>BODY_FLOOR-25) y=newPage(doc,model)+6;
 
   const totals = [
     ['Subtotal', money(model.totals.subtotal, model.shop), null],
@@ -598,15 +601,16 @@ function drawTotalsAndNotes(doc, model, startY) {
     totalsY += 20;
   });
 
-  // Notes / payment terms on the left.
-  let notesY = y;
-  drawLabel(doc, 'Notes & payment terms', PAGE.margin, notesY);
-  notesY += 12;
-  model.terms.forEach((term) => {
-    doc.circle(PAGE.margin + 2.2, notesY + 4.2, 1.5).fill(BRAND.accent);
-    writeText(doc, term, PAGE.margin + 12, notesY, { size: 8.2, color: BRAND.muted, width: notesWidth - 12, lineGap: 1.2 });
-    notesY = doc.y + 4.5;
-  });
+  // Compact conditions replace the previous notes in the left summary column.
+  let notesY=y;
+  writeText(doc,'PIXELHOUSE',PAGE.margin,notesY,{font:'Helvetica-Bold',size:7,width:notesWidth});
+  notesY+=10;
+  writeText(doc,'SALES, WARRANTY & SERVICE CONDITIONS',PAGE.margin,notesY,{font:'Helvetica-Bold',size:6.2,width:notesWidth});
+  notesY+=15;
+  for(const paragraph of paragraphs) {
+    writeText(doc,paragraph,PAGE.margin,notesY,{size:conditionSize,color:BRAND.body,width:notesWidth,lineGap:0.5});
+    notesY=doc.y+2.5;
+  }
 
   return Math.max(totalsY, notesY) + 16;
 }
@@ -687,34 +691,12 @@ function renderPdf(model) {
       drawLetterhead(doc, model);
       let y = drawAddressBlocks(doc, model, TOP_BAR + ACCENT_BAR + 26);
       y = drawItemsTable(doc, model, y);
-      // Short invoices should occupy the A4 page with a deliberate summary
-      // and balanced spacing. Long invoices retain the natural flow/pagination.
-      if (model.lines.length <= 4 && doc.bufferedPageRange().count === 1 && y < 420) {
-        y = drawOrderSummary(doc, model, y);
-        y = Math.max(y, 530);
-      }
       y = drawTotalsAndNotes(doc, model, y);
 
-      const closingY = Math.min(Math.max(y + 14, doc.bufferedPageRange().count === 1 ? 690 : y + 14), BODY_FLOOR - 6);
+      const closingY = Math.min(y + 8, BODY_FLOOR - 6);
       writeText(doc, `Thank you for choosing ${model.shop.name}. ${model.shop.tagline}`, PAGE.margin, closingY, {
         font: 'Helvetica-Bold', size: 8.2, color: BRAND.accentDeep, width: CONTENT_WIDTH, align: 'center', lineBreak: false,
       });
-
-      let conditionsY = newPage(doc, model) + 10;
-      function conditionsHeading() {
-        writeText(doc, 'PIXELHOUSE', PAGE.margin, conditionsY, { font: 'Helvetica-Bold', size: 13, width: CONTENT_WIDTH });
-        conditionsY += 22;
-        writeText(doc, 'SALES, WARRANTY & SERVICE CONDITIONS', PAGE.margin, conditionsY, { font: 'Helvetica-Bold', size: 12, width: CONTENT_WIDTH });
-        conditionsY += 30;
-      }
-      conditionsHeading();
-      const conditionParagraphs = (model.conditions || require('./invoice-conditions')).map((text, i) => `${i + 1}. ${text}`).concat(['Warranty enquiries: pixelhouse.lk', 'Thank you for shopping with Pixelhouse. We appreciate your trust.']);
-      for (const paragraph of conditionParagraphs) {
-        const height = textHeight(doc, paragraph, { size: 9, width: CONTENT_WIDTH, lineGap: 2 });
-        if (conditionsY + height > BODY_FLOOR - 10) { conditionsY = newPage(doc, model) + 10;conditionsHeading(); }
-        writeText(doc, paragraph, PAGE.margin, conditionsY, { size: 9, color: BRAND.body, width: CONTENT_WIDTH, lineGap: 2 });
-        conditionsY += height + 10;
-      }
 
       // Stamp the page footers last. The bottom margin is released while they are
       // drawn so a footer near the trim edge cannot push pdfkit onto a new page.
@@ -790,6 +772,7 @@ function renderHtml(model) {
   .serial-number{display:block;margin-top:4px;font-size:12px;color:var(--body);overflow-wrap:anywhere}
   .sku{display:block;font-size:11px;color:var(--muted);letter-spacing:.5px}
   .foot{display:grid;grid-template-columns:1fr 300px;gap:30px;margin-top:26px}
+  .compact-conditions{font-size:7px;line-height:1.2;margin:0;padding-left:10px}.compact-conditions li{margin-bottom:3px}
   .terms{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted)}
   .terms li{margin-bottom:6px}
   .totals{align-self:start;border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -806,7 +789,7 @@ function renderHtml(model) {
   .actions a,.actions button{border:0;border-radius:8px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;background:var(--accent);color:#fff}
   .actions .ghost{background:#fff;color:var(--body);border:1px solid var(--line)}
   @media(max-width:700px){.grid,.foot{grid-template-columns:1fr}.body{padding:22px 18px 6px}.band{padding:20px 18px}.contact{margin:22px -18px 0;padding:14px 18px 18px}}
-  @media print{body{background:#fff;padding:0}.sheet{border:0;border-radius:0;box-shadow:none;max-width:none}thead th{-webkit-print-color-adjust:exact}.actions{display:none}}
+  @media print{body{background:#fff;padding:0}.grid{grid-template-columns:1fr 1fr}.foot{grid-template-columns:1fr 1fr;gap:24px}.band{padding:16px 24px}.body{padding:20px 24px 6px}.sheet{overflow:visible}.compact-conditions{font-size:6.5px;line-height:1.15}.compact-conditions li{margin-bottom:2px}.sheet{border:0;border-radius:0;box-shadow:none;max-width:none}thead th{-webkit-print-color-adjust:exact}.actions{display:none}}
 </style></head>
 <body>
   <div class="actions">
@@ -842,8 +825,9 @@ function renderHtml(model) {
       </table>
       <div class="foot">
         <div>
-          <p class="label">Notes &amp; payment terms</p>
-          <ul class="terms">${model.terms.map((term) => `<li>${escapeHtml(term)}</li>`).join('')}</ul>
+          <p class="label">PIXELHOUSE<br>SALES, WARRANTY &amp; SERVICE CONDITIONS</p>
+          <ol class="compact-conditions">${(model.conditions || require('./invoice-conditions')).map(text=>`<li>${escapeHtml(text)}</li>`).join('')}</ol>
+          <p class="compact-conditions">Warranty enquiries: pixelhouse.lk<br>Thank you for shopping with Pixelhouse. We appreciate your trust.</p>
         </div>
         <div class="totals">
           <div><span>Subtotal</span><b>${moneyHtml(model.totals.subtotal)}</b></div>
@@ -858,7 +842,7 @@ function renderHtml(model) {
         <span>Invoice ${escapeHtml(model.invoiceNumber)} · Order ${escapeHtml(model.orderNumber)}</span>
       </div>
     </div>
-    <section class="invoice-conditions" style="padding:32px 42px;break-before:page;page-break-before:always"><h2>PIXELHOUSE</h2><h3>SALES, WARRANTY &amp; SERVICE CONDITIONS</h3><ol>${(model.conditions || require('./invoice-conditions')).map(text=>`<li style="margin-bottom:12px;break-inside:avoid">${escapeHtml(text)}</li>`).join('')}</ol><p>Warranty enquiries: pixelhouse.lk</p><p>Thank you for shopping with Pixelhouse. We appreciate your trust.</p></section>
+
   </div>
 </body></html>`;
 }

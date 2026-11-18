@@ -274,6 +274,7 @@ describe('FAQ rules engine', () => {
       ['waterproof case price', 'Waterproof Diving Case', 'Rs. 4,300'],
       ['head strap price', 'Head Strap Mount', 'Rs. 1,800'],
       ['chest strap mount', 'Chest Strap Mount', 'Rs. 2,499'],
+      ['hero 13 bundle price', 'GoPro HERO13 Bundle', 'Rs. 105,000'],
       ['gopro hero 13 price', 'GoPro Hero 13', 'Rs. 92,000'],
     ];
     assert.equal(cases.length, PRODUCTS.length);
@@ -331,6 +332,17 @@ describe('FAQ rules engine', () => {
     const reply = getReply('do you deliver to colombo?');
     assert.ok(/delivery/i.test(reply));
     assert.ok(!reply.includes('Rs.'), 'must not invent delivery fees');
+  });
+
+  it('mentions the bundle offer in the Hero 13 reply and lists bundle contents', () => {
+    const camera = getReply('gopro hero 13 price');
+    assert.ok(camera.includes('Rs. 92,000'));
+    assert.ok(camera.includes('Rs. 105,000'), 'Hero 13 reply should mention the bundle offer');
+    const bundle = getReply('hero 13 bundle price');
+    assert.ok(bundle.includes('Rs. 105,000'));
+    assert.ok(bundle.includes('50-in-1 accessory kit'));
+    assert.ok(bundle.includes('10 ft selfie stick'));
+    assert.ok(bundle.includes('waterproof case'));
   });
 
   it('matches one-word spellings of product names', () => {

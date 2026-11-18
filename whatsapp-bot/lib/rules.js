@@ -37,8 +37,11 @@ const PRODUCTS = [
   { name: 'Waterproof Diving Case', price: 4300, keywords: ['waterproof', 'diving case', 'waterproof case'] },
   { name: 'Head Strap Mount', price: 1800, keywords: ['head strap', 'head mount'] },
   { name: 'Chest Strap Mount', price: 2499, keywords: ['chest strap', 'chest mount'] },
-  // Price from the site catalogue (pixelhouse.lk) — owner to confirm.
-  { name: 'GoPro Hero 13', price: 92000, keywords: ['hero 13', 'hero13', 'gopro 13'] },
+  // Bundle first: "hero 13 bundle" must match the bundle, not the camera.
+  { name: 'GoPro HERO13 Bundle', price: 105000, keywords: ['bundle kit', 'hero 13 bundle', 'hero13 bundle', 'bundle'],
+    blurb: 'Includes the HERO13 Black camera, battery, USB-C cable, 50-in-1 accessory kit, 10 ft selfie stick and waterproof case.' },
+  { name: 'GoPro Hero 13', price: 92000, keywords: ['hero 13', 'hero13', 'gopro 13'],
+    blurb: 'There is also a GoPro HERO13 Bundle for Rs. 105,000, including the 50-in-1 accessory kit, 10 ft selfie stick and waterproof case.' },
 ];
 
 const RENTAL_KEYWORDS = ['rent', 'rental', 'renting', 'hire'];
@@ -80,10 +83,10 @@ function formatPrice(price) {
 }
 
 function priceReply(product) {
-  return (
-    'The ' + product.name + ' is ' + formatPrice(product.price) +
-    '. Reply here if you would like to order, and a team member will help you.'
-  );
+  let reply =
+    'The ' + product.name + ' is ' + formatPrice(product.price) + '.';
+  if (product.blurb) reply += ' ' + product.blurb;
+  return reply + ' Reply here if you would like to order, and a team member will help you.';
 }
 
 function normalize(text) {

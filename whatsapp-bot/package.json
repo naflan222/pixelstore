@@ -1,0 +1,1 @@
+{"description":"WhatsApp Cloud API webhook receiver + auto-reply bot for PIXELHOUSE (scaffold, not deployed).","engines":{"node":">=18"},"main":"api/webhook.js","name":"pixelhouse-whatsapp-bot","private":true,"scripts":{"check":"for f in api/webhook.js lib/*.js test/*.js; do node --check \"$f\" || exit 1; done","test":"node --test"},"version":"0.1.0"}

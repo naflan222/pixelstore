@@ -274,6 +274,7 @@ describe('FAQ rules engine', () => {
       ['waterproof case price', 'Waterproof Diving Case', 'Rs. 4,300'],
       ['head strap price', 'Head Strap Mount', 'Rs. 1,800'],
       ['chest strap mount', 'Chest Strap Mount', 'Rs. 2,499'],
+      ['gopro hero 13 price', 'GoPro Hero 13', 'Rs. 92,000'],
     ];
     assert.equal(cases.length, PRODUCTS.length);
     for (const [query, name, price] of cases) {
@@ -330,6 +331,22 @@ describe('FAQ rules engine', () => {
     const reply = getReply('do you deliver to colombo?');
     assert.ok(/delivery/i.test(reply));
     assert.ok(!reply.includes('Rs.'), 'must not invent delivery fees');
+  });
+
+  it('matches one-word spellings of product names', () => {
+    const cases = [
+      ['Price of domeport', 'Dome Port', 'Rs. 14,000'],
+      ['hero13 price', 'GoPro Hero 13', 'Rs. 92,000'],
+      ['3mstick price', '3M Selfie Stick', 'Rs. 8,500'],
+      ['cheststrap price', 'Chest Strap Mount', 'Rs. 2,499'],
+      ['selfiestick price', null, 'Rs. 8,500'],
+    ];
+    for (const [query, name, price] of cases) {
+      const reply = getReply(query);
+      assert.ok(reply, 'reply for "' + query + '"');
+      if (name) assert.ok(reply.includes(name), 'reply for "' + query + '" should name ' + name);
+      assert.ok(reply.includes(price), 'reply for "' + query + '" should contain ' + price);
+    }
   });
 
   it('does not match "3m" inside other words', () => {

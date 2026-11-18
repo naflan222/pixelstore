@@ -23,7 +23,9 @@ const SHOP = {
 };
 
 // Prices in LKR, exactly as approved. Keywords are matched as whole words
-// or phrases (word-boundary regex) so "3m" never matches inside "13m".
+// or phrases (word-boundary regex) and also as squashed runs, so "domeport"
+// matches "dome port" and "3mstick" matches "3m stick" — while "3m" still
+// never matches inside "13m", because runs only join whole words.
 const PRODUCTS = [
   { name: '50-in-1 Accessories Kit', price: 8000, keywords: ['50-in-1', '50 in 1', '50in1', 'accessories kit'] },
   { name: 'Dome Port', price: 14000, keywords: ['dome port', 'dome'] },
@@ -35,6 +37,8 @@ const PRODUCTS = [
   { name: 'Waterproof Diving Case', price: 4300, keywords: ['waterproof', 'diving case', 'waterproof case'] },
   { name: 'Head Strap Mount', price: 1800, keywords: ['head strap', 'head mount'] },
   { name: 'Chest Strap Mount', price: 2499, keywords: ['chest strap', 'chest mount'] },
+  // Price from the site catalogue (pixelhouse.lk) — owner to confirm.
+  { name: 'GoPro Hero 13', price: 92000, keywords: ['hero 13', 'hero13', 'gopro 13'] },
 ];
 
 const RENTAL_KEYWORDS = ['rent', 'rental', 'renting', 'hire'];
@@ -42,6 +46,10 @@ const DELIVERY_KEYWORDS = ['deliver', 'delivery', 'shipping', 'courier', 'cod', 
 const LOCATION_KEYWORDS = ['where', 'location', 'address', 'tangalle', 'directions', 'opening hours', 'open', 'hours', 'what time'];
 const PRICE_KEYWORDS = ['price', 'prices', 'pricing', 'cost', 'how much', 'rate', 'rates'];
 const GREETING_KEYWORDS = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'ayubowan'];
+
+// Stock, order and complaint questions always go to a human, even when they
+// name a product ("do you have hero 13 in stock?" must not get a price).
+const HUMAN_FOLLOWUP_KEYWORDS = ['in stock', 'stock', 'available', 'availability', 'order', 'ordering', 'refund', 'broken', 'damaged', 'complaint', 'return', 'warranty'];
 
 const GREETING_REPLY =
   'Hi! Welcome to PIXELHOUSE — Capture Your World. We sell GoPro cameras, accessories and camera rental in Tangalle. How can I help you today?';
@@ -86,8 +94,32 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function squash(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+// True when the squashed phrase equals the squashed join of a contiguous run
+// of whole words in the message, so "domeport" matches "dome port" and
+// "3mstick" matches "3m stick". Runs only join whole words, so "3m" can
+// never match inside "13m".
+function containsSquashedRun(normalized, phrase) {
+  const target = squash(phrase);
+  if (!target) return false;
+  const words = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  for (let start = 0; start < words.length; start++) {
+    let run = '';
+    for (let end = start; end < words.length; end++) {
+      run += words[end];
+      if (run === target) return true;
+      if (run.length > target.length) break;
+    }
+  }
+  return false;
+}
+
 function containsPhrase(normalized, phrase) {
-  return new RegExp('\\b' + escapeRegExp(phrase) + '\\b').test(normalized);
+  if (new RegExp('\\b' + escapeRegExp(phrase) + '\\b').test(normalized)) return true;
+  return containsSquashedRun(normalized, phrase);
 }
 
 function hasAny(normalized, keywords) {
@@ -105,6 +137,10 @@ function matchIntent(text) {
   if (typeof text !== 'string') return { intent: null, product: null };
   const normalized = normalize(text);
   if (!normalized) return { intent: null, product: null };
+
+  // Stock, order and complaint questions go to a human first, even when
+  // they name a product.
+  if (hasAny(normalized, HUMAN_FOLLOWUP_KEYWORDS)) return { intent: null, product: null };
 
   // Most specific first: a named product beats a generic question, and a
   // question beats a bare greeting ("hi, price of chest strap?" -> price).

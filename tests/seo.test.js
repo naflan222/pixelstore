@@ -66,7 +66,7 @@ test('homepage receives SEO metadata without removing storefront content', () =>
   assert.match(result, /GoPro, DJI &amp; Insta360 Accessories/);
   assert.match(result, /Rs\. 13,000/);
   assert.equal(stylesheetHref(result).split('?')[0], stylesheetHref(source).split('?')[0], 'SEO must preserve the page stylesheet');
-  assert.equal(stylesheetHref(result), 'style.css?v=20261115.6');
+  assert.equal(stylesheetHref(result), 'style.css?v=20261123.1');
   assert.match(result, /loading="lazy"/);
   assert.match(result, /decoding="async"/);
 });

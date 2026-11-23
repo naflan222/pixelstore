@@ -440,7 +440,7 @@ function enhanceHtml(html, filename, catalogProduct = null, canonicalOverride = 
     `    <script data-ga4-managed="true">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${GA4_MEASUREMENT_ID}');</script>`,
   ].join('\n');
 
-  output = output.replace(/style\.css\?v=[^"']+/g, 'style.css?v=20261115.6');
+  output = output.replace(/style\.css\?v=[^"']+/g, 'style.css?v=20261123.1');
   output = output.replace(/js\/api-client\.js\?v=[^"']+/g, 'js/api-client.js?v=20261115.5');
   if (!output.includes('/css/promotions.css?')) output = output.replace(/<\/head>/i, '    <link rel="stylesheet" href="/css/promotions.css?v=20261115.1">\n</head>');
   output = output.replace(/<\/head>/i, `${seoTags}\n  </head>`);

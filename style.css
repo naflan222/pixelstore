@@ -6411,17 +6411,33 @@ footer.site-footer.site-footer-home { padding-bottom: 2rem; }
 }
 .product-card .product-cart-button:not(:disabled):hover { background-color: #006f38; border-color: #006f38; }
 
-/* Homepage cards share each row's height, including cards with customer ratings. */
+/* Product cards share each row's height, including cards with discounts or ratings. */
+#allProductsGrid > [class*="col-"],
 [data-home-products="top_products"] > [class*="col-"] { display: flex; }
+#allProductsGrid .product-card,
 [data-home-products="top_products"] .product-card { width: 100%; height: 100%; }
+#allProductsGrid .product-card .card-body,
 [data-home-products="top_products"] .product-card .card-body {
   display: flex;
   flex-direction: column;
   width: 100%;
 }
+#allProductsGrid .product-cart-button,
 [data-home-products="top_products"] .product-cart-button { margin-top: auto; }
+#allProductsGrid .sale-price,
 [data-home-products="top_products"] .sale-price,
+#allProductsGrid .product-rating:not([hidden]),
 [data-home-products="top_products"] .product-rating:not([hidden]) { margin-bottom: .75rem; }
+
+#allProductsGrid .sale-price span {
+  display: block;
+  margin: .25rem 0 0;
+}
+@media (max-width: 575.98px) {
+  #allProductsGrid .sale-price {
+    font-size: clamp(.875rem, 4.25vw, 1.25rem);
+  }
+}
 
 /* Catalog pagination matches All Products/Camping, including readable dark-mode links. */
 [data-catalog-category] .pagination .page-link {

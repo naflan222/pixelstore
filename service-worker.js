@@ -1,6 +1,6 @@
 'use strict';
 
-const STATIC_CACHE = 'pixelhouse-static-v32';
+const STATIC_CACHE = 'pixelhouse-static-v33';
 const APP_SHELL = [
   '/',
   '/products',
@@ -8,7 +8,7 @@ const APP_SHELL = [
   '/gopro-accessories',
   '/osmo-accessories',
   '/offline',
-  '/style.css?v=20261115.6',
+  '/style.css?v=20261123.1',
   '/js/product-images.js?v=20261115.5',
   '/js/api-client.js?v=20261115.5',
   '/js/monthly-cycle.js?v=20261109.2',

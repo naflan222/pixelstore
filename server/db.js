@@ -232,6 +232,13 @@ CREATE TABLE IF NOT EXISTS store_settings (
   updated_at               TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS daraz_authorization (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  encrypted_tokens TEXT,
+  state_digest TEXT,
+  state_expires_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS order_items (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

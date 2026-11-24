@@ -254,6 +254,7 @@ tr:last-child td{border-bottom:none}
       <a data-tab="notifications" onclick="showTab('notifications')"><i class="ti ti-bell"></i> Notifications <span class="badge badge-danger" id="notificationUnread" style="margin-left:auto;display:none"></span></a>
       <a data-tab="audit" data-roles="owner,admin" onclick="showTab('audit')"><i class="ti ti-history"></i> Activity Log</a>
       <a data-tab="admin-users" data-roles="owner" onclick="showTab('admin-users')"><i class="ti ti-user-cog"></i> Admin Users</a>
+      <a data-tab="daraz" data-roles="owner,admin" onclick="showTab('daraz')"><i class="ti ti-building-store"></i> Daraz Integration</a>
       <a data-tab="settings" data-roles="owner,admin" onclick="showTab('settings')"><i class="ti ti-settings"></i> Settings</a>
     </nav>
     <div class="logout"><a onclick="doLogout()"><i class="ti ti-logout"></i> Sign Out</a></div>
@@ -499,6 +500,27 @@ tr:last-child td{border-bottom:none}
       </div>
 
       <!-- SETTINGS -->
+      <div class="tab" id="tab-daraz">
+        <div class="card" style="padding:16px">
+          <h3>Daraz Sri Lanka</h3>
+          <p id="darazStatus" aria-live="polite">Checking connection…</p>
+          <div class="section-toolbar">
+            <button type="button" class="btn btn-primary" onclick="darazAction('connect')">Connect Daraz Account</button>
+            <button type="button" class="btn btn-secondary" onclick="darazAction('test')">Test Connection</button>
+            <button type="button" class="btn btn-secondary" onclick="darazAction('disconnect')">Disconnect Account</button>
+          </div>
+        </div>
+        <div class="card" style="padding:16px">
+          <h3>Catalog dry run</h3>
+          <p>Checks existing PixelHouse data. Daraz categories, attributes, warranty, package details, and image eligibility still need marketplace validation.</p>
+          <button type="button" class="btn btn-secondary" onclick="darazAction('preview')">Preview Catalog</button>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Product</th><th>SKU</th><th>PixelHouse category</th><th>Stock</th><th>Regular</th><th>Offer</th><th>Images</th><th>Catalog checks</th></tr></thead>
+            <tbody id="darazPreview"></tbody>
+          </table></div>
+        </div>
+      </div>
+
       <div class="tab" id="tab-settings">
         <form id="settingsForm">
           <div id="settingsState" class="settings-notice" role="status">Loading settings…</div>
@@ -671,7 +693,9 @@ function showApp() {
     link.style.display = link.dataset.roles.split(',').includes(adminUser.role) ? '' : 'none';
   });
   refreshNotificationCount();
-  showTab('dashboard');
+  const openDaraz = location.hash === '#daraz' && ['owner', 'admin'].includes(adminUser.role);
+  showTab(openDaraz ? 'daraz' : 'dashboard');
+  if (openDaraz) history.replaceState(null, '', location.pathname);
 }
 
 $('#loginForm').addEventListener('submit', async (e) => {
@@ -715,7 +739,7 @@ function showTab(tab) {
   $('#tab-' + tab).classList.add('active');
   $$('.sidebar nav a').forEach(a => a.classList.remove('active'));
   $$(`.sidebar nav a[data-tab="${tab}"]`).forEach(a => a.classList.add('active'));
-  const titles = { dashboard: 'Dashboard', orders: 'Orders', invoices: 'Invoice Generator', products: 'Products', categories: 'Categories', inventory: 'Inventory', users: 'Users', customers: 'Customers', analytics: 'Sales Analytics', marketing: 'Marketing', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', notifications: 'Notifications', audit: 'Activity Log', 'admin-users': 'Admin Users', settings: 'Settings' };
+  const titles = { dashboard: 'Dashboard', orders: 'Orders', invoices: 'Invoice Generator', products: 'Products', categories: 'Categories', inventory: 'Inventory', users: 'Users', customers: 'Customers', analytics: 'Sales Analytics', marketing: 'Marketing', messages: 'Messages', vendors: 'Vendors', reviews: 'Reviews', notifications: 'Notifications', audit: 'Activity Log', 'admin-users': 'Admin Users', settings: 'Settings', daraz: 'Daraz Integration' };
   $('#pageTitle').textContent = titles[tab] || tab;
   $('#breadcrumb').textContent = 'Admin / ' + (titles[tab] || tab);
   // Load data
@@ -736,6 +760,7 @@ function showTab(tab) {
   if (tab === 'audit') loadAuditLogs();
   if (tab === 'admin-users') loadAdminUsers();
   if (tab === 'settings') loadSettings();
+  if (tab === 'daraz') loadDaraz();
   // Close sidebar on mobile
   $('#sidebar').classList.remove('open');
   $('#overlay').classList.remove('show');
@@ -744,6 +769,42 @@ function showTab(tab) {
 function toggleSidebar() {
   $('#sidebar').classList.toggle('open');
   $('#overlay').classList.toggle('show');
+}
+
+async function loadDaraz() {
+  try {
+    const { status, expiresAt } = await api('/admin/daraz/status');
+    $('#darazStatus').textContent = 'Connection: ' + status +
+      (expiresAt ? ' · Access token expiry: ' + new Date(expiresAt).toLocaleString() : '');
+  } catch (err) {
+    $('#darazStatus').textContent = err.message;
+  }
+}
+
+async function darazAction(action) {
+  try {
+    if (action === 'connect') {
+      const { url } = await apiPost('/admin/daraz/connect');
+      location.assign(url);
+    } else if (action === 'disconnect') {
+      if (!confirm('Remove this Daraz connection from PixelHouse?')) return;
+      await apiDel('/admin/daraz/connection');
+      await loadDaraz();
+    } else if (action === 'test') {
+      await apiPost('/admin/daraz/test');
+      await loadDaraz();
+      toast('Daraz catalog access verified');
+    } else if (action === 'preview') {
+      const { products } = await api('/admin/daraz/preview');
+      $('#darazPreview').innerHTML = products.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.sku)}</td>
+        <td>${esc(p.category)}</td><td>${p.stock ?? '—'}</td><td>${money(p.regularPrice)}</td>
+        <td>${p.promotionalPrice == null ? '—' : money(p.promotionalPrice)}</td>
+        <td>${p.imageCount}</td><td>${esc(p.issues.join(', ') || 'Base fields present')}</td></tr>`).join('') ||
+        '<tr><td colspan="8" class="empty">No active products</td></tr>';
+    }
+  } catch (err) {
+    toast(err.message, 'error');
+  }
 }
 
 /* ---------- DASHBOARD ---------- */

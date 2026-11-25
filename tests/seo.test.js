@@ -218,7 +218,7 @@ test('all-products HTML contains crawlable catalog cards before client JavaScrip
   });
 
   const app = express();
-  app.get('/products.html', createHtmlHandler({
+  app.get(['/products.html', '/products'], createHtmlHandler({
     rootDir: root,
     catalogList: async () => catalog,
   }));
@@ -244,6 +244,13 @@ test('all-products HTML contains crawlable catalog cards before client JavaScrip
     assert.match(nextPage, /GoPro Mount 13/);
     assert.match(nextPage, /Camping &lt;Lantern&gt;/);
     assert.doesNotMatch(nextPage, /src="javascript:/);
+
+    const valid = await (await fetch(base + '/products?page=2')).text();
+    const excessive = await (await fetch(base + '/products?page=999999')).text();
+    assert.ok(valid.includes('rel="canonical" href="https://pixelhouse.lk/products?page=2"'));
+    assert.ok(excessive.includes('rel="canonical" href="https://pixelhouse.lk/products?page=2"'));
+    assert.ok(!excessive.includes('rel="canonical" href="https://pixelhouse.lk/products?page=999999"'));
+    assert.match(excessive, /GoPro Mount 13/);
 
     const filtered = await (await fetch(base + '/products.html?category=Camping%20Accessories')).text();
     assert.match(filtered, /Camping &lt;Lantern&gt;/);

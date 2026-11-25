@@ -500,7 +500,7 @@ function catalogPageHref(page, category, search) {
 }
 
 function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
-  if (!Array.isArray(catalogProducts)) return html;
+  if (!Array.isArray(catalogProducts)) return { html, page: null };
   const products = catalogProducts.filter((product) =>
     product && typeof product.slug === 'string' && product.slug && product.name);
   const category = typeof query.category === 'string' ? query.category : '';
@@ -582,7 +582,7 @@ function renderCatalogSnapshot(html, catalogProducts, query, rootDir) {
       .replace('<h6 class="mb-0">All Products</h6>', '<h6 class="mb-0">Camping Accessories</h6>')
       .replace('id="allProductsCategoryHeading">Product Categories</h6>', 'id="allProductsCategoryHeading">Products</h6>');
   }
-  return result;
+  return { html: result, page };
 }
 
 function routeHtml(html, filename, product, products, current) {
@@ -646,10 +646,16 @@ function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = n
       if (productLookup && isProductPage && shouldResolveProduct && !catalogProduct) {
         return res.status(404).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product unavailable | PixelHouse</title><h1>Product unavailable</h1><a href="/products">Browse products</a></html>');
       }
+      const snapshot = filename === 'products.html' && catalogList
+        ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir) : null;
+      // The catalog clamps out-of-range requests to the last available page.
+      // Canonicalize to that actual page, not an arbitrary requested page.
+      const canonicalPage = snapshot && snapshot.page != null ? snapshot.page : Number(req.query.page);
+      const paginatedRoute = ['/products','/gopro-accessories','/osmo-accessories','/insta360-accessories'].includes(req.path);
       const routeCanonical = ROUTE_FILES[req.path]
-        ? SITE_URL + req.path + (['/products','/gopro-accessories','/osmo-accessories','/insta360-accessories'].includes(req.path) && Number.isSafeInteger(Number(req.query.page)) && Number(req.query.page) > 1 ? '?page=' + Number(req.query.page) : '') : null;
+        ? SITE_URL + req.path + (paginatedRoute && Number.isSafeInteger(canonicalPage) && canonicalPage > 1 ? '?page=' + canonicalPage : '') : null;
       const canonicalOverride = productPath(catalogProduct) ? SITE_URL + productPath(catalogProduct) : routeCanonical || (dynamicSlug && catalogProduct ? SITE_URL + '/single-product.html?product=' + encodeURIComponent(dynamicSlug) : null);
-      let pageHtml = filename === 'products.html' && catalogList ? renderCatalogSnapshot(html, await catalogList(), req.query || {}, rootDir) : html;
+      let pageHtml = snapshot ? snapshot.html : html;
       if (filename === 'promotions.html' && promotionList) pageHtml = require('./promotion-view').renderPromotionList(pageHtml, await promotionList());
       const enriched = enhanceHtml(pageHtml, filename, catalogProduct, canonicalOverride);
       // Customer pages are never cached; public catalog HTML must revalidate.

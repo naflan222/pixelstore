@@ -17,6 +17,7 @@ router.use(requireAdmin);
 router.use(express.text({ type: ['text/csv', 'application/csv', 'application/vnd.ms-excel'], limit: '5mb' }));
 
 const owners = requirePermission('owner', 'admin');
+router.use('/daraz', require('./daraz-routes'));
 const orderAccess = requirePermission('owner', 'admin', 'order_manager');
 const invoiceResendLimiter = rateLimit({ windowMs: 60 * 1000, max: 5 });
 const catalogAccess = requirePermission('owner', 'admin', 'catalog_manager');

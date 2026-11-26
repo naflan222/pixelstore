@@ -126,10 +126,24 @@ const INDEXABLE_PAGES = [
   'home.html', 'products.html',
   'catagory.html', 'gpproducts2.html', 'actioncamera.html', 'insta360-camera.html',
   'dji-osmo-camera.html', '360accesories.html', 'osmocat.html',
-  'rental-services.html', 'camera-trade.html', 'about-us.html', 'contact.html',
+  // camera-trade.html is intentionally NOT indexable: the page is still "Under
+  // Maintenance", so Google reports it as a soft 404 while it stays in the
+  // sitemap. It stays live for visitors (noindex,nofollow) — re-add it here
+  // when the real trade-in page is built.
+  'rental-services.html', 'about-us.html', 'contact.html',
   'support.html', 'privacy-policy.html', 'terms.html', 'return-policy.html',
   ...PRODUCT_PAGES,
 ];
+
+// Last real page of each static category template, from the templates'
+// own pagination (catagory/gpproducts2 = 2 pages; 360accesories/osmocat = 1).
+// /products is different: its snapshot renders the clamped page, so it keeps
+// the canonical-clamp behaviour from PR #106 instead of redirecting.
+const CATEGORY_MAX_PAGE = {
+  '/gopro-accessories': 2,
+  '/insta360-accessories': 1,
+  '/osmo-accessories': 1,
+};
 
 const INDEXABLE_SET = new Set(INDEXABLE_PAGES);
 
@@ -606,11 +620,29 @@ function routeHtml(html, filename, product, products, current) {
 function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = null, productRoutes = null, catalogList = null, promotionList = null }) {
   return async function serveSeoHtml(req, res, next) {
     try {
+      // Category pages are static templates, so unlike /products they cannot
+      // render an out-of-range page: ?page=99 serves the page-1 template
+      // while self-canonicalizing as ?page=99. Send crawlers and visitors
+      // to the last real page instead, in one 301 hop.
+      const maxCategoryPage = CATEGORY_MAX_PAGE[req.path];
+      const requestedPage = Number(req.query.page);
+      if (maxCategoryPage && Number.isSafeInteger(requestedPage) && requestedPage > maxCategoryPage) {
+        const params = new URL(req.originalUrl || req.url, SITE_URL).searchParams;
+        if (maxCategoryPage > 1) params.set('page', String(maxCategoryPage));
+        else params.delete('page');
+        const suffix = params.size ? '?' + params : '';
+        return res.redirect(301, req.path + suffix);
+      }
       // Old cached cart/search code can link imported products as /slug.html
       // even when no static template exists. Resolve those aliases as well.
       const legacySlug = req.path.match(/^\/([a-z0-9]+(?:-[a-z0-9]+)*)\.html$/)?.[1];
       if (legacySlug && legacySlug !== 'single-product' && !FILE_PATHS[legacySlug + '.html'] && productUrlLookup && productLookup) {
-        const legacyProduct = await productLookup(legacySlug);
+        // The database slug is short (domeport) but the public URL slug is
+        // long (dome-port): a /<url_slug>.html alias must resolve too, or
+        // 43 of 58 products 404 on that form. Try the slug first, then the
+        // public URL slug.
+        let legacyProduct = await productLookup(legacySlug);
+        if (!legacyProduct) legacyProduct = await productUrlLookup(legacySlug);
         if (productPath(legacyProduct)) {
           const query = new URL(req.originalUrl || req.url, SITE_URL).search;
           return res.redirect(301, productPath(legacyProduct) + query);
@@ -632,6 +664,12 @@ function createHtmlHandler({ rootDir, productLookup = null, productUrlLookup = n
       const shouldResolveProduct = filename !== 'single-product.html' || Boolean(dynamicSlug) || Boolean(readableSlug);
       if (!catalogProduct && productLookup && isProductPage && shouldResolveProduct) {
         catalogProduct = await productLookup(dynamicSlug || path.basename(filename, '.html'));
+      }
+      // ?product= may also carry the public URL slug (dome-port) instead of
+      // the database slug (domeport). Resolve that the same way, or the
+      // product 404s even though /product/dome-port exists.
+      if (!catalogProduct && dynamicSlug && productUrlLookup && isProductPage && shouldResolveProduct) {
+        catalogProduct = await productUrlLookup(dynamicSlug);
       }
       // The generic legacy product page is itself a real catalog item.
       if (!catalogProduct && filename === 'single-product.html' && !dynamicSlug && productLookup) catalogProduct = await productLookup('single-product');

@@ -463,3 +463,102 @@ test('Express serves enriched pages and a valid sitemap without redirects', asyn
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+test('public URL-slug aliases redirect in one hop instead of 404ing', async () => {
+  const bySlug = { domeport: { slug: 'domeport', url_slug: 'dome-port', name: 'Dome Port', price: 14000, stock: 1, status: 'active' } };
+  const byUrlSlug = { 'dome-port': bySlug.domeport };
+  const app = express();
+  app.get(/^\/[A-Za-z0-9][A-Za-z0-9._-]*\.html$/, createHtmlHandler({
+    rootDir: root,
+    productLookup: async (slug) => bySlug[slug] || null,
+    productUrlLookup: async (slug) => byUrlSlug[slug] || null,
+  }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    for (const old of ['/dome-port.html', '/single-product.html?product=dome-port']) {
+      const moved = await fetch(base + old, { redirect: 'manual' });
+      assert.equal(moved.status, 301, old);
+      assert.equal(moved.headers.get('location'), '/product/dome-port', old);
+    }
+    // The database-slug form still works, and an unknown alias still 404s.
+    const short = await fetch(base + '/domeport.html', { redirect: 'manual' });
+    assert.equal(short.status, 301);
+    assert.equal(short.headers.get('location'), '/product/dome-port');
+    const missing = await fetch(base + '/not-a-product.html', { redirect: 'manual' });
+    assert.equal(missing.status, 404);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('out-of-range category pagination redirects to the last real page', async () => {
+  const app = express();
+  app.get(['/gopro-accessories', '/insta360-accessories', '/osmo-accessories'], createHtmlHandler({ rootDir: root }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const cases = [
+      ['/gopro-accessories?page=99', '/gopro-accessories?page=2'],
+      ['/gopro-accessories?page=3&camera_brand=GoPro', '/gopro-accessories?page=2&camera_brand=GoPro'],
+      ['/insta360-accessories?page=2', '/insta360-accessories'],
+      ['/osmo-accessories?page=99', '/osmo-accessories'],
+    ];
+    for (const [old, target] of cases) {
+      const moved = await fetch(base + old, { redirect: 'manual' });
+      assert.equal(moved.status, 301, old);
+      assert.equal(moved.headers.get('location'), target, old);
+    }
+    // Real pages are untouched: page 2 of GoPro and page 1 of the others.
+    assert.equal((await fetch(base + '/gopro-accessories?page=2')).status, 200);
+    assert.equal((await fetch(base + '/insta360-accessories')).status, 200);
+    assert.equal((await fetch(base + '/osmo-accessories')).status, 200);
+    assert.equal((await fetch(base + '/gopro-accessories?page=1')).status, 200);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('camera-trade maintenance page is noindex and out of the sitemap', async () => {
+  const app = express();
+  app.get('/camera-trade', createHtmlHandler({ rootDir: root }));
+  app.get('/sitemap.xml', createSitemapHandler({ rootDir: root, productList: async () => [] }));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const page = await fetch(base + '/camera-trade');
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /<meta name="robots" content="noindex,nofollow">/);
+    assert.match(html, /Under Maintenance/);
+    const sitemap = await (await fetch(base + '/sitemap.xml')).text();
+    assert.doesNotMatch(sitemap, /camera-trade/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('product URLs with a .html suffix redirect to the clean product URL', async () => {
+  const { cleanStorefrontRedirect } = require('../server/storefront-urls');
+  const app = express();
+  app.use(cleanStorefrontRedirect);
+  app.use((req, res) => res.status(200).send('ok'));
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, () => resolve(listener));
+  });
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const moved = await fetch(base + '/product/dome-port.html', { redirect: 'manual' });
+    assert.equal(moved.status, 301);
+    assert.equal(moved.headers.get('location'), '/product/dome-port');
+    assert.equal((await fetch(base + '/product/dome-port')).status, 200);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
